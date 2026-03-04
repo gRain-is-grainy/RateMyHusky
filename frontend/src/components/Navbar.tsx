@@ -4,7 +4,7 @@
  * It includes the logo, name of the application, a link to a list of all professors, and a sign-in button.
  */
 
-import React from 'react';
+
 import './Navbar.css';
 
 const Navbar = () => {

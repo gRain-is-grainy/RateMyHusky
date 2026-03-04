@@ -5,7 +5,8 @@
  * The search type can be selected from a dropdown menu, and the placeholder text updates accordingly.
  */
 
-import React, { useState } from 'react';
+
+import { useState } from 'react';
 import './SearchBar.css';
 
 const SearchBar = () => {

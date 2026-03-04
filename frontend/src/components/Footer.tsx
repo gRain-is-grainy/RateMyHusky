@@ -4,7 +4,7 @@
  * It includes links to resources, affiliations, and legal information.
  */
 
-import React from 'react';
+
 import './Footer.css';
 
 const Footer = () => {
