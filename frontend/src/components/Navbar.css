@@ -1,0 +1,83 @@
+/**
+ * Navbar.css
+ * This file contains the styles for the Navbar component.
+ * It defines the layout, colors, fonts, and responsive behavior of the navigation bar.
+ */
+
+@import url('https://fonts.googleapis.com/css2?family=Lato:wght@400;700;900&display=swap');
+
+.navbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 28px;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  font-family: 'Lato', sans-serif;
+}
+
+.navbar-logo {
+  font-size: 1.35rem;
+  font-weight: 900;
+  letter-spacing: -0.3px;
+  text-decoration: none;
+  color: #333;
+}
+
+.navbar-logo span {
+  color: #d6394c;
+}
+
+.navbar-right {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+}
+
+.nav-link {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #444;
+  text-decoration: none;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.nav-link:hover {
+  color: #d6394c;
+}
+
+.nav-link svg {
+  width: 16px;
+  height: 16px;
+}
+
+.signin-btn {
+  background: #d6394c;
+  color: #fff;
+  border: none;
+  border-radius: 18px;
+  padding: 7px 20px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  font-family: 'Lato', sans-serif;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.signin-btn:hover {
+  background: #b82e3f;
+}
+
+@media (max-width: 768px) {
+  .navbar { padding: 10px 16px; }
+  .navbar-logo { font-size: 1.15rem; }
+}
