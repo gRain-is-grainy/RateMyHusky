@@ -29,7 +29,7 @@
   height: 200%;
   background-size: 180px 180px;
   background-repeat: repeat;
-  opacity: 0.045;
+  opacity: 0.08;
   transform: rotate(-25deg);
   pointer-events: none;
   z-index: 0;
@@ -48,10 +48,10 @@
 }
 
 .hero-tagline {
-  font-size: 2.6rem;
+  font-size: 3.25rem;
   font-weight: 900;
   text-align: center;
-  margin-bottom: 12px;
+  margin-bottom: 14px;
   animation: fadeUp 0.6s ease both;
 }
 
@@ -60,10 +60,10 @@
 }
 
 .hero-subtitle {
-  font-size: 1.05rem;
+  font-size: 1.3rem;
   color: #777;
   text-align: center;
-  margin-bottom: 36px;
+  margin-bottom: 44px;
   animation: fadeUp 0.6s 0.15s ease both;
 }
 
@@ -77,18 +77,18 @@
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 10px;
-  margin-top: 28px;
+  gap: 12px;
+  margin-top: 34px;
   animation: fadeUp 0.6s 0.45s ease both;
 }
 
 .college-chip {
   background: #fff;
   border: 1.5px solid #ddd;
-  border-radius: 20px;
-  padding: 7px 18px;
+  border-radius: 24px;
+  padding: 9px 22px;
   font-family: 'Nunito', sans-serif;
-  font-size: 0.82rem;
+  font-size: 1rem;
   font-weight: 700;
   color: #555;
   cursor: pointer;
@@ -438,11 +438,16 @@
    ============================== */
 @media (max-width: 768px) {
   .hero-tagline {
-    font-size: 1.8rem;
+    font-size: 2rem;
   }
 
   .hero-subtitle {
-    font-size: 0.9rem;
+    font-size: 1rem;
+  }
+
+  .college-chip {
+    font-size: 0.85rem;
+    padding: 7px 14px;
   }
 
   .stats-banner {

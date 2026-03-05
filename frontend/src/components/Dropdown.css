@@ -129,12 +129,26 @@
    VARIANT: inside search bar
    ============================== */
 .dropdown.search-dropdown .dropdown-trigger {
-  padding: 14px 8px 14px 20px;
+  padding: 18px 10px 18px 25px;
+  font-size: 1.15rem;
+  gap: 7px;
+}
+
+.dropdown.search-dropdown .dropdown-chevron {
+  width: 18px;
+  height: 18px;
 }
 
 .dropdown.search-dropdown .dropdown-menu {
-  left: 4px;
-  min-width: 160px;
+  left: 6px;
+  min-width: 200px;
+  border-radius: 14px;
+  padding: 7px 0;
+}
+
+.dropdown.search-dropdown .dropdown-item {
+  padding: 11px 18px;
+  font-size: 1rem;
 }
 
 /* ==============================
