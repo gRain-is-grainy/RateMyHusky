@@ -29,7 +29,7 @@
   height: 200%;
   background-size: 180px 180px;
   background-repeat: repeat;
-  opacity: 0.08;
+  opacity: .08;
   transform: rotate(-25deg);
   pointer-events: none;
   z-index: 0;
