@@ -236,3 +236,33 @@
 .dark .dropdown.feedback-dropdown .dropdown-trigger.placeholder {
   color: #666;
 }
+
+/* ==============================
+   MOBILE
+   ============================== */
+@media (max-width: 768px) {
+  .dropdown.search-dropdown .dropdown-trigger {
+    padding: 14px 8px 14px 16px;
+    font-size: 0.92rem;
+    gap: 5px;
+  }
+
+  .dropdown.search-dropdown .dropdown-chevron {
+    width: 14px;
+    height: 14px;
+  }
+
+  .dropdown.search-dropdown .dropdown-menu {
+    min-width: 150px;
+  }
+
+  .dropdown.search-dropdown .dropdown-item {
+    padding: 10px 14px;
+    font-size: 0.88rem;
+  }
+
+  .dropdown.feedback-dropdown .dropdown-trigger {
+    padding: 10px 12px;
+    font-size: 0.85rem;
+  }
+}

@@ -102,10 +102,21 @@
 }
 
 @media (max-width: 768px) {
+  .footer { padding: 32px 24px 0; }
   .footer-top { flex-direction: column; gap: 28px; }
   .footer-columns { gap: 32px; }
-  .footer { padding: 32px 24px 0; }
-  .footer-bottom { flex-direction: column; text-align: center; }
+  .footer-bottom { flex-direction: column; text-align: center; gap: 16px; }
+  .footer-bottom-links { justify-content: center; }
+  .footer-brand-logo { width: 80px; }
+}
+
+@media (max-width: 480px) {
+  .footer { padding: 24px 16px 0; }
+  .footer-brand-name { font-size: 1.3rem; }
+  .footer-col a { font-size: 0.85rem; }
+  .footer-bottom { font-size: 0.75rem; padding: 14px 0; }
+  .footer-bottom-links { gap: 16px; }
+  .footer-bottom-links a { font-size: 0.75rem; }
 }
 
 /* ---------- dark theme ---------- */

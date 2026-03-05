@@ -102,3 +102,35 @@
 .dark .search-input::placeholder {
   color: #666;
 }
+
+/* ==============================
+   MOBILE
+   ============================== */
+@media (max-width: 768px) {
+  .search-wrapper {
+    max-width: 100%;
+    padding: 0 8px;
+  }
+
+  .search-bar {
+    border-radius: 24px;
+  }
+
+  .search-input {
+    font-size: 0.95rem;
+    padding: 14px 16px 14px 4px;
+  }
+
+  .search-icon svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .search-icon {
+    padding: 0 8px 0 10px;
+  }
+
+  .search-divider {
+    height: 24px;
+  }
+}

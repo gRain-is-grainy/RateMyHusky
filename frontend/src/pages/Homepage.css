@@ -433,15 +433,21 @@
 }
 
 /* ==============================
-   RESPONSIVE
+   RESPONSIVE — TABLET
    ============================== */
 @media (max-width: 768px) {
+  .homepage-hero {
+    padding: 100px 16px 50px;
+  }
+
   .hero-tagline {
     font-size: 2rem;
+    padding: 0 8px;
   }
 
   .hero-subtitle {
     font-size: 1rem;
+    padding: 0 8px;
   }
 
   .stats-banner {
@@ -455,16 +461,25 @@
   }
 
   .section {
-    padding: 40px 20px;
+    padding: 40px 16px;
+  }
+
+  .section-title {
+    font-size: 1.25rem;
   }
 
   .reviews-grid {
     grid-template-columns: 1fr;
   }
 
+  .review-card {
+    padding: 18px;
+  }
+
   .goat-header-row,
   .goat-row {
     grid-template-columns: 40px 2fr 1.2fr 0.6fr;
+    padding: 12px 16px;
   }
 
   .goat-col-dept {
@@ -473,16 +488,124 @@
 
   .goat-college-tabs {
     gap: 6px;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    padding-bottom: 6px;
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .goat-college-tabs::-webkit-scrollbar {
+    display: none;
   }
 
   .goat-tab {
     padding: 6px 14px;
     font-size: 0.78rem;
+    white-space: nowrap;
+    flex-shrink: 0;
   }
 
   .goat-avatar {
     width: 32px;
     height: 32px;
     font-size: 0.85rem;
+  }
+
+  .goat-name-text {
+    font-size: 0.82rem;
+  }
+
+  .goat-score {
+    font-size: 0.82rem;
+  }
+}
+
+/* ==============================
+   RESPONSIVE — SMALL PHONE
+   ============================== */
+@media (max-width: 480px) {
+  .homepage-hero {
+    padding: 80px 12px 40px;
+  }
+
+  .hero-tagline {
+    font-size: 1.6rem;
+  }
+
+  .hero-subtitle {
+    font-size: 0.88rem;
+    margin-bottom: 28px;
+  }
+
+  .stats-banner {
+    gap: 18px 28px;
+    padding: 28px 16px;
+  }
+
+  .stat-value {
+    font-size: 1.2rem;
+  }
+
+  .stat-label {
+    font-size: 0.72rem;
+  }
+
+  .section {
+    padding: 32px 12px;
+  }
+
+  .section-title {
+    font-size: 1.1rem;
+  }
+
+  .goat-header-row,
+  .goat-row {
+    grid-template-columns: 32px 1fr 0.6fr;
+    padding: 10px 12px;
+    gap: 8px;
+  }
+
+  .goat-col-reviews {
+    display: none;
+  }
+
+  .goat-avatar {
+    width: 28px;
+    height: 28px;
+    font-size: 0.75rem;
+  }
+
+  .goat-name-text {
+    font-size: 0.78rem;
+  }
+
+  .goat-col-rank {
+    font-size: 0.9rem;
+  }
+
+  .goat-top3 .goat-col-rank {
+    font-size: 1.1rem;
+  }
+
+  .review-top {
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .review-card {
+    padding: 14px;
+  }
+
+  .review-text {
+    font-size: 0.82rem;
+  }
+
+  .stars {
+    gap: 0;
+  }
+
+  .star {
+    font-size: 0.78rem;
   }
 }
