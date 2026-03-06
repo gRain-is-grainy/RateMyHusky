@@ -159,7 +159,7 @@
 .goat-leaderboard {
   background: #fff;
   border-radius: 16px;
-  overflow: hidden;
+  overflow: visible;
   box-shadow: 0 2px 12px rgba(0,0,0,0.06);
 }
 
@@ -169,6 +169,7 @@
   align-items: center;
   padding: 14px 24px;
   background: #f0f0f0;
+  border-radius: 16px 16px 0 0;
   font-size: 0.72rem;
   font-weight: 700;
   text-transform: uppercase;
@@ -276,6 +277,90 @@
 }
 
 /* ==============================
+   RATING TOOLTIP
+   ============================== */
+.goat-rating-wrapper {
+  position: relative;
+  cursor: pointer;
+  user-select: none;
+}
+
+.goat-rating-hint {
+  font-size: 0.7rem;
+  opacity: 0.35;
+  margin-left: 4px;
+  transition: opacity 0.15s;
+}
+
+.goat-rating-wrapper:hover .goat-rating-hint {
+  opacity: 0.8;
+}
+
+.goat-rating-tooltip {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 10px;
+  padding: 12px 16px;
+  min-width: 160px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  animation: tooltipFadeIn 0.15s ease-out;
+  pointer-events: auto;
+}
+
+.goat-rating-tooltip::before {
+  content: '';
+  position: absolute;
+  top: -6px;
+  left: 50%;
+  transform: translateX(-50%) rotate(45deg);
+  width: 10px;
+  height: 10px;
+  background: #fff;
+  border-left: 1px solid #e0e0e0;
+  border-top: 1px solid #e0e0e0;
+}
+
+@keyframes tooltipFadeIn {
+  from { opacity: 0; transform: translateX(-50%) translateY(4px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+.tooltip-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 3px 0;
+  font-size: 0.85rem;
+}
+
+.tooltip-label {
+  color: #888;
+  font-weight: 500;
+}
+
+.tooltip-value {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: #333;
+}
+
+.tooltip-blended {
+  color: #d6394c;
+  font-weight: 800;
+}
+
+.tooltip-divider {
+  height: 1px;
+  background: #e8e8e8;
+  margin: 6px 0;
+}
+
+/* ==============================
    PROFESSOR RANDOMIZER
    ============================== */
 .randomizer-section {
@@ -326,6 +411,12 @@
 
 .randomizer-btn:active {
   transform: scale(0.97);
+}
+
+.randomizer-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
 }
 
 .randomizer-btn svg {
@@ -435,8 +526,33 @@
   color: #444;
 }
 
+/* ---- dark tooltip ---- */
+.dark .goat-rating-tooltip {
+  background: #2a2a2a;
+  border-color: #444;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.dark .goat-rating-tooltip::before {
+  background: #2a2a2a;
+  border-left-color: #444;
+  border-top-color: #444;
+}
+
+.dark .tooltip-label {
+  color: #999;
+}
+
+.dark .tooltip-value {
+  color: #e0e0e0;
+}
+
+.dark .tooltip-divider {
+  background: #444;
+}
+
 /* ==============================
-   RESPONSIVE — TABLET
+   RESPONSIVE — TABLET (≤ 768px)
    ============================== */
 @media (max-width: 768px) {
   .homepage-hero {
@@ -486,6 +602,7 @@
     font-size: 4rem;
   }
 
+  /* Hide department column on tablet */
   .goat-header-row,
   .goat-row {
     grid-template-columns: 40px 2fr 1.2fr 0.6fr;
@@ -529,10 +646,25 @@
   .goat-score {
     font-size: 0.82rem;
   }
+
+  /* Tooltip nudge — keep it on-screen */
+  .goat-rating-tooltip {
+    min-width: 140px;
+    padding: 10px 14px;
+    left: auto;
+    right: 0;
+    transform: none;
+  }
+
+  .goat-rating-tooltip::before {
+    left: auto;
+    right: 20px;
+    transform: rotate(45deg);
+  }
 }
 
 /* ==============================
-   RESPONSIVE — SMALL PHONE
+   RESPONSIVE — SMALL PHONE (≤ 480px)
    ============================== */
 @media (max-width: 480px) {
   .homepage-hero {
@@ -549,6 +681,8 @@
   }
 
   .stats-banner {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
     gap: 18px 28px;
     padding: 28px 16px;
   }
@@ -569,9 +703,10 @@
     font-size: 1.1rem;
   }
 
+  /* Hide reviews column — keep rank, name, rating */
   .goat-header-row,
   .goat-row {
-    grid-template-columns: 32px 1fr 0.6fr;
+    grid-template-columns: 32px 1fr 1fr;
     padding: 10px 12px;
     gap: 8px;
   }
@@ -617,5 +752,30 @@
 
   .star {
     font-size: 0.78rem;
+  }
+
+  /* Hide stars on small phones — just show score */
+  .goat-col-rating .stars {
+    display: none;
+  }
+
+  .goat-rating-hint {
+    display: none;
+  }
+
+  /* Tooltip: anchor to left edge on tiny screens */
+  .goat-rating-tooltip {
+    min-width: 130px;
+    padding: 10px 12px;
+    left: 0;
+    right: auto;
+    transform: none;
+    font-size: 0.8rem;
+  }
+
+  .goat-rating-tooltip::before {
+    left: 16px;
+    right: auto;
+    transform: rotate(45deg);
   }
 }
