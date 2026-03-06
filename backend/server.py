@@ -34,9 +34,6 @@ rmp_profs.dropna(subset=["rating", "num_ratings"], inplace=True)
 # Normalize display names — collapse double spaces like "Jelena  Golubovic"
 rmp_profs["name"] = rmp_profs["name"].astype(str).str.replace(r'\s+', ' ', regex=True).str.strip()
 
-# Precompute review name keys for professor page lookups
-rmp_reviews["_rev_name_key"] = rmp_reviews["professor_name"].astype(str).str.strip().str.lower().str.replace(r'\s+', ' ', regex=True)
-
 
 # ──────────────────────────────────────────────
 #  Friendly stat formatting:  round down then "+"
@@ -615,187 +612,65 @@ def search():
 
 
 # ──────────────────────────────────────────────
-#  Professor page — PRECOMPUTE everything at startup
-#  Convert DataFrames to raw Python first, then index
+#  Professor page
 # ──────────────────────────────────────────────
 
-import time as _time
-_t0 = _time.time()
-print("[prof-page] Precomputing professor page data...")
+# Slug index: frontend generates slugs like "john-smith" from names
+# This maps every slug back to the actual lowercase name key
+def _name_to_slug(name: str) -> str:
+    return re.sub(r'[^a-z0-9]+', '-', name.lower()).strip('-')
 
-# 1. RMP profile lookup: name_key → row index (fast — only 3.8K rows)
-_rmp_prof_index = dict(zip(rmp_profs["_name_key"], rmp_profs.index))
-print(f"[prof-page] 1/5 RMP profile index  ({_time.time()-_t0:.1f}s)")
+_slug_to_name = {}
+for _, row in rmp_profs.iterrows():
+    _slug_to_name[_name_to_slug(row["_name_key"])] = row["_name_key"]
+for nk in trace_courses["_full"].unique():
+    s = _name_to_slug(nk)
+    if s not in _slug_to_name:
+        _slug_to_name[s] = nk
+for nk in prof_search["_name_lower"].values:
+    s = _name_to_slug(nk)
+    if s not in _slug_to_name:
+        _slug_to_name[s] = nk
 
-# 2. RMP reviews: dump entire DF to Python list of dicts, then bucket
-_rev_raw = rmp_reviews[["_rev_name_key", "professor_name", "department",
-    "overall_rating", "course", "quality", "difficulty", "date",
-    "tags", "attendance", "grade", "textbook", "online_class", "comment"
-]].fillna("").values.tolist()
+print(f"[prof-page] Slug index: {len(_slug_to_name)} unique slugs")
 
-_rmp_reviews_by_name = {}
-for row in _rev_raw:
-    nk = row[0]
-    entry = {
-        "professorName": str(row[1]),  "department": str(row[2]),
-        "overallRating": float(row[3]) if row[3] != "" else 0,
-        "course": str(row[4]),
-        "quality": int(row[5]) if row[5] != "" else 0,
-        "difficulty": int(row[6]) if row[6] != "" else 0,
-        "date": str(row[7]),     "tags": str(row[8]),
-        "attendance": str(row[9]), "grade": str(row[10]),
-        "textbook": str(row[11]),  "online_class": str(row[12]),
-        "comment": str(row[13]),
-    }
-    if nk in _rmp_reviews_by_name:
-        _rmp_reviews_by_name[nk].append(entry)
-    else:
-        _rmp_reviews_by_name[nk] = [entry]
-
-print(f"[prof-page] 2/5 Reviews for {len(_rmp_reviews_by_name)} professors  ({_time.time()-_t0:.1f}s)")
-
-# 3. TRACE scores: dump to numpy, bucket by (cid, iid, tid)
-_ts_raw = trace_scores[["courseId", "instructorId", "termId",
-    "question", "mean", "median", "std_dev", "enrollment", "completed"
-]].fillna(0).values.tolist()
-
-_trace_scores_index = {}
-for row in _ts_raw:
-    key = (int(row[0]), int(row[1]), int(row[2]))
-    entry = {
-        "question": str(row[3]) if row[3] else "",
-        "mean": round(float(row[4]), 2),
-        "median": round(float(row[5]), 2),
-        "stdDev": round(float(row[6]), 2),
-        "enrollment": int(row[7]),
-        "completed": int(row[8]),
-    }
-    if key in _trace_scores_index:
-        _trace_scores_index[key].append(entry)
-    else:
-        _trace_scores_index[key] = [entry]
-
-print(f"[prof-page] 3/5 Scores for {len(_trace_scores_index)} sections  ({_time.time()-_t0:.1f}s)")
-
-# 4. TRACE courses: bucket by instructor, attach scores from step 3
-_tc_raw = trace_courses[["_full", "courseId", "instructorId", "termId",
-    "termTitle", "departmentName", "displayName", "section", "enrollment"
-]].fillna("").values.tolist()
-
-_trace_courses_by_name = {}
-for row in _tc_raw:
-    nk = row[0]
-    cid = int(row[1]) if row[1] != "" else 0
-    iid = int(row[2]) if row[2] != "" else 0
-    tid = int(row[3]) if row[3] != "" else 0
-    entry = {
-        "courseId": cid, "termId": tid,
-        "termTitle": str(row[4]), "departmentName": str(row[5]),
-        "displayName": str(row[6]), "section": str(row[7]),
-        "enrollment": int(row[8]) if row[8] != "" else 0,
-        "scores": _trace_scores_index.get((cid, iid, tid), []),
-    }
-    if nk in _trace_courses_by_name:
-        _trace_courses_by_name[nk].append(entry)
-    else:
-        _trace_courses_by_name[nk] = [entry]
-
-# Sort each professor's courses by term (most recent first)
-for nk in _trace_courses_by_name:
-    _trace_courses_by_name[nk].sort(key=lambda x: x["termId"], reverse=True)
-
-print(f"[prof-page] 4/5 Courses for {len(_trace_courses_by_name)} instructors  ({_time.time()-_t0:.1f}s)")
-
-# Build (courseId, instructorId, termId) → name_key mapping for comments
-_section_to_name = {}
-for row in _tc_raw:
-    nk = row[0]
-    cid = int(row[1]) if row[1] != "" else 0
-    iid = int(row[2]) if row[2] != "" else 0
-    tid = int(row[3]) if row[3] != "" else 0
-    _section_to_name[(cid, iid, tid)] = nk
-
-# 5. TRACE comments: dump to raw Python, use string split (not regex)
-_tcm_raw = trace_comments[["course_url", "question", "comment"]].values.tolist()
-
-_trace_comments_by_name = {}
-_comments_matched = 0
-for row in _tcm_raw:
-    url = row[0]
-    comment = row[2]
-    if not isinstance(comment, str) or not comment.strip():
-        continue
-    if not isinstance(url, str):
-        continue
-
-    # URL looks like: /trace/course/12345/67890/202310
-    # Split and take last 3 numeric segments
-    parts = url.rstrip("/").split("/")
-    if len(parts) < 3:
-        continue
-    try:
-        key = (int(parts[-3]), int(parts[-2]), int(parts[-1]))
-    except (ValueError, IndexError):
-        continue
-
-    nk = _section_to_name.get(key)
-    if nk is None:
-        continue
-
-    question = str(row[1]) if isinstance(row[1], str) else ""
-    entry = {"courseUrl": url, "question": question, "comment": comment}
-    if nk in _trace_comments_by_name:
-        _trace_comments_by_name[nk].append(entry)
-    else:
-        _trace_comments_by_name[nk] = [entry]
-    _comments_matched += 1
-
-print(f"[prof-page] 5/5 TRACE comments: {_comments_matched} matched for {len(_trace_comments_by_name)} instructors  ({_time.time()-_t0:.1f}s)")
-print(f"[prof-page] Precomputation complete! ({_time.time()-_t0:.1f}s total)")
+# Precompute review name keys
+rmp_reviews["_rev_name_key"] = rmp_reviews["professor_name"].astype(str).str.strip().str.lower().str.replace(r'\s+', ' ', regex=True)
 
 
-# ──────────────────────────────────────────────
-#  Professor page API routes (all O(1) lookups now)
-# ──────────────────────────────────────────────
-
-def _slug_to_name_key(slug: str) -> str:
-    """Convert URL slug back to a lowercase name key for lookup.
-    'john-smith' → 'john smith'
-    """
-    return slug.strip().lower().replace("-", " ")
+def _resolve_slug(slug):
+    nk = _slug_to_name.get(slug)
+    return nk if nk else slug.strip().lower().replace("-", " ")
 
 
 @app.route("/api/professors/<slug>")
 def professor_profile(slug):
-    name_key = _slug_to_name_key(slug)
-
+    name_key = _resolve_slug(slug)
     profile = None
 
-    # Try RMP first
-    rmp_idx = _rmp_prof_index.get(name_key)
-    if rmp_idx is not None:
-        row = rmp_profs.loc[rmp_idx]
+    # Try RMP
+    rmp_match = rmp_profs[rmp_profs["_name_key"] == name_key]
+    if not rmp_match.empty:
+        row = rmp_match.iloc[0]
         has_rmp = int(row["num_ratings"]) > 0 and row["rating"] > 0
         has_trace = pd.notna(row["trace_overall"]) and int(row["trace_reviews"]) > 0
 
         wta = None
         if "would_take_again_pct" in row.index:
-            raw = str(row["would_take_again_pct"]).strip().replace("%", "")
+            raw_val = str(row["would_take_again_pct"]).strip().replace("%", "")
             try:
-                wta = float(raw)
-                if wta < 0:
-                    wta = None
+                wta = float(raw_val)
+                if wta < 0: wta = None
             except (ValueError, TypeError):
-                wta = None
+                pass
 
         difficulty = None
         if "level_of_difficulty" in row.index:
             try:
                 difficulty = float(row["level_of_difficulty"])
-                if pd.isna(difficulty) or difficulty <= 0:
-                    difficulty = None
+                if pd.isna(difficulty) or difficulty <= 0: difficulty = None
             except (ValueError, TypeError):
-                difficulty = None
+                pass
 
         profile = {
             "name": row["name"],
@@ -808,15 +683,13 @@ def professor_profile(slug):
             "difficulty": round(difficulty, 2) if difficulty is not None else None,
             "totalRatings": int(row["total_reviews"]),
             "professorUrl": row.get("professor_url", None) or None,
-            "traceCourses": _trace_courses_by_name.get(name_key, []),
         }
 
     # Try TRACE-only
-    elif name_key in _trace_courses_by_name:
+    elif not trace_courses[trace_courses["_full"] == name_key].empty:
         trace_rating = trace_lookup.get(name_key)
         trace_rev = trace_reviews_lookup.get(name_key, 0)
         dept = trace_dept_lookup.get(name_key, "")
-
         profile = {
             "name": name_key.title(),
             "department": dept,
@@ -828,15 +701,92 @@ def professor_profile(slug):
             "difficulty": None,
             "totalRatings": int(trace_rev),
             "professorUrl": None,
-            "traceCourses": _trace_courses_by_name.get(name_key, []),
         }
 
     if profile is None:
         return jsonify({"error": "Professor not found"}), 404
 
-    # Bundle everything into one response
-    profile["reviews"] = _rmp_reviews_by_name.get(name_key, [])
-    profile["traceComments"] = _trace_comments_by_name.get(name_key, [])
+    # --- TRACE courses + scores ---
+    tc = trace_courses[trace_courses["_full"] == name_key]
+    trace_course_list = []
+    for _, c in tc.iterrows():
+        cid = int(c["courseId"])
+        iid = int(c["instructorId"])
+        tid = int(c["termId"]) if pd.notna(c["termId"]) else 0
+        section_scores = trace_scores[
+            (trace_scores["courseId"] == cid) &
+            (trace_scores["instructorId"] == iid) &
+            (trace_scores["termId"] == tid)
+        ]
+        scores_list = []
+        for _, s in section_scores.iterrows():
+            scores_list.append({
+                "question": str(s["question"]),
+                "mean": round(float(s["mean"]), 2) if pd.notna(s["mean"]) else 0,
+                "median": round(float(s["median"]), 2) if pd.notna(s["median"]) else 0,
+                "stdDev": round(float(s["std_dev"]), 2) if pd.notna(s["std_dev"]) else 0,
+                "enrollment": int(s["enrollment"]) if pd.notna(s["enrollment"]) else 0,
+                "completed": int(s["completed"]) if pd.notna(s["completed"]) else 0,
+            })
+        trace_course_list.append({
+            "courseId": cid, "termId": tid,
+            "termTitle": str(c["termTitle"]) if pd.notna(c["termTitle"]) else "",
+            "departmentName": str(c["departmentName"]) if pd.notna(c["departmentName"]) else "",
+            "displayName": str(c["displayName"]) if pd.notna(c["displayName"]) else "",
+            "section": str(c["section"]) if pd.notna(c["section"]) else "",
+            "enrollment": int(c["enrollment"]) if pd.notna(c["enrollment"]) else 0,
+            "scores": scores_list,
+        })
+    trace_course_list.sort(key=lambda x: x["termId"], reverse=True)
+    profile["traceCourses"] = trace_course_list
+
+    # --- RMP reviews ---
+    rev_matches = rmp_reviews[rmp_reviews["_rev_name_key"] == name_key]
+    reviews = []
+    for _, r in rev_matches.iterrows():
+        reviews.append({
+            "professorName": str(r["professor_name"]),
+            "department": str(r["department"]) if pd.notna(r["department"]) else "",
+            "overallRating": float(r["overall_rating"]) if pd.notna(r["overall_rating"]) else 0,
+            "course": str(r["course"]) if pd.notna(r["course"]) else "",
+            "quality": int(r["quality"]) if pd.notna(r["quality"]) else 0,
+            "difficulty": int(r["difficulty"]) if pd.notna(r["difficulty"]) else 0,
+            "date": str(r["date"]) if pd.notna(r["date"]) else "",
+            "tags": str(r["tags"]) if pd.notna(r["tags"]) else "",
+            "attendance": str(r["attendance"]) if pd.notna(r["attendance"]) else "",
+            "grade": str(r["grade"]) if pd.notna(r["grade"]) else "",
+            "textbook": str(r["textbook"]) if pd.notna(r["textbook"]) else "",
+            "online_class": str(r["online_class"]) if pd.notna(r["online_class"]) else "",
+            "comment": str(r["comment"]) if pd.notna(r["comment"]) else "",
+        })
+    profile["reviews"] = reviews
+
+    # --- TRACE comments ---
+    url_patterns = set()
+    for _, c in tc.iterrows():
+        cid = str(int(c["courseId"]))
+        iid = str(int(c["instructorId"]))
+        tid = str(int(c["termId"])) if pd.notna(c["termId"]) else ""
+        url_patterns.add(f"{cid}/{iid}/{tid}")
+
+    if url_patterns:
+        mask = trace_comments["course_url"].apply(
+            lambda url: isinstance(url, str) and any(pat in url for pat in url_patterns)
+        )
+        matching = trace_comments[mask]
+        comments = []
+        for _, c in matching.iterrows():
+            comment_text = str(c["comment"]) if pd.notna(c["comment"]) else ""
+            if not comment_text.strip():
+                continue
+            comments.append({
+                "courseUrl": str(c["course_url"]) if pd.notna(c["course_url"]) else "",
+                "question": str(c["question"]) if pd.notna(c["question"]) else "",
+                "comment": comment_text,
+            })
+        profile["traceComments"] = comments
+    else:
+        profile["traceComments"] = []
 
     return jsonify(profile)
 
@@ -845,4 +795,4 @@ if __name__ == "__main__":
     print(f"Loaded {len(rmp_profs)} RMP professors, {len(rmp_reviews)} RMP reviews")
     print(f"Stats → {stat_professor_count} professors, {stat_course_count} courses, "
           f"{stat_total_comments} comments, {stat_department_count} departments")
-    app.run(debug=True, port=5001)
+    app.run(debug=True, port=5001, use_reloader=False)
