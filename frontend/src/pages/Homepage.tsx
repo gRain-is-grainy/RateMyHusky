@@ -289,7 +289,7 @@ const Homepage = () => {
           ))}
         </div>
 
-        <div className="goat-leaderboard">
+        <div className={`goat-leaderboard ${profsLoading ? 'goat-loading' : ''}`}>
           <div className="goat-header-row">
             <span className="goat-col-rank">#</span>
             <span className="goat-col-name">Professor</span>
@@ -298,11 +298,7 @@ const Homepage = () => {
             <span className="goat-col-reviews">Reviews</span>
           </div>
 
-          {profsLoading ? (
-            <div className="goat-row" style={{ justifyContent: 'center', opacity: 0.6 }}>
-              Loading professors…
-            </div>
-          ) : profs.length === 0 ? (
+          {profs.length === 0 && !profsLoading ? (
             <div className="goat-row" style={{ justifyContent: 'center', opacity: 0.6 }}>
               No professors found for this college.
             </div>
