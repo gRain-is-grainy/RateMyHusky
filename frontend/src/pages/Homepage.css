@@ -207,6 +207,10 @@
   font-size: 1.1rem;
   font-weight: 900;
   color: #888;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .goat-top3 .goat-col-rank {
@@ -216,21 +220,6 @@
 .goat-col-name {
   display: flex;
   align-items: center;
-  gap: 12px;
-}
-
-.goat-avatar {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background: #d6394c;
-  color: #fff;
-  font-size: 1rem;
-  font-weight: 900;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
 }
 
 .goat-name-text {
@@ -246,7 +235,8 @@
 .goat-col-rating {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+  padding-right: 24px;
 }
 
 .goat-score {
@@ -259,21 +249,31 @@
   font-size: 0.85rem;
   color: #888;
   font-weight: 700;
+  padding-left: 8px;
 }
 
-/* ---- stars ---- */
-.stars {
-  display: flex;
-  gap: 1px;
-}
-
-.star {
+/* ---- partial stars ---- */
+.stars-wrapper {
+  position: relative;
+  display: inline-block;
   font-size: 0.9rem;
-  color: #ddd;
+  line-height: 1;
+  white-space: nowrap;
 }
 
-.star.filled {
+.stars-empty {
+  color: #ddd;
+  letter-spacing: 1px;
+}
+
+.stars-filled {
+  position: absolute;
+  top: 0;
+  left: 0;
+  overflow: hidden;
   color: #f5a623;
+  letter-spacing: 1px;
+  white-space: nowrap;
 }
 
 /* ==============================
@@ -288,7 +288,7 @@
 .goat-rating-hint {
   font-size: 0.7rem;
   opacity: 0.35;
-  margin-left: 4px;
+  margin-left: 0;
   transition: opacity 0.15s;
 }
 
@@ -522,7 +522,7 @@
   color: #999;
 }
 
-.dark .star {
+.dark .stars-empty {
   color: #444;
 }
 
@@ -602,15 +602,16 @@
     font-size: 4rem;
   }
 
-  /* Hide department column on tablet */
-  .goat-header-row,
-  .goat-row {
-    grid-template-columns: 40px 2fr 1.2fr 0.6fr;
-    padding: 12px 16px;
+  /* Horizontal scroll for the leaderboard — all columns stay visible */
+  .goat-leaderboard {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
-  .goat-col-dept {
-    display: none;
+  .goat-header-row,
+  .goat-row {
+    min-width: 600px;
+    padding: 12px 16px;
   }
 
   .goat-college-tabs {
@@ -631,12 +632,6 @@
     font-size: 0.78rem;
     white-space: nowrap;
     flex-shrink: 0;
-  }
-
-  .goat-avatar {
-    width: 32px;
-    height: 32px;
-    font-size: 0.85rem;
   }
 
   .goat-name-text {
@@ -703,22 +698,10 @@
     font-size: 1.1rem;
   }
 
-  /* Hide reviews column — keep rank, name, rating */
   .goat-header-row,
   .goat-row {
-    grid-template-columns: 32px 1fr 1fr;
+    min-width: 560px;
     padding: 10px 12px;
-    gap: 8px;
-  }
-
-  .goat-col-reviews {
-    display: none;
-  }
-
-  .goat-avatar {
-    width: 28px;
-    height: 28px;
-    font-size: 0.75rem;
   }
 
   .goat-name-text {
@@ -731,6 +714,14 @@
 
   .goat-top3 .goat-col-rank {
     font-size: 1.1rem;
+  }
+
+  .goat-col-dept {
+    font-size: 0.72rem;
+  }
+
+  .goat-col-reviews {
+    font-size: 0.75rem;
   }
 
   .randomizer-desc {
@@ -746,21 +737,12 @@
     font-size: 3.5rem;
   }
 
-  .stars {
-    gap: 0;
-  }
-
-  .star {
+  .stars-wrapper {
     font-size: 0.78rem;
   }
 
-  /* Hide stars on small phones — just show score */
-  .goat-col-rating .stars {
-    display: none;
-  }
-
-  .goat-rating-hint {
-    display: none;
+  .goat-score {
+    font-size: 0.8rem;
   }
 
   /* Tooltip: anchor to left edge on tiny screens */

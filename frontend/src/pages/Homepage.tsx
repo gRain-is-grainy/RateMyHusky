@@ -9,14 +9,17 @@ import type { Stat, Professor } from '../api/api';
 import neuIcon from '../assets/neu-circle-icon.png';
 import './Homepage.css';
 
-/* ---- star renderer ---- */
-const Stars = ({ rating }: { rating: number }) => (
-  <span className="stars">
-    {[1, 2, 3, 4, 5].map((i) => (
-      <span key={i} className={i <= Math.round(rating) ? 'star filled' : 'star'}>★</span>
-    ))}
-  </span>
-);
+/* ---- partial star renderer ---- */
+const Stars = ({ rating }: { rating: number }) => {
+  // Width percentage: e.g. rating 4.3 → 86% of 5 stars
+  const pct = (Math.min(Math.max(rating, 0), 5) / 5) * 100;
+  return (
+    <span className="stars-wrapper">
+      <span className="stars-empty">★★★★★</span>
+      <span className="stars-filled" style={{ width: `${pct}%` }}>★★★★★</span>
+    </span>
+  );
+};
 
 /* ---- rating cell with hover/click tooltip ---- */
 const RatingCell = ({ prof, isOpen, onToggle }: {
@@ -226,7 +229,6 @@ const Homepage = () => {
                   {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : i + 1}
                 </span>
                 <div className="goat-col-name">
-                  <div className="goat-avatar">{p.name.charAt(0)}</div>
                   <span className="goat-name-text">{p.name}</span>
                 </div>
                 <span className="goat-col-dept">{p.dept}</span>

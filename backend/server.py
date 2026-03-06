@@ -46,100 +46,159 @@ def friendly_count(n: int) -> str:
 
 # ──────────────────────────────────────────────
 #  Department → College mapping (NEU)
+#  Exact match only — no substring matching
 # ──────────────────────────────────────────────
 COLLEGE_MAP = {
     # Khoury College of Computer Sciences
-    "Computer Science":           "Khoury",
-    "Information Systems":        "Khoury",
-    "Cybersecurity":              "Khoury",
-    "Data Science":               "Khoury",
-    "Computer Information Systm": "Khoury",
-    "Information Science":        "Khoury",
+    "Computer Science":                   "Khoury",
+    "Information Science":                "Khoury",
+    "Information Systems":                "Khoury",
+    "Computer & Informational Tech.":     "Khoury",
+    "Computer amp Informational Tech.":   "Khoury",
+    "Computer  Informational Tech.":      "Khoury",
+    "Computer Engineering":               "Khoury",
+    "Cybersecurity":                      "Khoury",
+    "Data Science":                       "Khoury",
+    "Computer Information Systm":         "Khoury",
     # College of Engineering
-    "Electrical Engineering":     "Engineering",
-    "Electrical & Computer Engr": "Engineering",
-    "Mechanical Engineering":     "Engineering",
-    "Mechanical & Industrial Eng":"Engineering",
-    "Civil Engineering":          "Engineering",
-    "Civil & Environmental Eng":  "Engineering",
-    "Chemical Engineering":       "Engineering",
-    "Bioengineering":             "Engineering",
-    "Engineering":                "Engineering",
-    "Industrial Engineering":     "Engineering",
+    "Engineering":                        "Engineering",
+    "Electrical Engineering":             "Engineering",
+    "Mechanical Engineering":             "Engineering",
+    "Civil Engineering":                  "Engineering",
+    "Chemical Engineering":               "Engineering",
+    "Industrial Engineering":             "Engineering",
+    "Materials Engineering":              "Engineering",
+    "Engineering Technology":             "Engineering",
+    "Electronics":                        "Engineering",
+    "Electrical & Computer Engr":         "Engineering",
+    "Mechanical & Industrial Eng":        "Engineering",
+    "Civil & Environmental Eng":          "Engineering",
+    "Bioengineering":                     "Engineering",
+    "Industrial Technology":              "Engineering",
     # D'Amore-McKim School of Business
-    "Finance":                    "Business",
-    "Finance & Insurance":        "Business",
-    "Accounting":                 "Business",
-    "Accounting & Finance":       "Business",
-    "Marketing":                  "Business",
-    "Management":                 "Business",
-    "International Business":     "Business",
-    "Business":                   "Business",
-    "Business Administration":    "Business",
-    "Entrepreneurship":           "Business",
-    "Supply Chain Management":    "Business",
+    "Business":                           "Business",
+    "Business Administration":            "Business",
+    "Finance":                            "Business",
+    "Finance & Insurance":                "Business",
+    "Accounting":                         "Business",
+    "Accounting & Finance":               "Business",
+    "Marketing":                          "Business",
+    "Management":                         "Business",
+    "Entrepreneurship":                   "Business",
+    "International Business":             "Business",
+    "Supply Chain Management":            "Business",
+    "Operations Management":              "Business",
+    "Managerial Science":                 "Business",
+    "Organizational Behavior":            "Business",
+    "Organizational Leadership":          "Business",
+    "Human Resources Management":         "Business",
+    "Leadership":                         "Business",
     # College of Science
-    "Physics":                    "Science",
-    "Chemistry":                  "Science",
-    "Biology":                    "Science",
-    "Mathematics":                "Science",
-    "Math":                       "Science",
-    "Marine Biology":             "Science",
-    "Biochemistry":               "Science",
-    "Environmental Science":      "Science",
-    "Behavioral Neuroscience":    "Science",
+    "Mathematics":                        "Science",
+    "Physics":                            "Science",
+    "Chemistry":                          "Science",
+    "Biology":                            "Science",
+    "Biochemistry":                       "Science",
+    "Environmental Science":              "Science",
+    "Environmental Studies":              "Science",
+    "Marine Sciences":                    "Science",
+    "Marine Biology":                     "Science",
+    "Microbiology":                       "Science",
+    "Biotechnology":                      "Science",
+    "Geology":                            "Science",
+    "Earth Science":                      "Science",
+    "Biomedical":                         "Science",
+    "Science":                            "Science",
+    "Math":                               "Science",
+    "Behavioral Neuroscience":            "Science",
     # College of Arts, Media and Design (CAMD)
-    "Art":                        "CAMD",
-    "Music":                      "CAMD",
-    "Communications":             "CAMD",
-    "Communication Studies":      "CAMD",
-    "Journalism":                 "CAMD",
-    "Media":                      "CAMD",
-    "Graphic Design":             "CAMD",
-    "Architecture":               "CAMD",
-    "Theater":                    "CAMD",
-    "Game Design":                "CAMD",
+    "Art":                                "CAMD",
+    "Art History":                        "CAMD",
+    "Architecture":                       "CAMD",
+    "Communication Studies":              "CAMD",
+    "Communication":                      "CAMD",
+    "Communications":                     "CAMD",
+    "Journalism":                         "CAMD",
+    "Media":                              "CAMD",
+    "Media Studies":                      "CAMD",
+    "Graphic Design":                     "CAMD",
+    "Design":                             "CAMD",
+    "Music":                              "CAMD",
+    "Music Technology":                   "CAMD",
+    "Music Business":                     "CAMD",
+    "Theater":                            "CAMD",
+    "Game Design":                        "CAMD",
+    "Fine Arts":                          "CAMD",
+    "Visual Arts":                        "CAMD",
+    "Cinema":                             "CAMD",
+    "Photography":                        "CAMD",
+    "Multimedia":                         "CAMD",
+    "Creative Studies":                   "CAMD",
     # Bouvé College of Health Sciences
-    "Nursing":                    "Health Sciences",
-    "Pharmacy":                   "Health Sciences",
-    "Health Sciences":            "Health Sciences",
-    "Physical Therapy":           "Health Sciences",
-    "Speech Language Pathology":  "Health Sciences",
-    "Counseling Psychology":      "Health Sciences",
-    "Applied Psychology":         "Health Sciences",
+    "Health Science":                     "Health Sciences",
+    "Health Sciences":                    "Health Sciences",
+    "Nursing":                            "Health Sciences",
+    "Pharmacy":                           "Health Sciences",
+    "Physical Therapy":                   "Health Sciences",
+    "Speech & Hearing Sciences":          "Health Sciences",
+    "Speech Language Pathology":          "Health Sciences",
+    "Health Management":                  "Health Sciences",
+    "Health  Physical Education":         "Health Sciences",
+    "Medicine":                           "Health Sciences",
+    "Regulatory Affairs":                 "Health Sciences",
+    "Counseling Psychology":              "Health Sciences",
+    "Applied Psychology":                 "Health Sciences",
     # College of Social Sciences and Humanities (CSSH)
-    "Political Science":          "CSSH",
-    "Economics":                  "CSSH",
-    "History":                    "CSSH",
-    "Psychology":                 "CSSH",
-    "Sociology":                  "CSSH",
-    "Philosophy":                 "CSSH",
-    "English":                    "CSSH",
-    "Languages":                  "CSSH",
-    "Anthropology":               "CSSH",
-    "Linguistics":                "CSSH",
-    "Criminal Justice":           "CSSH",
-    "World Languages Center":     "CSSH",
-    "Human Services":             "CSSH",
-    "Religious Studies":          "CSSH",
+    "Political Science":                  "CSSH",
+    "Economics":                          "CSSH",
+    "History":                            "CSSH",
+    "Psychology":                         "CSSH",
+    "Sociology":                          "CSSH",
+    "Philosophy":                         "CSSH",
+    "English":                            "CSSH",
+    "Writing":                            "CSSH",
+    "Literature":                         "CSSH",
+    "Linguistics":                        "CSSH",
+    "Languages":                          "CSSH",
+    "Modern Languages":                   "CSSH",
+    "Spanish":                            "CSSH",
+    "French":                             "CSSH",
+    "Arabic":                             "CSSH",
+    "Sign Language":                      "CSSH",
+    "World Languages Center":             "CSSH",
+    "Criminal Justice":                   "CSSH",
+    "Anthropology":                       "CSSH",
+    "Human Services":                     "CSSH",
+    "Religious Studies":                  "CSSH",
+    "Judaic Studies":                     "CSSH",
+    "International Studies":              "CSSH",
+    "International Affairs":              "CSSH",
+    "International Politics":             "CSSH",
+    "East Asian Studies":                 "CSSH",
+    "Latin American Studies":             "CSSH",
+    "African-American Studies":           "CSSH",
+    "Women's Studies":                    "CSSH",
+    "Women":                              "CSSH",
+    "Social Science":                     "CSSH",
+    "Public Policy":                      "CSSH",
+    "Public Administration":              "CSSH",
+    "Urban Studies":                      "CSSH",
+    "Humanities":                         "CSSH",
     # College of Professional Studies
-    "Professional Studies":       "Professional Studies",
-    "Education":                  "Professional Studies",
+    "Education":                          "Professional Studies",
+    "Professional Studies":               "Professional Studies",
+    "Counseling & Educational Psych":     "Professional Studies",
+    "Counseling amp Educational Psych":   "Professional Studies",
+    "Counseling  Educational Psych":      "Professional Studies",
     # Law
-    "Law":                        "Law",
+    "Law":                                "Law",
 }
 
 
 def get_college(dept: str) -> str:
     if not isinstance(dept, str):
         return "Other"
-    if dept in COLLEGE_MAP:
-        return COLLEGE_MAP[dept]
-    dept_lower = dept.lower()
-    for key, college in COLLEGE_MAP.items():
-        if key.lower() in dept_lower or dept_lower in key.lower():
-            return college
-    return "Other"
+    return COLLEGE_MAP.get(dept, "Other")
 
 
 rmp_profs["college"] = rmp_profs["department"].apply(get_college)
@@ -157,6 +216,12 @@ rmp_profs["college"] = rmp_profs["department"].apply(get_college)
 trace_courses["_first"] = trace_courses["instructorFirstName"].astype(str).str.strip().str.lower()
 trace_courses["_last"]  = trace_courses["instructorLastName"].astype(str).str.strip().str.lower()
 trace_courses["_full"]  = trace_courses["_first"] + " " + trace_courses["_last"]
+
+# Build TRACE department lookup: use the most recent department per instructor
+# (highest termId = most recent term)
+trace_courses["termId"] = pd.to_numeric(trace_courses["termId"], errors="coerce")
+_dept_sorted = trace_courses.sort_values("termId", ascending=False).drop_duplicates(subset=["_full"])
+trace_dept_lookup = dict(zip(_dept_sorted["_full"], _dept_sorted["departmentName"]))
 
 # Filter trace_scores to only rows whose question mentions "overall"
 trace_scores["question"] = trace_scores["question"].astype(str)
@@ -261,6 +326,7 @@ print(f"[startup] Computed TRACE review counts for {len(trace_reviews_lookup)} i
 rmp_profs["_name_key"] = rmp_profs["name"].astype(str).str.strip().str.lower()
 rmp_profs["trace_overall"] = rmp_profs["_name_key"].map(trace_lookup)
 rmp_profs["trace_reviews"] = rmp_profs["_name_key"].map(trace_reviews_lookup).fillna(0).astype(int)
+rmp_profs["trace_dept"] = rmp_profs["_name_key"].map(trace_dept_lookup)
 rmp_profs["total_reviews"] = rmp_profs["num_ratings"].astype(int) + rmp_profs["trace_reviews"]
 
 def compute_blended(r):
@@ -357,7 +423,7 @@ def goat_professors():
         has_trace = pd.notna(row["trace_overall"]) and int(row["trace_reviews"]) > 0
         result.append({
             "name":           row["name"],
-            "dept":           row["department"],
+            "dept":           row["trace_dept"] if pd.notna(row["trace_dept"]) else row["department"],
             "rmpRating":      round(float(row["rating"]), 2) if has_rmp else None,
             "traceRating":    round(float(row["trace_overall"]), 2) if has_trace else None,
             "blendedRating":  round(float(row["blended_rating"]), 2),
@@ -378,7 +444,7 @@ def random_professor():
     has_trace = pd.notna(row["trace_overall"]) and int(row["trace_reviews"]) > 0
     return jsonify({
         "name":          row["name"],
-        "dept":          row["department"],
+        "dept":          row["trace_dept"] if pd.notna(row["trace_dept"]) else row["department"],
         "rmpRating":     round(float(row["rating"]), 2) if has_rmp else None,
         "traceRating":   round(float(row["trace_overall"]), 2) if has_trace else None,
         "blendedRating": round(float(row["blended_rating"]), 2),
