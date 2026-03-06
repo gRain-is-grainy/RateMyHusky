@@ -1,0 +1,39 @@
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5001";
+
+/* ---- Types ---- */
+export interface Stat {
+  label: string;
+  value: string;
+}
+
+export interface Professor {
+  name: string;
+  dept: string;
+  rmpRating: number;
+  traceRating: number | null;
+  blendedRating: number;
+  rmpReviews: number;
+  traceReviews: number;
+  totalReviews: number;
+  url: string;
+}
+
+export interface RandomProfessor extends Professor {
+  college: string;
+}
+
+/* ---- Fetchers ---- */
+async function get<T>(path: string): Promise<T> {
+  const res = await fetch(`${API_BASE}${path}`);
+  if (!res.ok) throw new Error(`API ${res.status}: ${res.statusText}`);
+  return res.json();
+}
+
+export const fetchStats = () => get<Stat[]>("/api/stats");
+
+export const fetchColleges = () => get<string[]>("/api/colleges");
+
+export const fetchGoatProfessors = (college: string, limit = 10) =>
+  get<Professor[]>(`/api/goat-professors?college=${encodeURIComponent(college)}&limit=${limit}`);
+
+export const fetchRandomProfessor = () => get<RandomProfessor>("/api/random-professor");
