@@ -31,6 +31,9 @@ rmp_profs["rating"]      = pd.to_numeric(rmp_profs["rating"], errors="coerce")
 rmp_profs["num_ratings"] = pd.to_numeric(rmp_profs["num_ratings"], errors="coerce")
 rmp_profs.dropna(subset=["rating", "num_ratings"], inplace=True)
 
+# Normalize display names — collapse double spaces like "Jelena  Golubovic"
+rmp_profs["name"] = rmp_profs["name"].astype(str).str.replace(r'\s+', ' ', regex=True).str.strip()
+
 
 # ──────────────────────────────────────────────
 #  Friendly stat formatting:  round down then "+"
@@ -215,7 +218,7 @@ rmp_profs["college"] = rmp_profs["department"].apply(get_college)
 # Normalise names for matching
 trace_courses["_first"] = trace_courses["instructorFirstName"].astype(str).str.strip().str.lower()
 trace_courses["_last"]  = trace_courses["instructorLastName"].astype(str).str.strip().str.lower()
-trace_courses["_full"]  = trace_courses["_first"] + " " + trace_courses["_last"]
+trace_courses["_full"]  = (trace_courses["_first"] + " " + trace_courses["_last"]).str.replace(r'\s+', ' ', regex=True).str.strip()
 
 # Build TRACE department lookup: use the most recent department per instructor
 # (highest termId = most recent term)
@@ -342,7 +345,7 @@ print(f"[startup] Computed TRACE review counts for {len(trace_reviews_lookup)} i
 #  otherwise fall back to just RMP.
 #  Total reviews = RMP num_ratings + TRACE completed responses
 # ──────────────────────────────────────────────
-rmp_profs["_name_key"] = rmp_profs["name"].astype(str).str.strip().str.lower()
+rmp_profs["_name_key"] = rmp_profs["name"].astype(str).str.strip().str.lower().str.replace(r'\s+', ' ', regex=True)
 rmp_profs["trace_overall"] = rmp_profs["_name_key"].map(trace_lookup)
 rmp_profs["trace_reviews"] = rmp_profs["_name_key"].map(trace_reviews_lookup).fillna(0).astype(int)
 rmp_profs["trace_dept"] = rmp_profs["_name_key"].map(trace_dept_lookup)
@@ -485,7 +488,7 @@ def random_professor():
 
 # RMP professors (already have avg_rating, trace_dept, etc.)
 rmp_for_search = rmp_profs[["name", "trace_dept", "avg_rating", "total_reviews"]].copy()
-rmp_for_search["_name_lower"] = rmp_for_search["name"].astype(str).str.strip().str.lower()
+rmp_for_search["_name_lower"] = rmp_for_search["name"].astype(str).str.strip().str.lower().str.replace(r'\s+', ' ', regex=True)
 rmp_for_search["dept_display"] = rmp_for_search["trace_dept"]  # only TRACE dept
 
 # TRACE-only professors (not in RMP)
