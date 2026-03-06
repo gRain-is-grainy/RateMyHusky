@@ -126,10 +126,39 @@
    GOAT LEADERBOARD
    ============================== */
 .goat-college-tabs {
+  position: relative;
   display: flex;
-  flex-wrap: wrap;
   gap: 8px;
   margin-bottom: 28px;
+  overflow-x: auto;
+  flex-wrap: nowrap;
+  padding-bottom: 6px;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, #000 10%, #000 85%, transparent 100%);
+  mask-image: linear-gradient(to right, transparent 0%, #000 10%, #000 85%, transparent 100%);
+}
+
+.goat-college-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+/* At start — only fade right */
+.goat-college-tabs.scrolled-start {
+  -webkit-mask-image: linear-gradient(to right, #000 85%, transparent 100%);
+  mask-image: linear-gradient(to right, #000 85%, transparent 100%);
+}
+
+/* At end — only fade left */
+.goat-college-tabs.scrolled-end {
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, #000 15%);
+  mask-image: linear-gradient(to right, transparent 0%, #000 15%);
+}
+
+/* At both ends — no fade needed */
+.goat-college-tabs.scrolled-start.scrolled-end {
+  -webkit-mask-image: none;
+  mask-image: none;
 }
 
 .goat-tab {
@@ -143,6 +172,8 @@
   color: #555;
   cursor: pointer;
   transition: all 0.2s;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .goat-tab:hover {
@@ -616,22 +647,11 @@
 
   .goat-college-tabs {
     gap: 6px;
-    overflow-x: auto;
-    flex-wrap: nowrap;
-    padding-bottom: 6px;
-    -ms-overflow-style: none;
-    scrollbar-width: none;
-  }
-
-  .goat-college-tabs::-webkit-scrollbar {
-    display: none;
   }
 
   .goat-tab {
     padding: 6px 14px;
     font-size: 0.78rem;
-    white-space: nowrap;
-    flex-shrink: 0;
   }
 
   .goat-name-text {

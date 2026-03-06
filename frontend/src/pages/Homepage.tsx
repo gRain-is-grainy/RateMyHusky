@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import Navbar from '../components/Navbar';
 import SearchBar from '../components/SearchBar';
 import Footer from '../components/Footer';
@@ -8,6 +8,71 @@ import { fetchStats, fetchColleges, fetchGoatProfessors, fetchRandomProfessor } 
 import type { Stat, Professor } from '../api/api';
 import neuIcon from '../assets/neu-circle-icon.png';
 import './Homepage.css';
+
+/* ---- animated stat counter ---- */
+const AnimatedStat = ({ value, label }: Stat) => {
+  const ref = useRef<HTMLDivElement>(null);
+  const [display, setDisplay] = useState('0');
+  const [hasAnimated, setHasAnimated] = useState(false);
+
+  // Parse "7,600+" → { num: 7600, suffix: "+" }
+  const parsed = useRef({ num: 0, suffix: '' });
+  useEffect(() => {
+    const clean = value.replace(/,/g, '');
+    const match = clean.match(/^(\d+)(.*)$/);
+    if (match) {
+      parsed.current = { num: parseInt(match[1], 10), suffix: match[2] };
+    }
+  }, [value]);
+
+  const animate = useCallback(() => {
+    if (hasAnimated) return;
+    setHasAnimated(true);
+
+    const { num, suffix } = parsed.current;
+    const duration = 2000;
+    const start = performance.now();
+
+    const step = (now: number) => {
+      const elapsed = now - start;
+      const progress = Math.min(elapsed / duration, 1);
+      // Ease out cubic
+      const eased = 1 - Math.pow(1 - progress, 3);
+      const current = Math.round(eased * num);
+      setDisplay(current.toLocaleString() + suffix);
+
+      if (progress < 1) {
+        requestAnimationFrame(step);
+      }
+    };
+
+    requestAnimationFrame(step);
+  }, [hasAnimated]);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          animate();
+          observer.disconnect();
+        }
+      },
+      { threshold: 0.5 }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [animate]);
+
+  return (
+    <div className="stat-item" ref={ref}>
+      <span className="stat-value">{display}</span>
+      <span className="stat-label">{label}</span>
+    </div>
+  );
+};
 
 /* ---- partial star renderer ---- */
 const Stars = ({ rating }: { rating: number }) => {
@@ -85,6 +150,28 @@ const Homepage = () => {
   const [profsLoading, setProfsLoading] = useState(false);
   const [shuffling, setShuffling] = useState(false);
   const [openTooltip, setOpenTooltip] = useState<number | null>(null);
+  const tabsRef = useRef<HTMLDivElement>(null);
+  const [tabsAtEnd, setTabsAtEnd] = useState(false);
+  const [tabsAtStart, setTabsAtStart] = useState(true);
+
+  // Detect scroll position on college tabs
+  useEffect(() => {
+    const el = tabsRef.current;
+    if (!el) return;
+
+    const checkScroll = () => {
+      setTabsAtStart(el.scrollLeft <= 10);
+      setTabsAtEnd(el.scrollLeft + el.clientWidth >= el.scrollWidth - 10);
+    };
+
+    checkScroll();
+    el.addEventListener('scroll', checkScroll);
+    window.addEventListener('resize', checkScroll);
+    return () => {
+      el.removeEventListener('scroll', checkScroll);
+      window.removeEventListener('resize', checkScroll);
+    };
+  }, [colleges]);
 
   // Initial data load
   useEffect(() => {
@@ -177,10 +264,7 @@ const Homepage = () => {
               </div>
             ))
           : stats.map((s) => (
-              <div key={s.label} className="stat-item">
-                <span className="stat-value">{s.value}</span>
-                <span className="stat-label">{s.label}</span>
-              </div>
+              <AnimatedStat key={s.label} value={s.value} label={s.label} />
             ))}
       </section>
 
@@ -190,7 +274,10 @@ const Homepage = () => {
           <h2 className="section-title">GOATED Professors</h2>
         </div>
 
-        <div className="goat-college-tabs">
+        <div
+          className={`goat-college-tabs${tabsAtStart ? ' scrolled-start' : ''}${tabsAtEnd ? ' scrolled-end' : ''}`}
+          ref={tabsRef}
+        >
           {colleges.map((c) => (
             <button
               key={c}
