@@ -37,3 +37,23 @@ export const fetchGoatProfessors = (college: string, limit = 10) =>
   get<Professor[]>(`/api/goat-professors?college=${encodeURIComponent(college)}&limit=${limit}`);
 
 export const fetchRandomProfessor = () => get<RandomProfessor>("/api/random-professor");
+
+/* ---- Search autocomplete ---- */
+export interface ProfessorSuggestion {
+  type: "professor";
+  name: string;
+  dept: string;
+  rating: number | null;
+}
+
+export interface CourseSuggestion {
+  type: "course";
+  code: string;
+  name: string;
+  dept: string;
+}
+
+export type SearchSuggestion = ProfessorSuggestion | CourseSuggestion;
+
+export const fetchSearchSuggestions = (query: string, type: string) =>
+  get<SearchSuggestion[]>(`/api/search?q=${encodeURIComponent(query)}&type=${encodeURIComponent(type)}`);

@@ -2,11 +2,11 @@
 Backend API server for NEU Professor Ratings.
 Place this file in: backend/server.py
 
-Install deps:  pip install flask flask-cors pandas numpy
+Install deps:  pip install flask flask-cors pandas
 Run:           python backend/server.py
 """
 
-import os
+import os, re
 import numpy as np
 import pandas as pd
 from flask import Flask, jsonify, request
@@ -424,8 +424,8 @@ def goat_professors():
 
     subset = rmp_profs[rmp_profs["college"] == college].copy()
     if college in NO_MIN_COLLEGES:
-        # Require at least 5 total reviews across both sources
-        subset = subset[subset["total_reviews"] >= 4]
+        # Require at least 3 total reviews across both sources
+        subset = subset[subset["total_reviews"] >= 3]
     else:
         subset = subset[
             (subset["num_ratings"] >= min_reviews) &
@@ -476,6 +476,115 @@ def random_professor():
         "url":           row.get("professor_url", ""),
         "college":       row["college"],
     })
+
+
+# ──────────────────────────────────────────────
+#  Precompute search indexes for autocomplete
+# ──────────────────────────────────────────────
+# Professors: unique names with their dept and blended rating
+prof_search = (
+    rmp_profs[["name", "department", "trace_dept", "blended_rating", "total_reviews", "college"]]
+    .copy()
+)
+prof_search["_name_lower"] = prof_search["name"].astype(str).str.strip().str.lower()
+# Split into individual name parts for whole-word matching
+prof_search["_name_parts"] = prof_search["_name_lower"].str.split()
+prof_search["dept_display"] = prof_search.apply(
+    lambda r: r["trace_dept"] if pd.notna(r["trace_dept"]) else r["department"], axis=1
+)
+prof_search = prof_search.drop_duplicates(subset=["_name_lower"])
+
+# Courses: unique course codes with their name
+# displayName format: "ACCT6228:02 (Contmp Issues Accountng Theory) - Michael Rezuke"
+
+def parse_course(display_name):
+    m = re.match(r"^([A-Z]+\d+):\d+\s+\((.+?)\)", str(display_name))
+    if m:
+        return m.group(1), m.group(2)
+    return None, None
+
+trace_courses["_parsed"] = trace_courses["displayName"].apply(parse_course)
+trace_courses["_code"] = trace_courses["_parsed"].apply(lambda x: x[0])
+trace_courses["_cname"] = trace_courses["_parsed"].apply(lambda x: x[1])
+
+course_search = (
+    trace_courses[trace_courses["_code"].notna()]
+    [["_code", "_cname", "departmentName"]]
+    .drop_duplicates(subset=["_code"])
+    .copy()
+)
+course_search["_search_lower"] = (
+    course_search["_code"].str.lower() + " " + course_search["_cname"].astype(str).str.lower()
+)
+
+print(f"[search] Indexed {len(prof_search)} professors, {len(course_search)} courses")
+
+
+@app.route("/api/search")
+def search():
+    q = request.args.get("q", "").strip().lower()
+    search_type = request.args.get("type", "Professor")
+    limit = int(request.args.get("limit", "3"))
+
+    if len(q) < 2:
+        return jsonify([])
+
+    if search_type == "Professor":
+        # Tier 1: query matches a whole first or last name exactly
+        exact_word = prof_search[prof_search["_name_parts"].apply(
+            lambda parts: q in parts if isinstance(parts, list) else False
+        )]
+        # Tier 2: query matches the start of any name part (but not exact)
+        starts_word = prof_search[
+            prof_search["_name_parts"].apply(
+                lambda parts: any(p.startswith(q) for p in parts) if isinstance(parts, list) else False
+            ) &
+            ~prof_search.index.isin(exact_word.index)
+        ]
+        # Tier 3: substring match anywhere in full name
+        contains = prof_search[
+            prof_search["_name_lower"].str.contains(q, na=False) &
+            ~prof_search.index.isin(exact_word.index) &
+            ~prof_search.index.isin(starts_word.index)
+        ]
+        matches = pd.concat([
+            exact_word.sort_values("total_reviews", ascending=False),
+            starts_word.sort_values("total_reviews", ascending=False),
+            contains.sort_values("total_reviews", ascending=False),
+        ]).head(limit)
+
+        results = []
+        for _, r in matches.iterrows():
+            results.append({
+                "type":   "professor",
+                "name":   r["name"],
+                "dept":   r["dept_display"],
+                "rating": round(float(r["blended_rating"]), 2) if r["blended_rating"] > 0 else None,
+            })
+        return jsonify(results)
+
+    else:
+        # Match courses: prioritize code prefix, then code contains, then name contains
+        code_starts = course_search[course_search["_code"].str.lower().str.startswith(q, na=False)]
+        code_contains = course_search[
+            course_search["_code"].str.lower().str.contains(q, na=False) &
+            ~course_search["_code"].str.lower().str.startswith(q, na=False)
+        ]
+        name_contains = course_search[
+            course_search["_cname"].astype(str).str.lower().str.contains(q, na=False) &
+            ~course_search["_code"].str.lower().str.contains(q, na=False)
+        ]
+        matches = pd.concat([code_starts, code_contains, name_contains]).head(limit)
+
+        results = []
+        for _, r in matches.iterrows():
+            results.append({
+                "type": "course",
+                "code": r["_code"],
+                "name": r["_cname"],
+                "dept": r["departmentName"],
+            })
+        return jsonify(results)
 
 
 if __name__ == "__main__":
