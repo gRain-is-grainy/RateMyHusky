@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import SearchBar from '../components/SearchBar';
 import Footer from '../components/Footer';
@@ -110,7 +111,7 @@ const RatingCell = ({ prof, isOpen, onToggle }: {
     <span
       ref={ref}
       className="goat-col-rating goat-rating-wrapper"
-      onClick={onToggle}
+      onClick={(e) => { e.stopPropagation(); onToggle(); }}
     >
       <Stars rating={prof.avgRating} />
       <span className="goat-score">{prof.avgRating.toFixed(2)}</span>
@@ -142,6 +143,7 @@ const RatingCell = ({ prof, isOpen, onToggle }: {
 };
 
 const Homepage = () => {
+  const navigate = useNavigate();
   const [stats, setStats] = useState<Stat[]>([]);
   const [colleges, setColleges] = useState<string[]>([]);
   const [selectedCollege, setSelectedCollege] = useState<string>('');
@@ -153,6 +155,12 @@ const Homepage = () => {
   const tabsRef = useRef<HTMLDivElement>(null);
   const [tabsAtEnd, setTabsAtEnd] = useState(false);
   const [tabsAtStart, setTabsAtStart] = useState(true);
+
+  // Navigate to professor page
+  const handleProfClick = (name: string) => {
+    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    navigate(`/professors/${slug}`);
+  };
 
   // Detect scroll position on college tabs
   useEffect(() => {
@@ -221,12 +229,8 @@ const Homepage = () => {
     setShuffling(true);
     try {
       const prof = await fetchRandomProfessor();
-      if (prof.url) {
-        window.open(prof.url, '_blank');
-      } else {
-        const slug = prof.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-        window.location.href = `/professors/${slug}`;
-      }
+      const slug = prof.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+      navigate(`/professors/${slug}`);
     } catch (err) {
       console.error('Failed to fetch random professor:', err);
     } finally {
@@ -307,6 +311,7 @@ const Homepage = () => {
               <div
                 key={p.name}
                 className={`goat-row ${i < 3 ? 'goat-top3' : ''}`}
+                onClick={() => handleProfClick(p.name)}
               >
                 <span className="goat-col-rank">
                   {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : i + 1}

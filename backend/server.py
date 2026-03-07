@@ -418,25 +418,29 @@ print(f"[startup] {has_trace}/{len(rmp_profs)} RMP professors matched to TRACE d
 # ──────────────────────────────────────────────
 #  Precompute stats
 # ──────────────────────────────────────────────
-#  Professors  = unique full names from trace_courses
-#  Courses     = unique course codes from displayName (e.g. ACCT6228, not per-section)
-#  Comments    = rmp_reviews with non-empty comments + trace_comments rows (1 row = 1 comment)
-#  Departments = unique departmentName in trace_courses
-# ──────────────────────────────────────────────
-stat_professor_count = trace_courses["_full"].nunique()
 
-# Extract course code before the colon: "ACCT6228:02 (Name) - Prof" → "ACCT6228"
+# Professors = unique names from BOTH RMP and TRACE (case-insensitive, already lowercase)
+_all_prof_names = set(rmp_profs["_name_key"].unique())
+_all_prof_names.update(trace_courses["_full"].unique())
+# Strip any extra whitespace that might cause false duplicates
+_all_prof_names = set(n.strip() for n in _all_prof_names if isinstance(n, str) and n.strip())
+stat_professor_count = len(_all_prof_names)
+
+# Courses = unique course codes (e.g. "ACCT6228"), case-insensitive
 trace_courses["_course_code"] = trace_courses["displayName"].astype(str).str.split(":").str[0]
-stat_course_count = trace_courses["_course_code"].nunique()
+stat_course_count = trace_courses["_course_code"].str.upper().nunique()
 
-# Comments: RMP reviews with a non-empty comment + all trace_comments rows
-rmp_comment_count = int(rmp_reviews["comment"].dropna().astype(str).str.strip().ne("").sum())
-stat_total_comments = rmp_comment_count + len(trace_comments)
+# Evaluations = RMP reviews + TRACE completed evaluations (deduplicated per section)
+_trace_sections_deduped = trace_scores.drop_duplicates(subset=["courseId", "instructorId", "termId"])
+trace_eval_count = int(_trace_sections_deduped["completed"].fillna(0).astype(int).sum())
+rmp_review_count = len(rmp_reviews)
+stat_total_evaluations = rmp_review_count + trace_eval_count
 
-stat_department_count = trace_courses["departmentName"].nunique()
+# Departments = unique department names, case-insensitive
+stat_department_count = trace_courses["departmentName"].str.lower().str.strip().nunique()
 
 print(f"[stats] {stat_professor_count} professors, {stat_course_count} courses, "
-      f"{stat_total_comments} comments ({rmp_comment_count} RMP + {len(trace_comments)} TRACE), "
+      f"{stat_total_evaluations} evaluations ({rmp_review_count} RMP + {trace_eval_count} TRACE), "
       f"{stat_department_count} departments")
 
 
@@ -448,7 +452,7 @@ def stats():
     return jsonify([
         {"label": "Professors",  "value": friendly_count(stat_professor_count)},
         {"label": "Courses",     "value": friendly_count(stat_course_count)},
-        {"label": "Comments",    "value": friendly_count(stat_total_comments)},
+        {"label": "Evaluations", "value": friendly_count(stat_total_evaluations)},
         {"label": "Departments", "value": friendly_count(stat_department_count)},
     ])
 
@@ -658,8 +662,188 @@ def search():
         return jsonify(results)
 
 
+# ──────────────────────────────────────────────
+#  Professor page
+# ──────────────────────────────────────────────
+
+# Slug index: frontend generates slugs like "john-smith" from names
+# This maps every slug back to the actual lowercase name key
+def _name_to_slug(name: str) -> str:
+    return re.sub(r'[^a-z0-9]+', '-', name.lower()).strip('-')
+
+_slug_to_name = {}
+for _, row in rmp_profs.iterrows():
+    _slug_to_name[_name_to_slug(row["_name_key"])] = row["_name_key"]
+for nk in trace_courses["_full"].unique():
+    s = _name_to_slug(nk)
+    if s not in _slug_to_name:
+        _slug_to_name[s] = nk
+for nk in prof_search["_name_lower"].values:
+    s = _name_to_slug(nk)
+    if s not in _slug_to_name:
+        _slug_to_name[s] = nk
+
+print(f"[prof-page] Slug index: {len(_slug_to_name)} unique slugs")
+
+# Precompute review name keys
+rmp_reviews["_rev_name_key"] = rmp_reviews["professor_name"].astype(str).str.strip().str.lower().str.replace(r'\s+', ' ', regex=True)
+
+
+def _resolve_slug(slug):
+    nk = _slug_to_name.get(slug)
+    return nk if nk else slug.strip().lower().replace("-", " ")
+
+
+@app.route("/api/professors/<slug>")
+def professor_profile(slug):
+    name_key = _resolve_slug(slug)
+    profile = None
+
+    # Try RMP
+    rmp_match = rmp_profs[rmp_profs["_name_key"] == name_key]
+    if not rmp_match.empty:
+        row = rmp_match.iloc[0]
+        has_rmp = int(row["num_ratings"]) > 0 and row["rating"] > 0
+        has_trace = pd.notna(row["trace_overall"]) and int(row["trace_reviews"]) > 0
+
+        wta = None
+        if "would_take_again_pct" in row.index:
+            raw_val = str(row["would_take_again_pct"]).strip().replace("%", "")
+            try:
+                wta = float(raw_val)
+                if wta < 0: wta = None
+            except (ValueError, TypeError):
+                pass
+
+        difficulty = None
+        if "level_of_difficulty" in row.index:
+            try:
+                difficulty = float(row["level_of_difficulty"])
+                if pd.isna(difficulty) or difficulty <= 0: difficulty = None
+            except (ValueError, TypeError):
+                pass
+
+        profile = {
+            "name": row["name"],
+            "department": row["trace_dept"] if pd.notna(row["trace_dept"]) else row["department"],
+            "rmpRating": round(float(row["rating"]), 2) if has_rmp else None,
+            "traceRating": round(float(row["trace_overall"]), 2) if has_trace else None,
+            "avgRating": round(float(row["avg_rating"]), 2),
+            "numRatings": int(row["num_ratings"]),
+            "wouldTakeAgainPct": round(wta, 1) if wta is not None else None,
+            "difficulty": round(difficulty, 2) if difficulty is not None else None,
+            "totalRatings": int(row["total_reviews"]),
+            "professorUrl": row.get("professor_url", None) or None,
+        }
+
+    # Try TRACE-only
+    elif not trace_courses[trace_courses["_full"] == name_key].empty:
+        trace_rating = trace_lookup.get(name_key)
+        trace_rev = trace_reviews_lookup.get(name_key, 0)
+        dept = trace_dept_lookup.get(name_key, "")
+        profile = {
+            "name": name_key.title(),
+            "department": dept,
+            "rmpRating": None,
+            "traceRating": round(float(trace_rating), 2) if trace_rating and pd.notna(trace_rating) else None,
+            "avgRating": round(float(trace_rating), 2) if trace_rating and pd.notna(trace_rating) else 0.0,
+            "numRatings": 0,
+            "wouldTakeAgainPct": None,
+            "difficulty": None,
+            "totalRatings": int(trace_rev),
+            "professorUrl": None,
+        }
+
+    if profile is None:
+        return jsonify({"error": "Professor not found"}), 404
+
+    # --- TRACE courses + scores ---
+    tc = trace_courses[trace_courses["_full"] == name_key]
+    trace_course_list = []
+    for _, c in tc.iterrows():
+        cid = int(c["courseId"])
+        iid = int(c["instructorId"])
+        tid = int(c["termId"]) if pd.notna(c["termId"]) else 0
+        section_scores = trace_scores[
+            (trace_scores["courseId"] == cid) &
+            (trace_scores["instructorId"] == iid) &
+            (trace_scores["termId"] == tid)
+        ]
+        scores_list = []
+        for _, s in section_scores.iterrows():
+            scores_list.append({
+                "question": str(s["question"]),
+                "mean": round(float(s["mean"]), 2) if pd.notna(s["mean"]) else 0,
+                "median": round(float(s["median"]), 2) if pd.notna(s["median"]) else 0,
+                "stdDev": round(float(s["std_dev"]), 2) if pd.notna(s["std_dev"]) else 0,
+                "enrollment": int(s["enrollment"]) if pd.notna(s["enrollment"]) else 0,
+                "completed": int(s["completed"]) if pd.notna(s["completed"]) else 0,
+            })
+        trace_course_list.append({
+            "courseId": cid, "termId": tid,
+            "termTitle": str(c["termTitle"]) if pd.notna(c["termTitle"]) else "",
+            "departmentName": str(c["departmentName"]) if pd.notna(c["departmentName"]) else "",
+            "displayName": str(c["displayName"]) if pd.notna(c["displayName"]) else "",
+            "section": str(c["section"]) if pd.notna(c["section"]) else "",
+            "enrollment": int(c["enrollment"]) if pd.notna(c["enrollment"]) else 0,
+            "scores": scores_list,
+        })
+    trace_course_list.sort(key=lambda x: x["termId"], reverse=True)
+    profile["traceCourses"] = trace_course_list
+
+    # --- RMP reviews ---
+    rev_matches = rmp_reviews[rmp_reviews["_rev_name_key"] == name_key]
+    reviews = []
+    for _, r in rev_matches.iterrows():
+        reviews.append({
+            "professorName": str(r["professor_name"]),
+            "department": str(r["department"]) if pd.notna(r["department"]) else "",
+            "overallRating": float(r["overall_rating"]) if pd.notna(r["overall_rating"]) else 0,
+            "course": str(r["course"]) if pd.notna(r["course"]) else "",
+            "quality": int(r["quality"]) if pd.notna(r["quality"]) else 0,
+            "difficulty": int(r["difficulty"]) if pd.notna(r["difficulty"]) else 0,
+            "date": str(r["date"]) if pd.notna(r["date"]) else "",
+            "tags": str(r["tags"]) if pd.notna(r["tags"]) else "",
+            "attendance": str(r["attendance"]) if pd.notna(r["attendance"]) else "",
+            "grade": str(r["grade"]) if pd.notna(r["grade"]) else "",
+            "textbook": str(r["textbook"]) if pd.notna(r["textbook"]) else "",
+            "online_class": str(r["online_class"]) if pd.notna(r["online_class"]) else "",
+            "comment": str(r["comment"]) if pd.notna(r["comment"]) else "",
+        })
+    profile["reviews"] = reviews
+
+    # --- TRACE comments ---
+    url_patterns = set()
+    for _, c in tc.iterrows():
+        cid = str(int(c["courseId"]))
+        iid = str(int(c["instructorId"]))
+        tid = str(int(c["termId"])) if pd.notna(c["termId"]) else ""
+        url_patterns.add(f"{cid}/{iid}/{tid}")
+
+    if url_patterns:
+        mask = trace_comments["course_url"].apply(
+            lambda url: isinstance(url, str) and any(pat in url for pat in url_patterns)
+        )
+        matching = trace_comments[mask]
+        comments = []
+        for _, c in matching.iterrows():
+            comment_text = str(c["comment"]) if pd.notna(c["comment"]) else ""
+            if not comment_text.strip():
+                continue
+            comments.append({
+                "courseUrl": str(c["course_url"]) if pd.notna(c["course_url"]) else "",
+                "question": str(c["question"]) if pd.notna(c["question"]) else "",
+                "comment": comment_text,
+            })
+        profile["traceComments"] = comments
+    else:
+        profile["traceComments"] = []
+
+    return jsonify(profile)
+
+
 if __name__ == "__main__":
     print(f"Loaded {len(rmp_profs)} RMP professors, {len(rmp_reviews)} RMP reviews")
     print(f"Stats → {stat_professor_count} professors, {stat_course_count} courses, "
-          f"{stat_total_comments} comments, {stat_department_count} departments")
-    app.run(debug=True, port=5001)
+          f"{stat_total_evaluations} evaluations, {stat_department_count} departments")
+    app.run(debug=True, port=5001, use_reloader=False)

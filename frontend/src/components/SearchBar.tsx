@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Dropdown from './Dropdown';
 import { fetchSearchSuggestions } from '../api/api';
 import type { SearchSuggestion } from '../api/api';
@@ -10,6 +11,7 @@ const searchOptions = [
 ];
 
 const SearchBar = () => {
+  const navigate = useNavigate();
   const [searchType, setSearchType] = useState('Professor');
   const [query, setQuery] = useState('');
   const [suggestions, setSuggestions] = useState<SearchSuggestion[]>([]);
@@ -71,11 +73,11 @@ const SearchBar = () => {
   const handleSelect = (suggestion: SearchSuggestion) => {
     setShowSuggestions(false);
     if (suggestion.type === 'professor') {
-      const slug = suggestion.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-      window.location.href = `/professors/${slug}`;
+      const slug = suggestion.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+      navigate(`/professors/${slug}`);
     } else {
       const code = suggestion.code.toLowerCase();
-      window.location.href = `/courses/${code}`;
+      navigate(`/courses/${code}`);
     }
   };
 
