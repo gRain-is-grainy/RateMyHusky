@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Dropdown from './Dropdown';
 import { fetchSearchSuggestions } from '../api/api';
@@ -17,13 +17,64 @@ const SearchBar = () => {
   const [suggestions, setSuggestions] = useState<SearchSuggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
+  const [isFocused, setIsFocused] = useState(false);
+  const [placeholder, setPlaceholder] = useState('');
+  
   const wrapperRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const placeholderText =
-    searchType === 'Professor'
-      ? 'Search by professor name...'
-      : 'Search by course name or code...';
+  const professorExamples = useMemo(() => [
+    "John Doe", "Jane Smith", "Alan Mislove", "Ravi Sundaram", 
+    "Dan Felushko", "Ousmane Hicham", "Cristina Nita-Rotaru",
+    "Stacy Marsella", "Kathleen Durant", "Gene Cooperman"
+  ], []);
+
+  const courseExamples = useMemo(() => [
+    "CS 2500", "CS 3500", "CS 4500", "ECON 1115", "MATH 1341",
+    "CY 2550", "PHYS 1161", "ACCT 1201", "MKTG 2101", "BIOL 1111"
+  ], []);
+
+  // Typing animation logic
+  useEffect(() => {
+    if (isFocused || query) {
+      setPlaceholder(searchType === 'Professor' ? 'Search by professor name...' : 'Search by course name or code...');
+      return;
+    }
+
+    const examples = searchType === 'Professor' ? professorExamples : courseExamples;
+    let currentExampleIndex = Math.floor(Math.random() * examples.length);
+    let currentText = "";
+    let isDeleting = false;
+    let typingSpeed = 100;
+
+    const type = () => {
+      const fullText = examples[currentExampleIndex];
+      
+      if (isDeleting) {
+        currentText = fullText.substring(0, currentText.length - 1);
+        typingSpeed = 50;
+      } else {
+        currentText = fullText.substring(0, currentText.length + 1);
+        typingSpeed = 100;
+      }
+
+      setPlaceholder(`Search for "${currentText}"`);
+
+      if (!isDeleting && currentText === fullText) {
+        isDeleting = true;
+        typingSpeed = 2000; // Pause at end
+      } else if (isDeleting && currentText === "") {
+        isDeleting = false;
+        currentExampleIndex = (currentExampleIndex + 1) % examples.length;
+        typingSpeed = 500; // Pause before next
+      }
+
+      timeoutId = setTimeout(type, typingSpeed);
+    };
+
+    let timeoutId = setTimeout(type, typingSpeed);
+    return () => clearTimeout(timeoutId);
+  }, [isFocused, query, searchType, professorExamples, courseExamples]);
 
   const handleSearchTypeChange = (newType: string) => {
     setSearchType(newType);
@@ -47,8 +98,9 @@ const SearchBar = () => {
     debounceRef.current = setTimeout(async () => {
       try {
         const results = await fetchSearchSuggestions(trimmedQuery, searchType);
-        setSuggestions(results);
-        setShowSuggestions(results.length > 0);
+        const limitedResults = searchType === 'Professor' ? results.slice(0, 3) : results;
+        setSuggestions(limitedResults);
+        setShowSuggestions(limitedResults.length > 0);
         setActiveIndex(-1);
       } catch {
         setSuggestions([]);
@@ -151,10 +203,14 @@ const SearchBar = () => {
         <input
           className="search-input"
           type="text"
-          placeholder={placeholderText}
+          placeholder={placeholder}
           value={query}
           onChange={(e) => handleQueryChange(e.target.value)}
-          onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
+          onFocus={() => {
+            setIsFocused(true);
+            if (suggestions.length > 0) setShowSuggestions(true);
+          }}
+          onBlur={() => setIsFocused(false)}
           onKeyDown={handleKeyDown}
         />
       </div>

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo, useLayoutEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import Footer from '../components/Footer';
 import NotFound from './NotFound';
@@ -85,6 +85,11 @@ const Professor = () => {
   const [courseFilter, setCourseFilter] = useState('__all__');
   const [visibleReviews, setVisibleReviews] = useState(10);
 
+  // Review tabs pill state
+  const [reviewPillStyle, setReviewPillStyle] = useState({ left: 0, width: 0, opacity: 0 });
+  const [isReviewPillReady, setIsReviewPillReady] = useState(false);
+  const reviewTabsRef = useRef<HTMLDivElement>(null);
+
   // TRACE specific states
   const [traceSearch, setTraceSearch] = useState('');
   const [traceSort, setTraceSort] = useState('popular');
@@ -100,6 +105,42 @@ const Professor = () => {
     window.addEventListener('scroll', handler, { passive: true });
     return () => window.removeEventListener('scroll', handler);
   }, []);
+
+  const updateReviewPill = useCallback(() => {
+    if (!reviewTabsRef.current) return;
+    const activeTab = reviewTabsRef.current.querySelector('.prof-review-tab.active') as HTMLElement;
+    if (activeTab) {
+      setReviewPillStyle({
+        left: activeTab.offsetLeft,
+        width: activeTab.offsetWidth,
+        opacity: 1
+      });
+    }
+  }, []);
+
+  useLayoutEffect(() => {
+    updateReviewPill();
+  }, [reviewTab, updateReviewPill]);
+
+  useEffect(() => {
+    const container = reviewTabsRef.current;
+    if (!container) return;
+
+    updateReviewPill();
+    const timer = setTimeout(() => setIsReviewPillReady(true), 150);
+
+    const observer = new ResizeObserver(() => {
+      setIsReviewPillReady(false);
+      updateReviewPill();
+      setTimeout(() => setIsReviewPillReady(true), 50);
+    });
+
+    observer.observe(container);
+    return () => {
+      clearTimeout(timer);
+      observer.disconnect();
+    };
+  }, [updateReviewPill]);
 
   /* ── grade bars animate on scroll ── */
   useEffect(() => {
@@ -474,7 +515,16 @@ const Professor = () => {
       <section className="prof-section prof-reviews-section" ref={reviewsRef}>
         <div className="prof-reviews-header">
           <h2 className="prof-section-title">Reviews</h2>
-          <div className="prof-review-tabs">
+          <div className="prof-review-tabs" ref={reviewTabsRef}>
+            <div 
+              className={`prof-review-pill-background ${isReviewPillReady ? 'animate' : ''}`}
+              style={{
+                transform: `translateX(${reviewPillStyle.left}px)`,
+                width: `${reviewPillStyle.width}px`,
+                opacity: reviewPillStyle.opacity,
+                visibility: reviewPillStyle.opacity === 0 ? 'hidden' : 'visible'
+              }}
+            />
             <button className={`prof-review-tab ${reviewTab === 'rmp' ? 'active' : ''}`} onClick={() => setReviewTab('rmp')}>
               RateMyProfessor ({reviews.length})
             </button>

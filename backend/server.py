@@ -573,9 +573,10 @@ def random_professor():
 # Professors: merge RMP + TRACE so all instructors are searchable
 
 # RMP professors (already have avg_rating, trace_dept, etc.)
-rmp_for_search = rmp_profs[["name", "trace_dept", "avg_rating", "total_reviews"]].copy()
+rmp_for_search = rmp_profs[["name", "department", "trace_dept", "avg_rating", "total_reviews"]].copy()
 rmp_for_search["_name_lower"] = rmp_for_search["name"].apply(normalize_name)
-rmp_for_search["dept_display"] = rmp_for_search["trace_dept"]  # only TRACE dept
+# Use TRACE department if available, otherwise fall back to RMP department
+rmp_for_search["dept_display"] = rmp_for_search["trace_dept"].fillna(rmp_for_search["department"])
 
 # TRACE-only professors (not in RMP)
 trace_unique = trace_courses[["_full", "departmentName"]].drop_duplicates(subset=["_full"])
@@ -596,11 +597,11 @@ prof_search = pd.concat([
     trace_only[["name", "_name_lower", "dept_display", "avg_rating", "total_reviews"]],
 ], ignore_index=True)
 
-# Drop any without a TRACE department
+# Drop any without any department info
 prof_search = prof_search[prof_search["dept_display"].notna()]
 
-# Split into individual name parts for whole-word matching
-prof_search["_name_parts"] = prof_search["_name_lower"].str.split()
+# Split into individual name parts for whole-word matching (strip punctuation for better matching)
+prof_search["_name_parts"] = prof_search["_name_lower"].str.replace(r'[^\w\s]', '', regex=True).str.split()
 prof_search = prof_search.drop_duplicates(subset=["_name_lower"])
 
 print(f"[search] Indexed {len(prof_search)} professors ({len(rmp_for_search)} RMP + {len(trace_only)} TRACE-only)")
@@ -635,7 +636,7 @@ print(f"[search] Indexed {len(prof_search)} professors, {len(course_search)} cou
 def search():
     q = normalize_name(request.args.get("q", ""))
     search_type = request.args.get("type", "Professor")
-    limit = int(request.args.get("limit", "3"))
+    limit = int(request.args.get("limit", "5"))
 
     if len(q) < 2:
         return jsonify([])
@@ -658,11 +659,62 @@ def search():
             ~prof_search.index.isin(exact_word.index) &
             ~prof_search.index.isin(starts_word.index)
         ]
-        matches = pd.concat([
+
+        # Tier 4: Fallback for spaced queries — each word must prefix a name part
+        # e.g. "jon bell" → "jon" starts "jonathan", "bell" starts "bell"
+        fallback_matches = pd.DataFrame()
+        if ' ' in q:
+            words = q.split()
+            if len(words) >= 2:
+                def robust_match(prof_parts):
+                    if not isinstance(prof_parts, list): return False
+                    for qw in words:
+                        if not any(pp.startswith(qw) for pp in prof_parts):
+                            return False
+                    return True
+
+                mask = prof_search["_name_parts"].apply(robust_match)
+                fallback_matches = prof_search[
+                    mask &
+                    ~prof_search.index.isin(exact_word.index) &
+                    ~prof_search.index.isin(starts_word.index) &
+                    ~prof_search.index.isin(contains.index)
+                ]
+
+        # Tier 5: Each query word is a substring of any name part (loosest)
+        # e.g. "ath bell" → "ath" in "jonathan", "bell" in "bell"
+        substring_matches = pd.DataFrame()
+        if ' ' in q:
+            words = q.split()
+            if len(words) >= 2:
+                def substring_match(prof_parts):
+                    if not isinstance(prof_parts, list): return False
+                    for qw in words:
+                        if not any(qw in pp for pp in prof_parts):
+                            return False
+                    return True
+
+                already = set(exact_word.index) | set(starts_word.index) | set(contains.index)
+                if not fallback_matches.empty:
+                    already |= set(fallback_matches.index)
+
+                mask = prof_search["_name_parts"].apply(substring_match)
+                substring_matches = prof_search[
+                    mask & ~prof_search.index.isin(already)
+                ]
+
+        # Combine all tiers in priority order
+        all_matches = [
             exact_word.sort_values("total_reviews", ascending=False),
             starts_word.sort_values("total_reviews", ascending=False),
             contains.sort_values("total_reviews", ascending=False),
-        ]).head(limit)
+        ]
+        if not fallback_matches.empty:
+            all_matches.append(fallback_matches.sort_values("total_reviews", ascending=False))
+        if not substring_matches.empty:
+            all_matches.append(substring_matches.sort_values("total_reviews", ascending=False))
+
+        matches = pd.concat(all_matches).head(limit)
 
         results = []
         for _, r in matches.iterrows():
@@ -895,4 +947,4 @@ if __name__ == "__main__":
     print(f"Loaded {len(rmp_profs)} RMP professors, {len(rmp_reviews)} RMP reviews")
     print(f"Stats → {stat_professor_count} professors, {stat_course_count} courses, "
           f"{stat_total_evaluations} evaluations, {stat_department_count} departments")
-    app.run(debug=True, port=5001, use_reloader=False)
+    app.run(debug=True, port=5001, use_reloader=True)

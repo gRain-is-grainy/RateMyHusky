@@ -202,14 +202,55 @@
 /* ═══════════ REVIEWS ═══════════ */
 .prof-reviews-section { padding-bottom: 60px; }
 .prof-reviews-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; margin-bottom: 20px; }
-.prof-review-tabs { display: flex; gap: 10px; }
-.prof-review-tab {
-  background: #fff; border: 1.5px solid #ddd; border-radius: 20px; padding: 10px 24px;
-  font-family: 'Nunito', sans-serif; font-size: 0.92rem; font-weight: 700; color: #555;
-  cursor: pointer; transition: all 0.2s;
+.prof-review-tabs {
+  position: relative;
+  display: flex;
+  gap: 10px;
+  background: rgba(0, 0, 0, 0.03);
+  padding: 4px;
+  border-radius: 24px;
 }
-.prof-review-tab:hover { border-color: #d6394c; color: #d6394c; }
-.prof-review-tab.active { background: #d6394c; border-color: #d6394c; color: #fff; }
+
+.prof-review-pill-background {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  left: 0;
+  background: #d6394c;
+  border-radius: 20px;
+  box-shadow: 0 4px 12px rgba(214, 57, 76, 0.25);
+  z-index: 0;
+  pointer-events: none;
+}
+
+.prof-review-pill-background.animate {
+  transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), width 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease;
+}
+
+.prof-review-tab {
+  position: relative;
+  z-index: 1;
+  background: transparent;
+  border: none;
+  border-radius: 20px;
+  padding: 10px 24px;
+  font-family: 'Nunito', sans-serif;
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: #555;
+  cursor: pointer;
+  transition: color 0.3s ease;
+}
+
+.prof-review-tab:hover {
+  color: #d6394c;
+}
+
+.prof-review-tab.active {
+  color: #fff !important;
+  background: transparent !important;
+  border: none !important;
+}
 
 .prof-reviews-filters { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
 .prof-reviews-filters .feedback-dropdown { width: auto; min-width: 180px; margin-bottom: 0; }
@@ -527,9 +568,10 @@
 .dark .prof-course-terms { color: #777; }
 .dark .prof-course-term-tag { color: #e06070; background: #3a2020; }
 
-.dark .prof-review-tab { background: #2a2a2a; border-color: #444; color: #ccc; }
-.dark .prof-review-tab:hover { border-color: #d6394c; color: #d6394c; }
-.dark .prof-review-tab.active { background: #d6394c; border-color: #d6394c; color: #fff; }
+.dark .prof-review-tabs { background: rgba(255, 255, 255, 0.03); }
+.dark .prof-review-tab { color: #aaa; }
+.dark .prof-review-tab:hover { color: #fff; }
+.dark .prof-review-tab.active { color: #fff !important; }
 .dark .prof-review-card { background: #242424; box-shadow: 0 2px 12px rgba(0,0,0,0.2); border-left-color: #555; }
 .dark .prof-review-card:hover { box-shadow: 0 6px 24px rgba(0,0,0,0.3); }
 .dark .prof-review-comment { color: #ccc; }
