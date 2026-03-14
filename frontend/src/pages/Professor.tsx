@@ -18,27 +18,56 @@ const AnimatedNumber = ({
 }: { value: number | null; decimals?: number; suffix?: string }) => {
   const [display, setDisplay] = useState('—');
   const hasAnimated = useRef(false);
+  const prevValue = useRef<number | null>(null);
   const ref = useRef<HTMLSpanElement>(null);
-  const animate = useCallback(() => {
-    if (hasAnimated.current || value === null) return;
-    hasAnimated.current = true;
-    const duration = 1200;
+
+  const animate = useCallback((from: number, to: number) => {
+    const duration = 1000;
     const start = performance.now();
     const step = (now: number) => {
       const t = Math.min((now - start) / duration, 1);
       const eased = 1 - Math.pow(1 - t, 3);
-      setDisplay((eased * value).toFixed(decimals) + suffix);
+      const current = from + (to - from) * eased;
+      setDisplay(current.toFixed(decimals) + suffix);
       if (t < 1) requestAnimationFrame(step);
     };
     requestAnimationFrame(step);
-  }, [value, decimals, suffix]);
+  }, [decimals, suffix]);
+
+  useEffect(() => {
+    if (value === null) {
+      setDisplay('—');
+      prevValue.current = null;
+      return;
+    }
+
+    if (!hasAnimated.current) {
+      // First animation is handled by IntersectionObserver
+      return;
+    }
+
+    // Subsequent updates
+    if (prevValue.current !== value) {
+      animate(prevValue.current || 0, value);
+      prevValue.current = value;
+    }
+  }, [value, animate]);
+
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    const obs = new IntersectionObserver(([e]) => { if (e.isIntersecting) { animate(); obs.disconnect(); } }, { threshold: 0.5 });
+    const obs = new IntersectionObserver(([e]) => { 
+      if (e.isIntersecting && !hasAnimated.current && value !== null) { 
+        hasAnimated.current = true;
+        animate(0, value);
+        prevValue.current = value;
+        obs.disconnect(); 
+      } 
+    }, { threshold: 0.5 });
     obs.observe(el);
     return () => obs.disconnect();
-  }, [animate]);
+  }, [animate, value]);
+
   return <span ref={ref}>{display}</span>;
 };
 
@@ -57,6 +86,18 @@ const traceSortOptions = [
 ];
 
 const courseFilterAll = { value: '__all__', label: 'All Courses' };
+
+// Strictly extract "Season Year" from messy term titles
+const cleanTerm = (t: string): string => {
+  // Extract the season keyword
+  const seasonMatch = t.match(/(Spring|Fall|Summer|Winter)/i);
+  if (!seasonMatch) return t.trim();
+  const season = seasonMatch[1].charAt(0).toUpperCase() + seasonMatch[1].slice(1).toLowerCase();
+  // Extract the first valid 4-digit year (2000-2099)
+  const yearMatch = t.match(/\b(20\d{2})\b/);
+  if (!yearMatch) return season;
+  return `${season} ${yearMatch[1]}`;
+};
 
 const GRADE_ORDER = ['A+','A','A-','B+','B','B-','C+','C','C-','D+','D','D-','F','W','WF','P','NP','I'];
 const GRADE_COLORS: Record<string, string> = {
@@ -84,6 +125,7 @@ const Professor = () => {
   const [sortBy, setSortBy] = useState('newest');
   const [courseFilter, setCourseFilter] = useState('__all__');
   const [visibleReviews, setVisibleReviews] = useState(10);
+  const [selectedCourses, setSelectedCourses] = useState<Set<string>>(new Set());
 
   // Review tabs pill state
   const [reviewPillStyle, setReviewPillStyle] = useState({ left: 0, width: 0, opacity: 0 });
@@ -175,11 +217,6 @@ const Professor = () => {
           setProfile(data); 
           setReviews(data.reviews || []); 
           setTraceComments(data.traceComments || []); 
-          
-          // Initial expanded state for the first few popular questions
-          if (data.traceComments && data.traceComments.length > 0) {
-            // We'll set this later after grouping
-          }
         }
       } catch { if (!cancelled) setError('Failed to load professor data.'); }
       finally { if (!cancelled) setLoading(false); }
@@ -190,25 +227,28 @@ const Professor = () => {
 
   useEffect(() => { setVisibleReviews(10); }, [sortBy, courseFilter, reviewTab]);
 
-  const courseCodeMap = new Map<string, string>();
-  profile?.traceCourses?.forEach((c) => {
-    const codeMatch = c.displayName.match(/^([A-Z]+)(\d+)/i);
-    if (codeMatch) {
-      const fullCode = codeMatch[0].toUpperCase();
-      const numberPart = codeMatch[2];
-      courseCodeMap.set(fullCode, fullCode);
-      if (!courseCodeMap.has(numberPart)) {
-        courseCodeMap.set(numberPart, fullCode);
+  const courseCodeMap = useMemo(() => {
+    const map = new Map<string, string>();
+    profile?.traceCourses?.forEach((c) => {
+      const codeMatch = c.displayName.match(/^([A-Z]+)(\d+)/i);
+      if (codeMatch) {
+        const fullCode = codeMatch[0].toUpperCase();
+        const numberPart = codeMatch[2];
+        map.set(fullCode, fullCode);
+        if (!map.has(numberPart)) {
+          map.set(numberPart, fullCode);
+        }
+      } else {
+        const code = c.displayName.split(':')[0].split(' ')[0];
+        if (code) {
+          map.set(code.toUpperCase(), code.toUpperCase());
+        }
       }
-    } else {
-      const code = c.displayName.split(':')[0].split(' ')[0];
-      if (code) {
-        courseCodeMap.set(code.toUpperCase(), code.toUpperCase());
-      }
-    }
-  });
+    });
+    return map;
+  }, [profile]);
 
-  const getFormattedCourseCode = (courseInput: string) => {
+  const getFormattedCourseCode = useCallback((courseInput: string) => {
     if (!courseInput) return courseInput;
     const cleanInput = courseInput.replace(/\s+/g, '').toUpperCase();
     
@@ -225,30 +265,131 @@ const Professor = () => {
     }
     
     return courseInput;
-  };
+  }, [courseCodeMap]);
 
-  const uniqueCourses = Array.from(new Set(reviews.map((r) => r.course).filter(Boolean)));
-  const courseOptions = [courseFilterAll, ...uniqueCourses.map((c) => ({ value: c, label: getFormattedCourseCode(c) }))];
+  const allCourseCodes = useMemo(() => {
+    const codes = new Set<string>();
+    profile?.traceCourses?.forEach(c => {
+      const match = c.displayName.match(/^([A-Z]+\d+)/);
+      const code = match ? match[1] : c.displayName.split(':')[0].split(' ')[0];
+      if (code) codes.add(code.toUpperCase());
+    });
+    reviews.forEach(r => {
+      const code = getFormattedCourseCode(r.course);
+      if (code) codes.add(code.toUpperCase());
+    });
+    return Array.from(codes).sort();
+  }, [profile, reviews, getFormattedCourseCode]);
 
-  const filteredReviews = reviews
-    .filter((r) => courseFilter === '__all__' || r.course === courseFilter)
-    .sort((a, b) => {
-      switch (sortBy) {
-        case 'oldest': return new Date(a.date).getTime() - new Date(b.date).getTime();
-        case 'highest': return b.quality - a.quality;
-        case 'lowest': return a.quality - b.quality;
-        default: return new Date(b.date).getTime() - new Date(a.date).getTime();
+  useEffect(() => {
+    if (allCourseCodes.length > 0 && selectedCourses.size === 0) {
+      setSelectedCourses(new Set(allCourseCodes));
+    }
+  }, [allCourseCodes]);
+
+  const filteredRmpReviews = useMemo(() => {
+    return reviews.filter(r => selectedCourses.has(getFormattedCourseCode(r.course).toUpperCase()));
+  }, [reviews, selectedCourses, getFormattedCourseCode]);
+
+  const filteredTraceCourses = useMemo(() => {
+    return (profile?.traceCourses || []).filter(c => {
+      const match = c.displayName.match(/^([A-Z]+\d+)/);
+      const code = match ? match[1] : c.displayName.split(':')[0].split(' ')[0];
+      return selectedCourses.has(code.toUpperCase());
+    });
+  }, [profile, selectedCourses]);
+
+  const stats = useMemo(() => {
+    if (!profile) return null;
+
+    // Recalculate RMP rating
+    const rmpRating = filteredRmpReviews.length > 0
+      ? filteredRmpReviews.reduce((acc, r) => acc + r.quality, 0) / filteredRmpReviews.length
+      : null;
+
+    // Recalculate difficulty
+    const difficulty = filteredRmpReviews.length > 0
+      ? filteredRmpReviews.reduce((acc, r) => acc + r.difficulty, 0) / filteredRmpReviews.length
+      : null;
+
+    // Recalculate TRACE rating (weighted mean of overall course scores)
+    let traceSum = 0;
+    let traceWeight = 0;
+    filteredTraceCourses.forEach(c => {
+      const overallScore = c.scores.find(s => 
+        (s.question.toLowerCase().includes('overall') && s.question.toLowerCase().includes('course')) ||
+        (s.question.toLowerCase().includes('instructor') && s.question.toLowerCase().includes('overall'))
+      );
+      if (overallScore) {
+        traceSum += overallScore.mean * overallScore.completed;
+        traceWeight += overallScore.completed;
       }
     });
+    const traceRating = traceWeight > 0 ? traceSum / traceWeight : null;
+
+    // Combined average
+    let combinedSum = 0;
+    let combinedWeight = 0;
+    if (rmpRating !== null) {
+      combinedSum += filteredRmpReviews.reduce((acc, r) => acc + r.quality, 0);
+      combinedWeight += filteredRmpReviews.length;
+    }
+    if (traceRating !== null) {
+      combinedSum += traceSum;
+      combinedWeight += traceWeight;
+    }
+    const avgRating = combinedWeight > 0 ? combinedSum / combinedWeight : null;
+
+    const totalRatings = filteredRmpReviews.length + traceWeight;
+
+    return {
+      avgRating,
+      rmpRating,
+      traceRating,
+      difficulty,
+      totalRatings,
+      wouldTakeAgainPct: profile.wouldTakeAgainPct, // Not course-specific in current data
+    };
+  }, [profile, filteredRmpReviews, filteredTraceCourses]);
+
+  const uniqueRmpCourses = Array.from(new Set(reviews.map((r) => r.course).filter(Boolean)));
+  const courseOptions = [courseFilterAll, ...uniqueRmpCourses.map((c) => ({ value: c, label: getFormattedCourseCode(c) }))];
+
+  const sortedReviews = useMemo(() => {
+    return [...filteredRmpReviews]
+      .filter((r) => courseFilter === '__all__' || r.course === courseFilter)
+      .sort((a, b) => {
+        switch (sortBy) {
+          case 'oldest': return new Date(a.date).getTime() - new Date(b.date).getTime();
+          case 'highest': return b.quality - a.quality;
+          case 'lowest': return a.quality - b.quality;
+          default: return new Date(b.date).getTime() - new Date(a.date).getTime();
+        }
+      });
+  }, [filteredRmpReviews, sortBy, courseFilter]);
+
+  const termIdMap = useMemo(() => {
+    const map = new Map<number, string>();
+    profile?.traceCourses?.forEach((c) => {
+      if (!map.has(c.termId)) {
+        map.set(c.termId, c.termTitle);
+      }
+    });
+    return map;
+  }, [profile]);
 
   // Group TRACE comments by question
   const groupedTrace = useMemo(() => {
     const groups: Record<string, TraceComment[]> = {};
+    const selectedTermIds = new Set(filteredTraceCourses.map(c => c.termId));
+
     traceComments.forEach(comment => {
-      if (!groups[comment.question]) {
-        groups[comment.question] = [];
+      if (selectedTermIds.has(comment.termId)) {
+        if (!groups[comment.question]) {
+          groups[comment.question] = [];
+        }
+        groups[comment.question].push(comment);
       }
-      groups[comment.question].push(comment);
     });
 
     // Helper to check if a comment is detailed for sorting
@@ -300,7 +441,7 @@ const Professor = () => {
           default: return 0;
         }
       });
-  }, [traceComments, traceSearch, traceSort]);
+  }, [traceComments, traceSearch, traceSort, filteredTraceCourses]);
 
   const toggleQuestion = (question: string) => {
     setExpandedQuestions(prev => ({
@@ -324,14 +465,17 @@ const Professor = () => {
     }));
   };
 
-  const ratingDistribution = [5,4,3,2,1].map((star) => ({
-    star, count: reviews.filter((r) => r.quality === star).length,
-  }));
-  const maxCount = Math.max(...ratingDistribution.map((d) => d.count), 1);
+  const ratingDistribution = useMemo(() => {
+    return [5,4,3,2,1].map((star) => ({
+      star, count: filteredRmpReviews.filter((r) => r.quality === star).length,
+    }));
+  }, [filteredRmpReviews]);
 
-  const gradeDistribution = (() => {
+  const maxCount = useMemo(() => Math.max(...ratingDistribution.map((d) => d.count), 1), [ratingDistribution]);
+
+  const gradeDistribution = useMemo(() => {
     const counts: Record<string, number> = {};
-    reviews.forEach((r) => {
+    filteredRmpReviews.forEach((r) => {
       const g = r.grade?.trim();
       if (g && g !== 'N/A' && g !== 'Not sure yet' && g !== 'Rather not say') {
         counts[g] = (counts[g] || 0) + 1;
@@ -342,7 +486,24 @@ const Professor = () => {
     return GRADE_ORDER
       .filter((g) => counts[g])
       .map((g) => ({ grade: g, count: counts[g], pct: (counts[g] / total) * 100, color: GRADE_COLORS[g] || '#999' }));
-  })();
+  }, [filteredRmpReviews]);
+
+  const toggleCourse = (code: string) => {
+    setSelectedCourses(prev => {
+      const next = new Set(prev);
+      if (next.has(code)) next.delete(code);
+      else next.add(code);
+      return next;
+    });
+  };
+
+  const selectAllCourses = () => {
+    setSelectedCourses(new Set(allCourseCodes));
+  };
+
+  const clearAllCourses = () => {
+    setSelectedCourses(new Set());
+  };
 
   const scrollToReviews = () => {
     reviewsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -356,7 +517,7 @@ const Professor = () => {
     </div>
   );
 
-  if (error || !profile) return <NotFound />;
+  if (error || !profile || !stats) return <NotFound />;
 
   const compareSlug = profile.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 
@@ -380,32 +541,32 @@ const Professor = () => {
       {/* ════════ STAT CARDS ════════ */}
       <section className="prof-stats">
         <div className="prof-stat-card prof-stat-clickable">
-          <span className="prof-stat-value accent"><AnimatedNumber value={profile.avgRating} /></span>
+          <span className="prof-stat-value accent"><AnimatedNumber value={stats.avgRating} /></span>
           <span className="prof-stat-label" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
             Overall Rating
-            {(profile.rmpRating || profile.traceRating) && (
+            {(stats.rmpRating || stats.traceRating) && (
               <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.6 }}><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
             )}
           </span>
-          <StarRating rating={profile.avgRating ?? 0} size="lg" />
-          {(profile.rmpRating || profile.traceRating) && (
+          <StarRating rating={stats.avgRating ?? 0} size="lg" />
+          {(stats.rmpRating || stats.traceRating) && (
             <div className="prof-stat-breakdown">
-              {profile.rmpRating && <span>RMP: {profile.rmpRating.toFixed(2)}</span>}
-              {profile.traceRating && <span>TRACE: {profile.traceRating.toFixed(2)}</span>}
+              {stats.rmpRating && <span>RMP: {stats.rmpRating.toFixed(2)}</span>}
+              {stats.traceRating && <span>TRACE: {stats.traceRating.toFixed(2)}</span>}
             </div>
           )}
         </div>
         <div className="prof-stat-card">
-          <span className="prof-stat-value"><AnimatedNumber value={profile.difficulty} /></span>
+          <span className="prof-stat-value"><AnimatedNumber value={stats.difficulty} /></span>
           <span className="prof-stat-label">Difficulty</span>
-          <div className="prof-difficulty-bar"><div className="prof-difficulty-fill" style={{ width: `${((profile.difficulty ?? 0) / 5) * 100}%` }} /></div>
+          <div className="prof-difficulty-bar"><div className="prof-difficulty-fill" style={{ width: `${((stats.difficulty ?? 0) / 5) * 100}%` }} /></div>
         </div>
         <div className="prof-stat-card">
-          <span className="prof-stat-value green">{profile.wouldTakeAgainPct !== null ? <AnimatedNumber value={profile.wouldTakeAgainPct} decimals={0} suffix="%" /> : '—'}</span>
+          <span className="prof-stat-value green">{stats.wouldTakeAgainPct !== null ? <AnimatedNumber value={stats.wouldTakeAgainPct} decimals={0} suffix="%" /> : '—'}</span>
           <span className="prof-stat-label">Would Take Again</span>
         </div>
         <div className="prof-stat-card prof-stat-clickable" onClick={scrollToReviews} title="Jump to reviews">
-          <span className="prof-stat-value">{profile.totalRatings.toLocaleString()}</span>
+          <span className="prof-stat-value">{stats.totalRatings.toLocaleString()}</span>
           <span className="prof-stat-label">Total Ratings</span>
           <span className="prof-stat-hint">Click to view ↓</span>
         </div>
@@ -454,18 +615,6 @@ const Professor = () => {
 
       {/* ════════ COURSES ════════ */}
       {profile.traceCourses && profile.traceCourses.length > 0 && (() => {
-        // Strictly extract "Season Year" from messy term titles
-        const cleanTerm = (t: string): string => {
-          // Extract the season keyword
-          const seasonMatch = t.match(/(Spring|Fall|Summer|Winter)/i);
-          if (!seasonMatch) return t.trim();
-          const season = seasonMatch[1].charAt(0).toUpperCase() + seasonMatch[1].slice(1).toLowerCase();
-          // Extract the first valid 4-digit year (2000-2099)
-          const yearMatch = t.match(/\b(20\d{2})\b/);
-          if (!yearMatch) return season;
-          return `${season} ${yearMatch[1]}`;
-        };
-
         // Extract course code: handle both "SCHM2301:02 (...)" and "SCHM2301 (...)" formats
         const extractCode = (displayName: string): string => {
           const match = displayName.match(/^([A-Z]+\d+)/);
@@ -478,12 +627,29 @@ const Professor = () => {
           if (!grouped.has(code)) grouped.set(code, []);
           grouped.get(code)!.push(c);
         });
+        
+        // Add courses from RMP that might not be in TRACE
+        reviews.forEach(r => {
+          const code = getFormattedCourseCode(r.course).toUpperCase();
+          if (code && !grouped.has(code)) {
+            grouped.set(code, []); // Empty sections list if only from RMP
+          }
+        });
+
+        const sortedGrouped = Array.from(grouped.entries()).sort(([a], [b]) => a.localeCompare(b));
+
         return (
           <section className="prof-section">
-            <h2 className="prof-section-title">Courses Taught</h2>
+            <div className="prof-section-header">
+              <h2 className="prof-section-title">Courses Taught</h2>
+              <div className="prof-section-actions">
+                <button className="prof-action-link" onClick={selectAllCourses}>Select All</button>
+                <button className="prof-action-link" onClick={clearAllCourses}>Clear All</button>
+              </div>
+            </div>
             <div className="prof-courses-compact">
-              {Array.from(grouped.entries()).map(([code, sections]) => {
-                const nameMatch = sections[0].displayName.match(/\((.+?)\)/);
+              {sortedGrouped.map(([code, sections]) => {
+                const nameMatch = sections[0]?.displayName.match(/\((.+?)\)/);
                 const courseName = nameMatch ? nameMatch[1] : '';
                 const terms = [...new Set(sections.map((s) => cleanTerm(s.termTitle)))]
                   .filter((t) => /\b20\d{2}\b/.test(t))
@@ -495,16 +661,25 @@ const Professor = () => {
                   const order: Record<string, number> = { Spring: 1, Summer: 2, Fall: 3, Winter: 4 };
                   return (order[b.split(' ')[0]] || 0) - (order[a.split(' ')[0]] || 0);
                 });
+                
+                const isSelected = selectedCourses.has(code.toUpperCase());
+
                 return (
-                  <div key={code} className="prof-course-row">
+                  <div 
+                    key={code} 
+                    className={`prof-course-row ${isSelected ? 'selected' : ''}`}
+                    onClick={() => toggleCourse(code.toUpperCase())}
+                  >
                     <div className="prof-course-row-main">
                       <span className="prof-course-code">{code}</span>
-                      <span className="prof-course-title">{courseName}</span>
-                      <span className="prof-course-terms">{sections.length} section{sections.length > 1 ? 's' : ''}</span>
+                      <span className="prof-course-title">{courseName || 'Course data from reviews'}</span>
+                      <span className="prof-course-terms">{sections.length > 0 ? `${sections.length} section${sections.length > 1 ? 's' : ''}` : 'RMP reviews only'}</span>
                     </div>
-                    <div className="prof-course-term-tags">
-                      {terms.map((t) => (<span key={t} className="prof-course-term-tag">{t}</span>))}
-                    </div>
+                    {terms.length > 0 && (
+                      <div className="prof-course-term-tags">
+                        {terms.map((t) => (<span key={t} className="prof-course-term-tag">{t}</span>))}
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -539,13 +714,13 @@ const Professor = () => {
         {reviewTab === 'rmp' && (<>
           <div className="prof-reviews-filters">
             <Dropdown className="feedback-dropdown" options={sortOptions} value={sortBy} onChange={setSortBy} placeholder="Sort by…" />
-            {uniqueCourses.length > 1 && (
+            {uniqueRmpCourses.length > 1 && (
               <Dropdown className="feedback-dropdown" options={courseOptions} value={courseFilter} onChange={setCourseFilter} placeholder="Filter by course" />
             )}
           </div>
           <div className="prof-reviews-list">
-            {filteredReviews.length === 0 ? <p className="prof-no-reviews">No reviews match the current filters.</p> : (
-              filteredReviews.slice(0, visibleReviews).map((r, i) => (
+            {sortedReviews.length === 0 ? <p className="prof-no-reviews">No reviews match the current filters.</p> : (
+              sortedReviews.slice(0, visibleReviews).map((r, i) => (
                 <div key={i} className="prof-review-card" style={{ animationDelay: `${(i % 10) * 0.04}s`, borderLeftColor: r.quality >= 4 ? '#27ae60' : r.quality >= 3 ? '#f39c12' : '#e74c3c' }}>
                   <div className="prof-review-top">
                     <div className="prof-review-ratings">
@@ -579,9 +754,9 @@ const Professor = () => {
               ))
             )}
           </div>
-          {visibleReviews < filteredReviews.length && (
+          {visibleReviews < sortedReviews.length && (
             <button className="prof-load-more" onClick={() => setVisibleReviews((v) => v + 10)}>
-              Load More Reviews ({filteredReviews.length - visibleReviews} remaining)
+              Load More Reviews ({sortedReviews.length - visibleReviews} remaining)
             </button>
           )}
         </>)}
@@ -635,11 +810,16 @@ const Professor = () => {
                       
                       {isExpanded && (
                         <div className="trace-category-content">
-                          {group.comments.slice(0, visibleCount).map((c, ci) => (
-                            <div key={ci} className="trace-comment-bubble">
-                              {c.comment}
-                            </div>
-                          ))}
+                          {group.comments.slice(0, visibleCount).map((c, ci) => {
+                            const termTitle = termIdMap.get(c.termId);
+                            const cleaned = termTitle ? cleanTerm(termTitle) : '';
+                            return (
+                              <div key={ci} className="trace-comment-bubble">
+                                {cleaned && <span className="trace-comment-term">{cleaned}</span>}
+                                {c.comment}
+                              </div>
+                            );
+                          })}
                           
                           <div className="trace-category-actions">
                             {visibleCount < group.count && (
