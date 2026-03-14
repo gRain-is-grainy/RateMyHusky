@@ -88,6 +88,19 @@ const cleanTerm = (t: string): string => {
   return `${season} ${yearMatch[1]}`;
 };
 
+const formatReviewDate = (dateStr: string) => {
+  if (!dateStr) return '';
+  // Convert "2022-12-11 18:36:58 +0000 UTC" to "2022-12-11T18:36:58Z"
+  const normalized = dateStr.replace(' +0000 UTC', '').replace(' ', 'T') + 'Z';
+  const date = new Date(normalized);
+  if (isNaN(date.getTime())) return dateStr;
+  return date.toLocaleDateString('en-US', {
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric'
+  });
+};
+
 const GRADE_ORDER = ['A+','A','A-','B+','B','B-','C+','C','C-','D+','D','D-','F','W','WF','P','NP','I'];
 const GRADE_COLORS: Record<string, string> = {
   'A+':'#1a9850','A':'#27ae60','A-':'#66bd63',
@@ -260,9 +273,6 @@ const Professor = () => {
     if (!profile) return null;
     const rmpRating = filteredRmpReviews.length > 0
       ? filteredRmpReviews.reduce((acc, r) => acc + r.quality, 0) / filteredRmpReviews.length
-      : null;
-    const difficulty = filteredRmpReviews.length > 0
-      ? filteredRmpReviews.reduce((acc, r) => acc + r.difficulty, 0) / filteredRmpReviews.length
       : null;
     
     let traceSum = 0, traceWeight = 0;
@@ -624,7 +634,7 @@ const Professor = () => {
                       </div>
                       <div className="prof-review-meta">
                         <span className="prof-review-course">{getFormattedCourseCode(r.course)}</span>
-                        <span className="prof-review-date">{r.date}</span>
+                        <span className="prof-review-date">{formatReviewDate(r.date)}</span>
                       </div>
                     </div>
                     {r.comment && <p className="prof-review-comment">{r.comment}</p>}
@@ -687,7 +697,12 @@ const Professor = () => {
                     {isExpanded && (
                       <div className="trace-category-content">
                         {g.comments.slice(0, visibleCount).map((c, ci) => (
-                          <div key={ci} className="trace-comment-bubble">
+                          <div 
+                            key={ci} 
+                            className={`trace-comment-bubble ${c.courseUrl ? 'clickable' : ''}`}
+                            onClick={() => c.courseUrl && window.open(c.courseUrl, '_blank')}
+                            title={c.courseUrl ? "Click to view original TRACE report" : ""}
+                          >
                             <span className="trace-comment-term">{cleanTerm(termIdMap.get(c.termId) || '')}</span>
                             {c.comment}
                           </div>
