@@ -31,6 +31,11 @@ export interface TraceCourseScore {
   enrollment: number;
   completed: number;
   totalResponses?: number;
+  count1?: number;
+  count2?: number;
+  count3?: number;
+  count4?: number;
+  count5?: number;
 }
 
 export interface TraceCourse {

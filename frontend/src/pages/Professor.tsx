@@ -328,11 +328,36 @@ const Professor = () => {
   }, [profile, filteredRmpReviews, filteredTraceCourses, allCourseCodes, selectedCourses]);
 
   const ratingDistribution = useMemo(() => {
-    return [5,4,3,2,1].map(star => ({
+    const counts = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+
+    // RMP
+    filteredRmpReviews.forEach(r => {
+      if (r.quality >= 1 && r.quality <= 5) {
+        const q = Math.round(r.quality) as 1 | 2 | 3 | 4 | 5;
+        counts[q]++;
+      }
+    });
+
+    // TRACE
+    filteredTraceCourses.forEach(c => {
+      const overall = c.scores.find(s => {
+        const q = s.question.toLowerCase().replace(/\s+/g, ' ');
+        return q === 'overall rating of teaching' || q.includes('overall rating') || q.includes('overall');
+      });
+      if (overall) {
+        counts[1] += overall.count1 ?? 0;
+        counts[2] += overall.count2 ?? 0;
+        counts[3] += overall.count3 ?? 0;
+        counts[4] += overall.count4 ?? 0;
+        counts[5] += overall.count5 ?? 0;
+      }
+    });
+
+    return [5, 4, 3, 2, 1].map(star => ({
       star,
-      count: filteredRmpReviews.filter(r => r.quality === star).length,
+      count: counts[star as 1 | 2 | 3 | 4 | 5],
     }));
-  }, [filteredRmpReviews]);
+  }, [filteredRmpReviews, filteredTraceCourses]);
 
   const maxCount = useMemo(() => Math.max(...ratingDistribution.map(d => d.count), 1), [ratingDistribution]);
 

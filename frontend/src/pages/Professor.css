@@ -161,7 +161,18 @@
 .prof-stat-value { font-size: 2.3rem; font-weight: 900; color: #333; }
 .prof-stat-value.accent { color: #d6394c; }
 .prof-stat-value.green { color: #27ae60; }
-.prof-stat-label { font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: #999; text-align: center; }
+.prof-stat-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: #999;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
 
 .prof-stat-clickable { cursor: pointer; }
 .prof-stat-hint { font-size: 0.72rem; color: #bbb; font-weight: 600; margin-top: 2px; transition: color 0.2s; }

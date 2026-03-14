@@ -867,6 +867,11 @@ def professor_profile(slug):
                 "enrollment": int(s["enrollment"]) if pd.notna(s["enrollment"]) else 0,
                 "completed": int(s["completed"]) if pd.notna(s["completed"]) else 0,
                 "totalResponses": int(s["_total_responses"]) if pd.notna(s["_total_responses"]) else 0,
+                "count1": int(s["count_1"]) if pd.notna(s["count_1"]) else 0,
+                "count2": int(s["count_2"]) if pd.notna(s["count_2"]) else 0,
+                "count3": int(s["count_3"]) if pd.notna(s["count_3"]) else 0,
+                "count4": int(s["count_4"]) if pd.notna(s["count_4"]) else 0,
+                "count5": int(s["count_5"]) if pd.notna(s["count_5"]) else 0,
             })
         trace_course_list.append({
             "courseId": cid, "termId": tid,
