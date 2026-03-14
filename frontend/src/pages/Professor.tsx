@@ -469,7 +469,7 @@ const Professor = () => {
       <section className="prof-stats">
         <div className="prof-stat-card prof-stat-clickable">
           <span className="prof-stat-value accent"><AnimatedNumber value={stats.avgRating} /></span>
-          <span className="prof-stat-label" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <span className="prof-stat-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
             Overall Rating
             {(stats.rmpRating !== null || stats.traceRating !== null) && (
               <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.6 }}><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
