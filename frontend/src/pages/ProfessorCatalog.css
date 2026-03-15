@@ -1,0 +1,800 @@
+/* ─── PAGE WRAPPER ─────────────────────────────────────────── */
+
+.catalog-page {
+  min-height: 100vh;
+  padding-top: 72px;
+  background: #f7f8fa;
+  font-family: 'Nunito', sans-serif;
+}
+
+.catalog-layout {
+  display: flex;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 24px 60px;
+  gap: 28px;
+}
+
+/* ─── SIDEBAR ─────────────────────────────────────────────── */
+
+.catalog-sidebar {
+  width: 260px;
+  flex-shrink: 0;
+  padding-top: 24px;
+}
+
+.sidebar-inner {
+  position: sticky;
+  top: 88px;
+  background: #fff;
+  border-radius: 14px;
+  border: 1px solid #e8e8e8;
+  padding: 20px;
+  max-height: calc(100vh - 108px);
+  overflow-y: auto;
+}
+
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.sidebar-title {
+  font-weight: 700;
+  font-size: 1rem;
+  color: #1a1a1a;
+}
+
+.clear-btn {
+  font-size: 0.78rem;
+  color: #d6394c;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+  padding: 0;
+}
+
+.clear-btn:hover {
+  text-decoration: underline;
+}
+
+/* Filter sections */
+
+.filter-section {
+  border-top: 1px solid #f0f0f0;
+  padding-top: 16px;
+  margin-top: 16px;
+}
+
+.filter-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #999;
+  margin-bottom: 10px;
+}
+
+/* College pills */
+
+.college-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.college-pill {
+  padding: 4px 11px;
+  border-radius: 20px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1.5px solid #e0e0e0;
+  background: #fff;
+  color: #666;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+
+.college-pill:hover {
+  border-color: #d6394c;
+  color: #d6394c;
+}
+
+.college-pill.active {
+  background: #d6394c;
+  border-color: #d6394c;
+  color: #fff;
+}
+
+/* Department filter */
+
+.dept-filter {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dept-search {
+  width: 100%;
+  padding: 7px 10px;
+  border-radius: 8px;
+  border: 1px solid #e0e0e0;
+  font-size: 0.82rem;
+  background: #f8f8f8;
+  color: #333;
+  outline: none;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.dept-search:focus {
+  border-color: #d6394c;
+  background: #fff;
+}
+
+.dept-list {
+  max-height: 190px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.dept-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 6px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.82rem;
+  color: #444;
+}
+
+.dept-option:hover {
+  background: #f5f5f5;
+}
+
+.dept-option input[type='radio'] {
+  accent-color: #d6394c;
+  cursor: pointer;
+}
+
+.dept-empty {
+  font-size: 0.8rem;
+  color: #aaa;
+  padding: 4px;
+}
+
+/* Rating slider */
+
+.slider-value {
+  font-weight: 600;
+  color: #d6394c;
+  font-size: 0.8rem;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.rating-slider {
+  width: 100%;
+  accent-color: #d6394c;
+  cursor: pointer;
+}
+
+.slider-ticks {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.72rem;
+  color: #bbb;
+  margin-top: 4px;
+}
+
+.reviews-input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.reviews-input-row .rating-slider {
+  flex: 1;
+}
+
+.reviews-number-input {
+  width: 58px;
+  padding: 4px 7px;
+  border-radius: 7px;
+  border: 1.5px solid #e0e0e0;
+  font-size: 0.82rem;
+  font-family: 'Nunito', sans-serif;
+  font-weight: 600;
+  color: #444;
+  background: #f8f8f8;
+  text-align: center;
+  outline: none;
+  transition: border-color 0.15s, background 0.15s;
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+.reviews-number-input::-webkit-outer-spin-button,
+.reviews-number-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+}
+
+.reviews-number-input:focus {
+  border-color: #d6394c;
+  background: #fff;
+}
+
+/* ─── MAIN CONTENT ─────────────────────────────────────────── */
+
+.catalog-main {
+  flex: 1;
+  min-width: 0;
+  padding-top: 24px;
+}
+
+.catalog-header {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.catalog-title {
+  font-size: 1.7rem;
+  font-weight: 900;
+  color: #1a1a1a;
+}
+
+.catalog-count {
+  font-size: 0.88rem;
+  color: #aaa;
+  font-weight: 500;
+}
+
+.catalog-search-row {
+  margin-bottom: 12px;
+}
+
+.catalog-search {
+  width: 100%;
+  max-width: 560px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1.5px solid #e2e2e2;
+  background: #fff;
+  font-size: 0.96rem;
+  color: #222;
+  font-family: 'Nunito', sans-serif;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.catalog-search:focus {
+  border-color: #d6394c;
+  box-shadow: 0 0 0 3px rgba(214, 57, 76, 0.15);
+}
+
+.catalog-disclaimer {
+  font-size: 0.78rem;
+  color: #bbb;
+  margin-bottom: 18px;
+  margin-top: -8px;
+}
+
+.catalog-disclaimer span {
+  color: #ccc;
+}
+
+/* ─── PROFESSOR GRID ───────────────────────────────────────── */
+
+.catalog-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 14px;
+}
+
+/* ─── PROFESSOR CARD ───────────────────────────────────────── */
+
+.prof-card {
+  background: #fff;
+  border: 1px solid #e8e8e8;
+  border-radius: 14px;
+  padding: 18px;
+  cursor: pointer;
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s;
+  text-align: left;
+}
+
+.prof-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+  border-color: rgba(214, 57, 76, 0.25);
+}
+
+.prof-card:focus-visible {
+  outline: 2px solid #d6394c;
+  outline-offset: 2px;
+}
+
+.catalog-page .prof-avatar {
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #d6394c, #a02030);
+  color: #fff;
+  font-weight: 800;
+  font-size: 0.88rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  letter-spacing: 0.5px;
+}
+
+.catalog-page .prof-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.catalog-page .prof-name {
+  font-size: 0.93rem;
+  font-weight: 700;
+  color: #1a1a1a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 2px;
+}
+
+.catalog-page .prof-dept {
+  font-size: 0.76rem;
+  color: #888;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 6px;
+}
+
+.prof-college {
+  display: inline-block;
+  font-size: 0.67rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: #f3f4f6;
+  color: #777;
+  border-radius: 4px;
+  padding: 2px 6px;
+  margin-bottom: 10px;
+}
+
+.prof-rating-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.prof-avg {
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: #333;
+}
+
+.prof-avg.na {
+  color: #bbb;
+  font-weight: 600;
+}
+
+.prof-badges {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.prof-meta {
+  font-size: 0.74rem;
+  color: #aaa;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.meta-dot {
+  color: #ddd;
+}
+
+/* ─── SKELETON ─────────────────────────────────────────────── */
+
+.prof-card.skeleton {
+  min-height: 156px;
+  background: linear-gradient(
+    90deg,
+    #f0f0f0 25%,
+    #e6e6e6 50%,
+    #f0f0f0 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite;
+  cursor: default;
+  pointer-events: none;
+  border: none;
+}
+
+@keyframes shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ─── EMPTY STATE ──────────────────────────────────────────── */
+
+.catalog-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 80px 20px;
+  text-align: center;
+  color: #aaa;
+  font-size: 1rem;
+}
+
+.clear-btn.prominent {
+  padding: 10px 24px;
+  background: #d6394c;
+  color: #fff;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.clear-btn.prominent:hover {
+  background: #b8303f;
+  text-decoration: none;
+}
+
+/* ─── PAGINATION ───────────────────────────────────────────── */
+
+.pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  margin-top: 40px;
+}
+
+.page-btn {
+  min-width: 36px;
+  height: 36px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1.5px solid #e0e0e0;
+  background: #fff;
+  color: #555;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+
+.page-btn:hover:not(:disabled) {
+  border-color: #d6394c;
+  color: #d6394c;
+}
+
+.page-btn.active {
+  background: #d6394c;
+  border-color: #d6394c;
+  color: #fff;
+}
+
+.page-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.page-ellipsis {
+  color: #ccc;
+  padding: 0 4px;
+  line-height: 36px;
+}
+
+/* ─── MOBILE FILTER TOGGLE ─────────────────────────────────── */
+
+.catalog-filter-toggle {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  margin: 16px 16px 0;
+  padding: 10px 16px;
+  border-radius: 10px;
+  border: 1.5px solid #e0e0e0;
+  background: #fff;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #555;
+  cursor: pointer;
+  position: relative;
+}
+
+.catalog-filter-toggle svg {
+  width: 18px;
+  height: 18px;
+}
+
+.filter-active-dot {
+  width: 8px;
+  height: 8px;
+  background: #d6394c;
+  border-radius: 50%;
+  position: absolute;
+  top: 8px;
+  right: 8px;
+}
+
+.catalog-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 99;
+}
+
+/* ─── RESPONSIVE ───────────────────────────────────────────── */
+
+@media (max-width: 900px) {
+  .catalog-filter-toggle {
+    display: flex;
+  }
+
+  .catalog-layout {
+    padding: 0 16px 40px;
+  }
+
+  .catalog-sidebar {
+    position: fixed;
+    top: 0;
+    left: -290px;
+    bottom: 0;
+    z-index: 100;
+    width: 280px;
+    padding-top: 0;
+    transition: left 0.22s ease;
+  }
+
+  .catalog-sidebar.open {
+    left: 0;
+  }
+
+  .catalog-overlay {
+    display: block;
+  }
+
+  .sidebar-inner {
+    border-radius: 0;
+    border: none;
+    border-right: 1px solid #e8e8e8;
+    height: 100%;
+    max-height: 100%;
+    padding-top: 80px;
+  }
+}
+
+@media (max-width: 540px) {
+  .catalog-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ─── DARK THEME ───────────────────────────────────────────── */
+
+.dark .catalog-page {
+  background: #1a1a1a;
+}
+
+.dark .sidebar-inner {
+  background: #232323;
+  border-color: #333;
+}
+
+.dark .sidebar-title {
+  color: #e0e0e0;
+}
+
+.dark .filter-label {
+  color: #666;
+}
+
+.dark .filter-section {
+  border-top-color: #2e2e2e;
+}
+
+.dark .college-pill {
+  background: #232323;
+  border-color: #444;
+  color: #aaa;
+}
+
+.dark .college-pill:hover {
+  border-color: #d6394c;
+  color: #d6394c;
+}
+
+.dark .college-pill.active {
+  background: #d6394c;
+  border-color: #d6394c;
+  color: #fff;
+}
+
+.dark .dept-search {
+  background: #2a2a2a;
+  border-color: #444;
+  color: #e0e0e0;
+}
+
+.dark .dept-search::placeholder {
+  color: #555;
+}
+
+.dark .dept-search:focus {
+  border-color: #d6394c;
+  background: #2e2e2e;
+}
+
+.dark .dept-option {
+  color: #bbb;
+}
+
+.dark .dept-option:hover {
+  background: #2a2a2a;
+}
+
+.dark .dept-empty {
+  color: #555;
+}
+
+.dark .catalog-title {
+  color: #e0e0e0;
+}
+
+.dark .catalog-count {
+  color: #666;
+}
+
+.dark .catalog-search {
+  background: #232323;
+  border-color: #3a3a3a;
+  color: #e0e0e0;
+}
+
+.dark .catalog-search::placeholder {
+  color: #6f6f6f;
+}
+
+.dark .catalog-search:focus {
+  border-color: #d6394c;
+  box-shadow: 0 0 0 3px rgba(214, 57, 76, 0.2);
+}
+
+.dark .catalog-disclaimer {
+  color: #555;
+}
+
+.dark .catalog-disclaimer span {
+  color: #4a4a4a;
+}
+
+.dark .reviews-number-input {
+  background: #2a2a2a;
+  border-color: #444;
+  color: #e0e0e0;
+}
+
+.dark .reviews-number-input:focus {
+  border-color: #d6394c;
+  background: #2e2e2e;
+}
+
+.dark .prof-card {
+  background: #232323;
+  border-color: #333;
+}
+
+.dark .prof-card:hover {
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
+  border-color: rgba(214, 57, 76, 0.3);
+}
+
+.dark .catalog-page .prof-name {
+  color: #e0e0e0;
+}
+
+.dark .catalog-page .prof-dept {
+  color: #777;
+}
+
+.dark .prof-college {
+  background: #2a2a2a;
+  color: #777;
+}
+
+.dark .prof-avg {
+  color: #ccc;
+}
+
+.dark .prof-avg.na {
+  color: #555;
+}
+
+.dark .prof-meta {
+  color: #666;
+}
+
+.dark .meta-dot {
+  color: #444;
+}
+
+.dark .prof-card.skeleton {
+  background: linear-gradient(
+    90deg,
+    #2a2a2a 25%,
+    #333 50%,
+    #2a2a2a 75%
+  );
+  background-size: 200% 100%;
+  border: none;
+}
+
+.dark .catalog-empty {
+  color: #666;
+}
+
+.dark .page-btn {
+  background: #232323;
+  border-color: #3a3a3a;
+  color: #aaa;
+}
+
+.dark .page-btn:hover:not(:disabled) {
+  border-color: #d6394c;
+  color: #d6394c;
+}
+
+.dark .page-btn.active {
+  background: #d6394c;
+  border-color: #d6394c;
+  color: #fff;
+}
+
+.dark .page-ellipsis {
+  color: #555;
+}
+
+.dark .catalog-filter-toggle {
+  background: #232323;
+  border-color: #3a3a3a;
+  color: #aaa;
+}
+
+.dark .catalog-overlay {
+  background: rgba(0, 0, 0, 0.65);
+}
+
+.dark .sidebar-inner {
+  border-right-color: #333;
+}
