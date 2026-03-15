@@ -83,9 +83,13 @@ const cleanTerm = (t: string): string => {
   const seasonMatch = t.match(/(Spring|Fall|Summer|Winter)/i);
   if (!seasonMatch) return t.trim();
   const season = seasonMatch[1].charAt(0).toUpperCase() + seasonMatch[1].slice(1).toLowerCase();
+  // Try standard 4-digit year first (e.g. "Fall 2019")
   const yearMatch = t.match(/\b(20\d{2})\b/);
-  if (!yearMatch) return season;
-  return `${season} ${yearMatch[1]}`;
+  if (yearMatch) return `${season} ${yearMatch[1]}`;
+  // Fallback: extract year from 6-digit term codes like "202130" → "2021"
+  const termCodeMatch = t.match(/(20\d{2})\d{2}/);
+  if (termCodeMatch) return `${season} ${termCodeMatch[1]}`;
+  return season;
 };
 
 const formatReviewDate = (dateStr: string) => {
