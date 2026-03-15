@@ -410,6 +410,36 @@ const Professor = () => {
     return map;
   }, [profile]);
 
+  // Map courseUrl → course code for TRACE comments
+  const commentCourseMap = useMemo(() => {
+    const map = new Map<string, string>();
+    if (!profile?.traceCourses) return map;
+
+    // Build courseId → code lookup
+    const idToCode = new Map<number, string>();
+    profile.traceCourses.forEach(c => {
+      const m = c.displayName.match(/^([A-Z]+\d+)/i);
+      const code = m ? m[1].toUpperCase() : '';
+      if (code) idToCode.set(c.courseId, code);
+    });
+
+    // For each trace comment, extract courseId from URL and map to code
+    traceComments.forEach(c => {
+      if (c.courseUrl) {
+        const spMatches = c.courseUrl.match(/sp=(\d+)/g);
+        if (spMatches && spMatches.length >= 1) {
+          const courseId = parseInt(spMatches[0].replace('sp=', ''));
+          const code = idToCode.get(courseId);
+          if (code) {
+            map.set(c.courseUrl, code);
+          }
+        }
+      }
+    });
+
+    return map;
+  }, [profile, traceComments]);
+
   const groupedTrace = useMemo(() => {
     const groups: Record<string, TraceComment[]> = {};
     const ids = new Set(filteredTraceCourses.map(c => c.termId));
@@ -544,7 +574,18 @@ const Professor = () => {
           <span className="prof-stat-value"><AnimatedNumber value={stats.difficulty} /></span>
           <span className="prof-stat-label">Difficulty</span>
           <div className="prof-difficulty-bar">
-            <div className="prof-difficulty-fill" style={{ width: `${((stats.difficulty ?? 0) / 5) * 100}%` }} />
+            <div className="prof-difficulty-fill" style={{ 
+              width: `${((stats.difficulty ?? 0) / 5) * 100}%`,
+              background: (() => {
+                const d = stats.difficulty ?? 0;
+                if (d <= 1.5) return '#27ae60';
+                if (d <= 2.5) return '#66bd63';
+                if (d <= 3.0) return '#f39c12';
+                if (d <= 3.5) return '#e67e22';
+                if (d <= 4.0) return '#e74c3c';
+                return '#c0392b';
+              })()
+            }} />
           </div>
         </div>
         <div className="prof-stat-card">
@@ -776,17 +817,28 @@ const Professor = () => {
                     </div>
                     {isExpanded && (
                       <div className="trace-category-content">
-                        {g.comments.slice(0, visibleCount).map((c, ci) => (
+                        {g.comments.slice(0, visibleCount).map((c, ci) => {
+                          const termRaw = termIdMap.get(c.termId) || '';
+                          const term = cleanTerm(termRaw);
+                          const hasYear = /\b20\d{2}\b/.test(term);
+                          return (
                           <div 
                             key={ci} 
                             className={`trace-comment-bubble ${c.courseUrl ? 'clickable' : ''}`}
                             onClick={() => c.courseUrl && window.open(c.courseUrl, '_blank')}
                             title={c.courseUrl ? "Click to view original TRACE report" : ""}
                           >
-                            <span className="trace-comment-term">{cleanTerm(termIdMap.get(c.termId) || '')}</span>
+                            <div className="trace-comment-meta">
+                              {hasYear && <span className="trace-comment-term">{term}</span>}
+                              {(() => {
+                                const courseCode = commentCourseMap.get(c.courseUrl || '') || commentCourseMap.get(String(c.termId)) || '';
+                                return courseCode ? <span className="trace-comment-course">{courseCode}</span> : null;
+                              })()}
+                            </div>
                             {c.comment}
                           </div>
-                        ))}
+                          );
+                        })}
                         <div className="trace-category-actions">
                           {visibleCount < g.count && (
                             <button className="trace-action-btn primary" onClick={e => showMoreComments(e, g.question)}>Show More ({g.count - visibleCount} left)</button>

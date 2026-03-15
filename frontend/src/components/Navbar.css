@@ -282,11 +282,21 @@
 
   /* dark mobile */
   .dark .navbar-right {
-    background: #1e1e1e;
-    box-shadow: -4px 0 20px rgba(0,0,0,0.3);
+    background: #242424;
+    box-shadow: -4px 0 20px rgba(0,0,0,0.4);
   }
 
   .dark .navbar-right .nav-link {
+    color: #ccc;
     border-bottom-color: #333;
+  }
+
+  .dark .navbar-right .nav-link.active {
+    color: #d6394c !important;
+  }
+
+  .dark .navbar-right .nav-link:hover {
+    color: #e06070;
+    background: transparent;
   }
 }
