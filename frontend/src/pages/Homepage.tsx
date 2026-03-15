@@ -1,3 +1,6 @@
+/*
+Primary Homepage Codespace
+*/
 import { useState, useEffect, useRef, useCallback, useLayoutEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import SearchBar from '../components/SearchBar';
