@@ -93,6 +93,8 @@ export default function ProfessorCatalog() {
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading]       = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [minRatingDraft, setMinRatingDraft] = useState(() => getFiltersFromSearchParams(searchParams).minRating);
+  const [minReviewsDraft, setMinReviewsDraft] = useState(() => getFiltersFromSearchParams(searchParams).minReviews);
   const [searchSuggestions, setSearchSuggestions] = useState<ProfessorSuggestion[]>([]);
   const [showSearchSuggestions, setShowSearchSuggestions] = useState(false);
   const [activeSearchIndex, setActiveSearchIndex] = useState(-1);
@@ -162,6 +164,14 @@ export default function ProfessorCatalog() {
     });
   }, [searchParams]);
 
+  useEffect(() => {
+    setMinRatingDraft(filters.minRating);
+  }, [filters.minRating]);
+
+  useEffect(() => {
+    setMinReviewsDraft(filters.minReviews);
+  }, [filters.minReviews]);
+
   const updateFilter = useCallback(
     <K extends keyof Filters>(key: K, value: Filters[K]) => {
       setFilters(f => ({
@@ -172,6 +182,27 @@ export default function ProfessorCatalog() {
     },
     []
   );
+
+  // Debounce slider-based filter commits so the catalog doesn't reload on every drag step.
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (minRatingDraft !== filters.minRating) {
+        updateFilter('minRating', minRatingDraft);
+      }
+    }, 250);
+
+    return () => clearTimeout(timeoutId);
+  }, [minRatingDraft, filters.minRating, updateFilter]);
+
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (minReviewsDraft !== filters.minReviews) {
+        updateFilter('minReviews', minReviewsDraft);
+      }
+    }, 250);
+
+    return () => clearTimeout(timeoutId);
+  }, [minReviewsDraft, filters.minReviews, updateFilter]);
 
   const setCollege = useCallback((college: string) => {
     setFilters(f => ({ ...f, college, dept: '', page: 1 }));
@@ -315,8 +346,8 @@ export default function ProfessorCatalog() {
               <p className="filter-label">
                 Min. Rating
                 <span className="slider-value">
-                  {filters.minRating > 0
-                    ? `${filters.minRating.toFixed(1)}+`
+                  {minRatingDraft > 0
+                    ? `${minRatingDraft.toFixed(1)}+`
                     : 'Any'}
                 </span>
               </p>
@@ -326,8 +357,8 @@ export default function ProfessorCatalog() {
                 min="0"
                 max="5"
                 step="0.5"
-                value={filters.minRating}
-                onChange={e => updateFilter('minRating', parseFloat(e.target.value))}
+                value={minRatingDraft}
+                onChange={e => setMinRatingDraft(parseFloat(e.target.value))}
               />
               <div className="slider-ticks">
                 <span>Any</span>
@@ -345,19 +376,19 @@ export default function ProfessorCatalog() {
                   min="1"
                   max="100"
                   step="1"
-                  value={filters.minReviews}
-                  onChange={e => updateFilter('minReviews', parseInt(e.target.value, 10))}
+                  value={minReviewsDraft}
+                  onChange={e => setMinReviewsDraft(parseInt(e.target.value, 10))}
                 />
                 <input
                   type="number"
                   className="reviews-number-input"
                   min="1"
                   max="999"
-                  value={filters.minReviews === 1 ? '' : filters.minReviews}
+                  value={minReviewsDraft === 1 ? '' : minReviewsDraft}
                   placeholder="Any"
                   onChange={e => {
                     const v = parseInt(e.target.value, 10);
-                    updateFilter('minReviews', isNaN(v) || v < 1 ? 1 : Math.min(v, 999));
+                    setMinReviewsDraft(isNaN(v) || v < 1 ? 1 : Math.min(v, 999));
                   }}
                 />
               </div>
