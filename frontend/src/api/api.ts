@@ -154,6 +154,7 @@ export interface CatalogResponse {
 }
 
 export interface CatalogParams {
+  q?: string;
   college?: string;
   dept?: string;
   minRating?: number;
@@ -165,6 +166,7 @@ export interface CatalogParams {
 
 export function fetchProfessorsCatalog(params: CatalogParams = {}): Promise<CatalogResponse> {
   const q = new URLSearchParams();
+  if (params.q)                  q.set('q', params.q);
   if (params.college)            q.set('college', params.college);
   if (params.dept)               q.set('dept', params.dept);
   if (params.minRating)          q.set('minRating', String(params.minRating));

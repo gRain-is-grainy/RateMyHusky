@@ -1030,6 +1030,7 @@ def departments():
 
 @app.route("/api/professors-catalog")
 def professors_catalog():
+    q          = normalize_name(request.args.get("q", ""))
     college    = request.args.get("college", "")
     dept       = request.args.get("dept", "")
     sort       = request.args.get("sort", "alpha")
@@ -1053,6 +1054,8 @@ def professors_catalog():
         subset = subset[subset["college"] == college]
     if dept and dept != "All":
         subset = subset[subset["department"] == dept]
+    if q:
+        subset = subset[subset["_name_lower"].str.contains(q, na=False)]
     if min_rating > 0:
         subset = subset[subset["avgRating"] >= min_rating]
     if min_reviews > 1:

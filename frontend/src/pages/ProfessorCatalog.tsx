@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   fetchProfessorsCatalog,
   fetchColleges,
@@ -19,6 +19,7 @@ const SORT_OPTIONS = [
 ];
 
 interface Filters {
+  q:          string;
   college:    string;
   dept:       string;
   minRating:  number;
@@ -28,6 +29,7 @@ interface Filters {
 }
 
 const DEFAULT_FILTERS: Filters = {
+  q:          '',
   college:    '',
   dept:       '',
   minRating:  0,
@@ -35,6 +37,27 @@ const DEFAULT_FILTERS: Filters = {
   sort:       'alpha',
   page:       1,
 };
+
+function getFiltersFromSearchParams(sp: URLSearchParams): Filters {
+  const sortValue = sp.get('sort');
+  const sort = sortValue === 'rating' || sortValue === 'reviews' || sortValue === 'alpha'
+    ? sortValue
+    : 'alpha';
+
+  const minRating = Number(sp.get('minRating') || '0');
+  const minReviews = Number(sp.get('minReviews') || '1');
+  const page = Number(sp.get('page') || '1');
+
+  return {
+    q:          (sp.get('q') || '').trim(),
+    college:    sp.get('college') || '',
+    dept:       sp.get('dept') || '',
+    minRating:  Number.isFinite(minRating) ? Math.max(0, Math.min(5, minRating)) : 0,
+    minReviews: Number.isFinite(minReviews) ? Math.max(1, Math.floor(minReviews)) : 1,
+    sort,
+    page:       Number.isFinite(page) ? Math.max(1, Math.floor(page)) : 1,
+  };
+}
 
 function initials(name: string) {
   return name
@@ -47,7 +70,8 @@ function initials(name: string) {
 
 export default function ProfessorCatalog() {
   const navigate = useNavigate();
-  const [filters, setFilters]       = useState<Filters>(DEFAULT_FILTERS);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [filters, setFilters]       = useState<Filters>(() => getFiltersFromSearchParams(searchParams));
   const [colleges, setColleges]     = useState<string[]>([]);
   const [departments, setDepts]     = useState<string[]>([]);
   const [professors, setProfessors] = useState<CatalogProfessor[]>([]);
@@ -72,6 +96,7 @@ export default function ProfessorCatalog() {
   useEffect(() => {
     setLoading(true);
     fetchProfessorsCatalog({
+      q:          filters.q          || undefined,
       college:    filters.college    || undefined,
       dept:       filters.dept       || undefined,
       minRating:  filters.minRating  > 0 ? filters.minRating  : undefined,
@@ -88,6 +113,19 @@ export default function ProfessorCatalog() {
       .catch(console.error)
       .finally(() => setLoading(false));
   }, [filters]);
+
+  // Keep filters in the URL so the catalog view is shareable/bookmarkable.
+  useEffect(() => {
+    const next = new URLSearchParams();
+    if (filters.q) next.set('q', filters.q);
+    if (filters.college) next.set('college', filters.college);
+    if (filters.dept) next.set('dept', filters.dept);
+    if (filters.minRating > 0) next.set('minRating', String(filters.minRating));
+    if (filters.minReviews > 1) next.set('minReviews', String(filters.minReviews));
+    if (filters.sort !== 'alpha') next.set('sort', filters.sort);
+    if (filters.page > 1) next.set('page', String(filters.page));
+    setSearchParams(next, { replace: true });
+  }, [filters, setSearchParams]);
 
   const updateFilter = useCallback(
     <K extends keyof Filters>(key: K, value: Filters[K]) => {
@@ -107,7 +145,7 @@ export default function ProfessorCatalog() {
   const clearFilters = () => setFilters(DEFAULT_FILTERS);
 
   const hasActiveFilters =
-    !!filters.college || !!filters.dept || filters.minRating > 0 || filters.minReviews > 1;
+    !!filters.q || !!filters.college || !!filters.dept || filters.minRating > 0 || filters.minReviews > 1;
 
   return (
     <div className="catalog-page">
@@ -252,6 +290,15 @@ export default function ProfessorCatalog() {
             <span className="catalog-count">
               {loading ? '…' : `${total.toLocaleString()} result${total !== 1 ? 's' : ''}`}
             </span>
+          </div>
+          <div className="catalog-search-row">
+            <input
+              type="text"
+              className="catalog-search"
+              placeholder="Search professor name…"
+              value={filters.q}
+              onChange={e => updateFilter('q', e.target.value)}
+            />
           </div>
           <p className="catalog-disclaimer">
             Professors without any rating data are not shown.{' '}

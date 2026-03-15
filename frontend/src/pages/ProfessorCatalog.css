@@ -259,6 +259,29 @@
   font-weight: 500;
 }
 
+.catalog-search-row {
+  margin-bottom: 12px;
+}
+
+.catalog-search {
+  width: 100%;
+  max-width: 560px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1.5px solid #e2e2e2;
+  background: #fff;
+  font-size: 0.96rem;
+  color: #222;
+  font-family: 'Nunito', sans-serif;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.catalog-search:focus {
+  border-color: #d6394c;
+  box-shadow: 0 0 0 3px rgba(214, 57, 76, 0.15);
+}
+
 .catalog-disclaimer {
   font-size: 0.78rem;
   color: #bbb;
@@ -651,6 +674,21 @@
 
 .dark .catalog-count {
   color: #666;
+}
+
+.dark .catalog-search {
+  background: #232323;
+  border-color: #3a3a3a;
+  color: #e0e0e0;
+}
+
+.dark .catalog-search::placeholder {
+  color: #6f6f6f;
+}
+
+.dark .catalog-search:focus {
+  border-color: #d6394c;
+  box-shadow: 0 0 0 3px rgba(214, 57, 76, 0.2);
 }
 
 .dark .catalog-disclaimer {
