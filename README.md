@@ -1,5 +1,7 @@
 ## Run
 
+Unzip trace_comments.zip in backend/Better_Scraper/output_data
+
 **Backend:**
 ```
 pip install flask flask-cors pandas numpy
