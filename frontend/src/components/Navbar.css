@@ -246,9 +246,9 @@
   }
 
   .navbar-right .nav-link.active {
-    background: transparent;
-    color: #d6394c;
-    box-shadow: none;
+    background: transparent !important;
+    color: #d6394c !important;
+    box-shadow: none !important;
     font-weight: 800;
   }
 
@@ -282,11 +282,23 @@
 
   /* dark mobile */
   .dark .navbar-right {
-    background: #1e1e1e;
-    box-shadow: -4px 0 20px rgba(0,0,0,0.3);
+    background: #232323;
+    box-shadow: -4px 0 20px rgba(0,0,0,0.5);
+    border-left: 1px solid #333;
   }
 
   .dark .navbar-right .nav-link {
+    color: #ccc;
     border-bottom-color: #333;
+  }
+
+  .dark .navbar-right .nav-link.active {
+    color: #d6394c !important;
+    background: transparent !important;
+  }
+
+  .dark .navbar-right .nav-link:hover {
+    color: #e06070;
+    background: transparent;
   }
 }

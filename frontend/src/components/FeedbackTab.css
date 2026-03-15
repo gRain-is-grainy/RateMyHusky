@@ -1,7 +1,7 @@
 /* ---------- fixed tab ---------- */
 .feedback-tab {
   position: fixed;
-  right: 0;
+  left: 0;
   bottom: 80px;
   z-index: 200;
   writing-mode: vertical-rl;
@@ -14,10 +14,10 @@
   letter-spacing: 1px;
   text-transform: uppercase;
   padding: 14px 8px;
-  border-radius: 6px 0 0 6px;
+  border-radius: 0 6px 6px 0;
   cursor: pointer;
   border: none;
-  box-shadow: -2px 2px 8px rgba(0,0,0,0.15);
+  box-shadow: 2px 2px 8px rgba(0,0,0,0.15);
   transition: background 0.2s;
 }
 
@@ -33,7 +33,7 @@
   background: rgba(0, 0, 0, 0.35);
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: flex-start;
   padding: 24px;
   animation: fadeIn 0.2s ease;
 }
@@ -61,7 +61,7 @@
 }
 
 @keyframes slideIn {
-  from { opacity: 0; transform: translateX(30px); }
+  from { opacity: 0; transform: translateX(-30px); }
   to   { opacity: 1; transform: translateX(0); }
 }
 

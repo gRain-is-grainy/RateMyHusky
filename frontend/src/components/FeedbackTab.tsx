@@ -6,7 +6,8 @@ import './FeedbackTab.css';
 const feedbackOptions = [
   { value: 'bug', label: 'Bug Report' },
   { value: 'feature', label: 'Feature Request' },
-  { value: 'alias', label: 'Missing RMP Reviews / Wrong Name' },
+  { value: 'missing', label: 'Missing Data' },
+  { value: 'wrongname', label: 'Wrong Name' },
   { value: 'general', label: 'General Feedback' },
 ];
 
@@ -40,8 +41,11 @@ const FeedbackTab = () => {
   };
 
   const getPlaceholder = () => {
-    if (feedbackType === 'alias') {
-      return "Who is the professor? Please provide links to their RMP pages so we can merge their ratings.";
+    if (feedbackType === 'missing') {
+      return "What data is missing? Please include the professor name and any relevant links.";
+    }
+    if (feedbackType === 'wrongname') {
+      return "What's the correct name? Please provide links to their RMP pages so we can fix it.";
     }
     return "Say more about bugs, suggestions, etc.";
   };

@@ -13,7 +13,7 @@
 .prof-loading {
   flex: 1; display: flex; flex-direction: column;
   align-items: center; justify-content: center;
-  gap: 20px; padding-top: 120px; color: #999; font-size: 0.95rem; font-weight: 600;
+  gap: 20px; min-height: 100vh; color: #999; font-size: 0.95rem; font-weight: 600;
 }
 .prof-loading-spinner {
   width: 40px; height: 40px;
@@ -107,7 +107,7 @@
 /* ═══════════ STAT CARDS ═══════════ */
 .prof-stats {
   max-width: 1200px; margin: 24px auto 0; padding: 0 48px;
-  display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px;
+  display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px;
   position: relative; z-index: 2;
 }
 .prof-stat-card {
@@ -122,6 +122,7 @@
 .prof-stat-card:nth-child(2) { animation-delay: 0.15s; }
 .prof-stat-card:nth-child(3) { animation-delay: 0.2s; }
 .prof-stat-card:nth-child(4) { animation-delay: 0.25s; }
+.prof-stat-card:nth-child(5) { animation-delay: 0.3s; }
 @keyframes profCardIn { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
 
 .prof-stat-breakdown {
@@ -179,7 +180,7 @@
 .prof-stat-clickable:hover .prof-stat-hint { color: #d6394c; }
 
 .prof-difficulty-bar { width: 100%; height: 8px; background: #eee; border-radius: 3px; overflow: hidden; margin-top: 4px; }
-.prof-difficulty-fill { height: 100%; background: linear-gradient(90deg, #27ae60, #f39c12, #e74c3c); border-radius: 3px; transition: width 1.2s cubic-bezier(0.4,0,0.2,1); }
+.prof-difficulty-fill { height: 100%; border-radius: 3px; transition: width 1.2s cubic-bezier(0.4,0,0.2,1), background 0.5s ease; }
 
 /* ═══════════ SECTIONS ═══════════ */
 .prof-section { max-width: 1200px; margin: 0 auto; padding: 48px 48px 0; width: 100%; }
@@ -310,9 +311,11 @@
 .prof-review-rating-item { display: flex; flex-direction: column; align-items: center; gap: 3px; }
 .prof-review-rating-label { font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #aaa; }
 .prof-review-rating-value { width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 1.2rem; color: #fff; }
-.prof-review-rating-value[data-score='high'] { background: #27ae60; }
-.prof-review-rating-value[data-score='mid'] { background: #f39c12; }
-.prof-review-rating-value[data-score='low'] { background: #e74c3c; }
+.prof-review-rating-value[data-score='5'] { background: #1a9850; }
+.prof-review-rating-value[data-score='4'] { background: #66bd63; }
+.prof-review-rating-value[data-score='3'] { background: #f39c12; }
+.prof-review-rating-value[data-score='2'] { background: #e67e22; }
+.prof-review-rating-value[data-score='1'] { background: #e74c3c; }
 
 .prof-review-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
 .prof-review-course { font-size: 0.82rem; font-weight: 800; color: #d6394c; background: #fef0f0; padding: 3px 10px; border-radius: 8px; }
@@ -501,6 +504,25 @@
   letter-spacing: 0.3px;
 }
 
+.trace-comment-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.trace-comment-course {
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: #d6394c;
+  background: #fef0f0;
+  padding: 2px 8px;
+  border-radius: 6px;
+  margin-left: auto;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
 .trace-category-actions {
   display: flex;
   justify-content: center;
@@ -620,6 +642,7 @@
 .dark .prof-stat-breakdown { background: #444; color: #e0e0e0 !important; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
 .dark .prof-stat-breakdown::before { border-color: transparent transparent #444 transparent; }
 .dark .prof-stat-value { color: #e0e0e0; }
+.dark .prof-stat-value.green { color: #27ae60; }
 .dark .prof-stat-label { color: #777; }
 .dark .prof-stat-hint { color: #555; }
 .dark .prof-stat-clickable:hover .prof-stat-hint { color: #d6394c; }
@@ -641,6 +664,9 @@
 .dark .prof-course-terms { color: #777; }
 .dark .prof-course-term-tag { color: #e06070; background: #3a2020; }
 .dark .trace-comment-term { color: #e06070; background: #3a2020; }
+.dark .trace-comment-course { color: #e06070; background: #3a2020; }
+.dark .prof-action-link { color: #e06070; }
+.dark .prof-action-link:hover { background: #3a2020; }
 
 .dark .prof-review-tabs { background: rgba(255, 255, 255, 0.03); }
 .dark .prof-review-tab { color: #aaa; }
@@ -649,9 +675,11 @@
 .dark .prof-review-card { background: #242424; box-shadow: 0 2px 12px rgba(0,0,0,0.2); border-left-color: #555; }
 .dark .prof-review-card:hover { box-shadow: 0 6px 24px rgba(0,0,0,0.3); }
 .dark .prof-review-comment { color: #ccc; }
-.dark .prof-review-course { background: #3a2020; }
+.dark .prof-review-course { background: #3a2020; color: #e06070; }
 .dark .prof-review-pill { background: #2a2a2a; color: #999; }
+.dark .prof-review-tag { background: #333; border-color: #444; color: #ccc; }
 .dark .prof-review-date { color: #666; }
+.dark .prof-review-rating-label { color: #777; }
 
 .dark .prof-loading { color: #777; }
 .dark .prof-error h2 { color: #e0e0e0; }
@@ -671,7 +699,7 @@
 
   .prof-hero-actions-row { padding: 0 20px; justify-content: center; }
 
-  .prof-stats { grid-template-columns: repeat(2, 1fr); padding: 0 20px; }
+  .prof-stats { grid-template-columns: repeat(3, 1fr); padding: 0 20px; }
   .prof-section { padding: 36px 20px 0; }
 
   .prof-charts-row { grid-template-columns: 1fr; }
@@ -702,7 +730,7 @@
   .prof-hero-actions-row { padding: 0 16px; flex-direction: column; align-items: stretch; }
   .prof-compare-btn, .prof-rmp-btn { justify-content: center; }
 
-  .prof-stats { padding: 0 16px; }
+  .prof-stats { padding: 0 16px; grid-template-columns: repeat(2, 1fr); }
   .prof-stat-value { font-size: 1.5rem; }
   .prof-section { padding: 28px 16px 0; }
   .prof-section-title { font-size: 1.15rem; }
