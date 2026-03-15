@@ -132,3 +132,50 @@ export type SearchSuggestion = ProfessorSuggestion | CourseSuggestion;
 
 export const fetchSearchSuggestions = (query: string, type: string) =>
   get<SearchSuggestion[]>(`/api/search?q=${encodeURIComponent(query)}&type=${encodeURIComponent(type)}`);
+
+/* ---- Professors catalog ---- */
+export interface CatalogProfessor {
+  name: string;
+  slug: string;
+  department: string;
+  college: string;
+  avgRating: number | null;
+  rmpRating: number | null;
+  traceRating: number | null;
+  totalReviews: number;
+  wouldTakeAgainPct: number | null;
+}
+
+export interface CatalogResponse {
+  professors: CatalogProfessor[];
+  total: number;
+  page: number;
+  totalPages: number;
+}
+
+export interface CatalogParams {
+  college?: string;
+  dept?: string;
+  minRating?: number;
+  minReviews?: number;
+  sort?: 'alpha' | 'rating' | 'reviews';
+  page?: number;
+  limit?: number;
+}
+
+export function fetchProfessorsCatalog(params: CatalogParams = {}): Promise<CatalogResponse> {
+  const q = new URLSearchParams();
+  if (params.college)            q.set('college', params.college);
+  if (params.dept)               q.set('dept', params.dept);
+  if (params.minRating)          q.set('minRating', String(params.minRating));
+  if (params.minReviews != null) q.set('minReviews', String(params.minReviews));
+  if (params.sort)               q.set('sort', params.sort);
+  if (params.page)               q.set('page', String(params.page));
+  if (params.limit)              q.set('limit', String(params.limit));
+  return get<CatalogResponse>(`/api/professors-catalog?${q.toString()}`);
+}
+
+export function fetchDepartments(college?: string): Promise<string[]> {
+  const q = college ? `?college=${encodeURIComponent(college)}` : '';
+  return get<string[]>(`/api/departments${q}`);
+}

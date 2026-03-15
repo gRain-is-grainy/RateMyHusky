@@ -777,6 +777,72 @@ print(f"[prof-page] Slug index: {len(_slug_to_name)} unique slugs")
 rmp_reviews["_rev_name_key"] = rmp_reviews["professor_name"].astype(str).str.strip().str.lower().str.replace(r'\s+', ' ', regex=True).replace(ALIAS_MAP)
 
 
+# ──────────────────────────────────────────────
+#  Build catalog DataFrame (all professors, for the browse page)
+# ──────────────────────────────────────────────
+def _build_catalog():
+    rows = []
+    rmp_name_keys = set(rmp_profs["_name_key"].values)
+
+    # RMP professors (may also have TRACE data)
+    for _, row in rmp_profs.iterrows():
+        has_rmp   = int(row["num_ratings"]) > 0 and float(row["rating"]) > 0
+        has_trace = pd.notna(row["trace_overall"]) and int(row["trace_reviews"]) > 0
+        dept = str(row["trace_dept"]) if pd.notna(row["trace_dept"]) else str(row["department"])
+
+        wta = None
+        wta_raw = str(row.get("would_take_again_pct", "")).strip().replace("%", "")
+        try:
+            if wta_raw and wta_raw.lower() not in ("nan", "n/a", ""):
+                wta = round(float(wta_raw), 1)
+                if wta < 0:
+                    wta = None
+        except (ValueError, TypeError):
+            pass
+
+        avg = round(float(row["avg_rating"]), 2) if float(row["avg_rating"]) > 0 else None
+        rows.append({
+            "name":              row["name"],
+            "slug":              _name_to_slug(row["_name_key"]),
+            "department":        dept,
+            "college":           row["college"],
+            "avgRating":         avg,
+            "rmpRating":         round(float(row["rating"]), 2) if has_rmp else None,
+            "traceRating":       round(float(row["trace_overall"]), 2) if has_trace else None,
+            "totalReviews":      int(row["total_reviews"]),
+            "wouldTakeAgainPct": wta,
+            "_name_lower":       row["_name_key"],
+        })
+
+    # TRACE-only professors (not in RMP)
+    for _, row in trace_only.iterrows():
+        nk = row["_name_lower"]
+        if nk in rmp_name_keys:
+            continue
+        dept = str(row["dept_display"]) if pd.notna(row["dept_display"]) else ""
+        trace_rat = trace_lookup.get(nk)
+        has_trace = trace_rat is not None and pd.notna(trace_rat)
+        avg = round(float(trace_rat), 2) if has_trace else None
+        rows.append({
+            "name":              row["name"],
+            "slug":              _name_to_slug(nk),
+            "department":        dept,
+            "college":           get_college(dept),
+            "avgRating":         avg,
+            "rmpRating":         None,
+            "traceRating":       avg,
+            "totalReviews":      int(row["total_reviews"]),
+            "wouldTakeAgainPct": None,
+            "_name_lower":       nk,
+        })
+
+    return pd.DataFrame(rows)
+
+
+catalog_df = _build_catalog()
+print(f"[catalog] Built catalog with {len(catalog_df)} professors")
+
+
 def _resolve_slug(slug):
     nk = _slug_to_name.get(slug)
     return nk if nk else slug.strip().lower().replace("-", " ")
@@ -947,6 +1013,86 @@ def professor_profile(slug):
         profile["traceComments"] = []
 
     return jsonify(profile)
+
+
+@app.route("/api/departments")
+def departments():
+    college = request.args.get("college", "")
+    # Keep department options aligned with the catalog: only rated professors are visible.
+    rated_subset = catalog_df[catalog_df["avgRating"].notna()]
+    if college and college != "All":
+        subset = rated_subset[rated_subset["college"] == college]
+    else:
+        subset = rated_subset
+    depts = sorted(subset["department"].dropna().unique().tolist())
+    return jsonify(depts)
+
+
+@app.route("/api/professors-catalog")
+def professors_catalog():
+    college    = request.args.get("college", "")
+    dept       = request.args.get("dept", "")
+    sort       = request.args.get("sort", "alpha")
+    page       = int(request.args.get("page", "1"))
+    limit      = int(request.args.get("limit", "20"))
+
+    try:
+        min_rating = float(request.args.get("minRating", "0"))
+    except (ValueError, TypeError):
+        min_rating = 0.0
+
+    try:
+        min_reviews = int(request.args.get("minReviews", "1"))
+    except (ValueError, TypeError):
+        min_reviews = 1
+
+    # Always exclude professors with no rating data
+    subset = catalog_df[catalog_df["avgRating"].notna()].copy()
+
+    if college and college != "All":
+        subset = subset[subset["college"] == college]
+    if dept and dept != "All":
+        subset = subset[subset["department"] == dept]
+    if min_rating > 0:
+        subset = subset[subset["avgRating"] >= min_rating]
+    if min_reviews > 1:
+        subset = subset[subset["totalReviews"] >= min_reviews]
+
+    if sort == "rating":
+        subset = subset.sort_values("avgRating", ascending=False, na_position="last")
+    elif sort == "reviews":
+        subset = subset.sort_values("totalReviews", ascending=False)
+    else:  # alpha
+        subset = subset.sort_values(
+            "name", ascending=True, key=lambda s: s.str.lower()
+        )
+
+    total = len(subset)
+    total_pages = max(1, (total + limit - 1) // limit)
+    page = max(1, min(page, total_pages))
+    start = (page - 1) * limit
+    page_data = subset.iloc[start : start + limit]
+
+    professors = []
+    for _, row in page_data.iterrows():
+        professors.append({
+            "name":              row["name"],
+            "slug":              row["slug"],
+            "department":        row["department"],
+            "college":           row["college"],
+            "avgRating":         float(row["avgRating"]) if pd.notna(row["avgRating"]) else None,
+            "rmpRating":         float(row["rmpRating"]) if pd.notna(row["rmpRating"]) else None,
+            "traceRating":       float(row["traceRating"]) if pd.notna(row["traceRating"]) else None,
+            "totalReviews":      int(row["totalReviews"]),
+            "wouldTakeAgainPct": float(row["wouldTakeAgainPct"]) if pd.notna(row["wouldTakeAgainPct"]) else None,
+        })
+
+    return jsonify({
+        "professors": professors,
+        "total":      total,
+        "page":       page,
+        "totalPages": total_pages,
+    })
 
 
 if __name__ == "__main__":
