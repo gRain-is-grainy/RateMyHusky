@@ -205,29 +205,36 @@ def extract_photo_from_html(html, page_url):
 
 def try_fetch_photo(session, name, slug, subdomains):
     """Try to find a professor's photo. HEAD first, GET only on 200."""
+    # Try both /people/ and /faculty/ URL patterns
+    patterns = [
+        "/people/{slug}/",
+        "/faculty/{slug}/",
+        "/person/{slug}/",
+        "/directory/{slug}/",
+    ]
+
     for subdomain in subdomains:
-        url = f"https://{subdomain}.northeastern.edu/people/{slug}/"
+        for pattern in patterns:
+            url = f"https://{subdomain}.northeastern.edu{pattern.format(slug=slug)}"
 
-        try:
-            # HEAD is fast — just checks if page exists
-            head = session.head(url, timeout=5, allow_redirects=True)
+            try:
+                head = session.head(url, timeout=5, allow_redirects=True)
 
-            if head.status_code != 200:
+                if head.status_code != 200:
+                    continue
+                if not any(p.split('/')[1] in head.url for p in patterns):
+                    continue
+
+                resp = session.get(url, timeout=10, allow_redirects=True)
+                if resp.status_code != 200:
+                    continue
+
+                photo_url = extract_photo_from_html(resp.text, resp.url)
+                if photo_url:
+                    return photo_url, resp.url
+
+            except Exception:
                 continue
-            if '/people/' not in head.url:
-                continue
-
-            # Page exists — now GET the full HTML
-            resp = session.get(url, timeout=10, allow_redirects=True)
-            if resp.status_code != 200:
-                continue
-
-            photo_url = extract_photo_from_html(resp.text, resp.url)
-            if photo_url:
-                return photo_url, resp.url
-
-        except Exception:
-            continue
 
     return None, None
 

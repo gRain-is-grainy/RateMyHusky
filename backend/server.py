@@ -36,6 +36,18 @@ trace_courses = pd.read_csv(os.path.join(DATA_DIR, "trace_courses.csv"))
 trace_scores  = pd.read_csv(os.path.join(DATA_DIR, "trace_scores.csv"))
 trace_comments = pd.read_csv(os.path.join(DATA_DIR, "trace_comments.csv"))
 
+# Load professor photos
+photo_lookup = {}
+photos_path = os.path.join(DATA_DIR, "professor_photos.csv")
+if os.path.exists(photos_path):
+    _photos = pd.read_csv(photos_path)
+    for _, row in _photos.iterrows():
+        key = normalize_name(str(row['name']))
+        photo_lookup[key] = str(row['image_url'])
+    print(f"[startup] Loaded {len(photo_lookup)} professor photos")
+else:
+    print("[startup] No professor_photos.csv found — photos disabled")
+
 # Clean RMP data
 rmp_profs["rating"]      = pd.to_numeric(rmp_profs["rating"], errors="coerce")
 rmp_profs["num_ratings"] = pd.to_numeric(rmp_profs["num_ratings"], errors="coerce")
@@ -844,6 +856,9 @@ def professor_profile(slug):
 
     if profile is None:
         return jsonify({"error": "Professor not found"}), 404
+
+    # --- Professor photo ---
+    profile["imageUrl"] = photo_lookup.get(name_key, None)
 
     # --- TRACE courses + scores ---
     tc = trace_courses[trace_courses["_full"] == name_key]

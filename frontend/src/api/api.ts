@@ -63,6 +63,7 @@ export interface ProfessorProfile {
   traceCourses: TraceCourse[];
   reviews: ProfessorReview[];
   traceComments: TraceComment[];
+  imageUrl: string | null;
 }
 
 export interface ProfessorReview {

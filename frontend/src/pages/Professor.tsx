@@ -482,7 +482,25 @@ const Professor = () => {
         <div className="prof-hero-glow" />
         <div className="prof-hero-inner">
           <div className="prof-avatar">
-            <span>{profile.name.split(' ').map(n => n[0]).join('')}</span>
+            {profile.imageUrl ? (
+              <img
+                src={profile.imageUrl}
+                alt={profile.name}
+                className="prof-avatar-img"
+                onError={(e) => {
+                  const target = e.currentTarget;
+                  target.style.display = 'none';
+                  const initials = target.parentElement?.querySelector('.prof-avatar-initials') as HTMLElement;
+                  if (initials) initials.style.display = 'flex';
+                }}
+              />
+            ) : null}
+            <span
+              className="prof-avatar-initials"
+              style={profile.imageUrl ? { display: 'none' } : undefined}
+            >
+              {profile.name.split(' ').map(n => n[0]).join('')}
+            </span>
           </div>
           <div className="prof-hero-info">
             <h1 className="prof-name">{profile.name}</h1>
