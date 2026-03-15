@@ -282,9 +282,9 @@
 
   /* dark mobile */
   .dark .navbar-right {
-    background: #232323;
-    box-shadow: -4px 0 20px rgba(0,0,0,0.5);
-    border-left: 1px solid #333;
+    background: #1a1a1a;
+    box-shadow: -4px 0 20px rgba(0,0,0,0.6);
+    border-left: 1px solid #2a2a2a;
   }
 
   .dark .navbar-right .nav-link {
@@ -299,6 +299,10 @@
 
   .dark .navbar-right .nav-link:hover {
     color: #e06070;
+    background: transparent;
+  }
+
+  .dark .nav-links-container {
     background: transparent;
   }
 }
