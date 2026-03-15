@@ -37,14 +37,18 @@ trace_scores  = pd.read_csv(os.path.join(DATA_DIR, "trace_scores.csv"))
 trace_comments = pd.read_csv(os.path.join(DATA_DIR, "trace_comments.csv"))
 
 # Load professor photos
+def _upgrade_image_url(url: str) -> str:
+    """Strip WordPress thumbnail size suffix to get the full-resolution original."""
+    return re.sub(r'-\d+x\d+(?=\.\w+$)', '', url)
+
 photo_lookup = {}
 photos_path = os.path.join(DATA_DIR, "professor_photos.csv")
 if os.path.exists(photos_path):
     _photos = pd.read_csv(photos_path)
     for _, row in _photos.iterrows():
         key = normalize_name(str(row['name']))
-        photo_lookup[key] = str(row['image_url'])
-    print(f"[startup] Loaded {len(photo_lookup)} professor photos")
+        photo_lookup[key] = _upgrade_image_url(str(row['image_url']))
+    print(f"[startup] Loaded {len(photo_lookup)} professor photos (upgraded to full-res)")
 else:
     print("[startup] No professor_photos.csv found — photos disabled")
 

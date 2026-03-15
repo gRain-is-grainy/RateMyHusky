@@ -57,7 +57,9 @@ const pickWinner = (
 	const left = parseMaybeNumber(leftValue);
 	const right = parseMaybeNumber(rightValue);
 
-	if (left === null || right === null) return null;
+	if (left === null && right === null) return null;
+	if (left === null) return 'right';
+	if (right === null) return 'left';
 	if (left === right) return null;
 
 	if (mode === 'higher') return left > right ? 'left' : 'right';

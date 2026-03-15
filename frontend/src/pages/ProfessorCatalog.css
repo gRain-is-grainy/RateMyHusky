@@ -547,6 +547,8 @@
   height: 100%;
   object-fit: cover;
   border-radius: 50%;
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: crisp-edges;
 }
 
 .catalog-page .prof-avatar-initials {
