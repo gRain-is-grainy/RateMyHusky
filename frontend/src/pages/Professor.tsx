@@ -114,6 +114,7 @@ const GRADE_COLORS: Record<string, string> = {
 const Professor = () => {
   const { slug } = useParams<{ slug: string }>();
   const reviewsRef = useRef<HTMLElement>(null);
+  const chartsRef = useRef<HTMLElement>(null);
   const gradesRef = useRef<HTMLDivElement>(null);
   const reviewTabsRef = useRef<HTMLDivElement>(null);
   const questionRefs = useRef<Record<string, HTMLDivElement | null>>({});
@@ -418,21 +419,30 @@ const Professor = () => {
         groups[c.question].push(c);
       }
     });
+    const searchLower = traceSearch.toLowerCase();
     return Object.entries(groups).map(([q, cs]) => ({
       question: q,
       maxTermId: Math.max(...cs.map(c => c.termId || 0)),
       count: cs.length,
       comments: [...cs].sort((a, b) => {
+        // If searching, boost comments containing the search term
+        if (searchLower) {
+          const aMatch = a.comment.toLowerCase().includes(searchLower);
+          const bMatch = b.comment.toLowerCase().includes(searchLower);
+          if (aMatch && !bMatch) return -1;
+          if (!aMatch && bMatch) return 1;
+        }
         if (traceSort === 'newest') return (b.termId || 0) - (a.termId || 0);
         return b.comment.length - a.comment.length;
       }),
     })).filter(g => 
       !traceSearch || 
-      g.question.toLowerCase().includes(traceSearch.toLowerCase())
+      g.question.toLowerCase().includes(searchLower) ||
+      g.comments.some(c => c.comment.toLowerCase().includes(searchLower))
     ).sort((a, b) => {
       if (traceSearch) {
-        const aM = a.question.toLowerCase().includes(traceSearch.toLowerCase());
-        const bM = b.question.toLowerCase().includes(traceSearch.toLowerCase());
+        const aM = a.question.toLowerCase().includes(searchLower);
+        const bM = b.question.toLowerCase().includes(searchLower);
         if (aM && !bM) return -1;
         if (!aM && bM) return 1;
       }
@@ -452,8 +462,12 @@ const Professor = () => {
   };
 
   const toggleQuestion = (q: string) => {
-    setExpandedQuestions(p => ({ ...p, [q]: !p[q] }));
-    if (!visibleCommentsPerQuestion[q]) setVisibleCommentsPerQuestion(p => ({ ...p, [q]: 5 }));
+    const wasExpanded = expandedQuestions[q];
+    setExpandedQuestions(p => ({ ...p, [q]: !wasExpanded }));
+    // Always reset to 5 when opening (or reopening)
+    if (!wasExpanded) {
+      setVisibleCommentsPerQuestion(p => ({ ...p, [q]: 5 }));
+    }
   };
 
   const showMoreComments = (e: React.MouseEvent, q: string) => {
@@ -511,7 +525,7 @@ const Professor = () => {
 
       <section className="prof-stats">
         <div className="prof-stat-card prof-stat-clickable">
-          <span className="prof-stat-value accent"><AnimatedNumber value={stats.avgRating} /></span>
+          <span className="prof-stat-value"><AnimatedNumber value={stats.avgRating} /></span>
           <span className="prof-stat-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
             Overall Rating
             {(stats.rmpRating !== null || stats.traceRating !== null) && (
@@ -539,10 +553,15 @@ const Professor = () => {
           </span>
           <span className="prof-stat-label">Would Take Again</span>
         </div>
-        <div className="prof-stat-card prof-stat-clickable" onClick={() => reviewsRef.current?.scrollIntoView({ behavior: 'smooth' })}>
+        <div className="prof-stat-card prof-stat-clickable" onClick={() => chartsRef.current?.scrollIntoView({ behavior: 'smooth' })}>
           <span className="prof-stat-value">{stats.totalRatings.toLocaleString()}</span>
           <span className="prof-stat-label">Total Ratings</span>
-          <span className="prof-stat-hint">Click to view ↓</span>
+          <span className="prof-stat-hint">View distribution ↓</span>
+        </div>
+        <div className="prof-stat-card prof-stat-clickable" onClick={() => reviewsRef.current?.scrollIntoView({ behavior: 'smooth' })}>
+          <span className="prof-stat-value">{(filteredRmpReviews.length + groupedTrace.reduce((acc, g) => acc + g.count, 0)).toLocaleString()}</span>
+          <span className="prof-stat-label">Total Comments</span>
+          <span className="prof-stat-hint">Read reviews ↓</span>
         </div>
       </section>
 
@@ -560,7 +579,7 @@ const Professor = () => {
         )}
       </div>
 
-      <section className="prof-section prof-charts-row">
+      <section className="prof-section prof-charts-row" ref={chartsRef}>
         <div className="prof-chart-card">
           <h3 className="prof-chart-title">Rating Distribution</h3>
           <div className="prof-distribution">
@@ -686,11 +705,11 @@ const Professor = () => {
                       <div className="prof-review-ratings">
                         <div className="prof-review-rating-item">
                           <span className="prof-review-rating-label">Quality</span>
-                          <span className="prof-review-rating-value" data-score={r.quality >= 4 ? 'high' : r.quality >= 3 ? 'mid' : 'low'}>{r.quality}</span>
+                          <span className="prof-review-rating-value" data-score={String(r.quality)}>{r.quality}</span>
                         </div>
                         <div className="prof-review-rating-item">
                           <span className="prof-review-rating-label">Difficulty</span>
-                          <span className="prof-review-rating-value" data-score={r.difficulty <= 2 ? 'high' : r.difficulty <= 3 ? 'mid' : 'low'}>{r.difficulty}</span>
+                          <span className="prof-review-rating-value" data-score={String(6 - r.difficulty)}>{r.difficulty}</span>
                         </div>
                       </div>
                       <div className="prof-review-meta">
@@ -733,7 +752,7 @@ const Professor = () => {
                 <input 
                   type="text" 
                   className="trace-search-input" 
-                  placeholder="Search questions..." 
+                  placeholder="Search comments or questions..." 
                   value={traceSearch} 
                   onChange={e => setTraceSearch(e.target.value)} 
                 />
@@ -770,7 +789,10 @@ const Professor = () => {
                         ))}
                         <div className="trace-category-actions">
                           {visibleCount < g.count && (
-                            <button className="trace-action-btn primary" onClick={e => showMoreComments(e, g.question)}>Show More</button>
+                            <button className="trace-action-btn primary" onClick={e => showMoreComments(e, g.question)}>Show More ({g.count - visibleCount} left)</button>
+                          )}
+                          {visibleCount > 5 && (
+                            <button className="trace-action-btn" onClick={e => { e.stopPropagation(); setVisibleCommentsPerQuestion(p => ({ ...p, [g.question]: 5 })); questionRefs.current[g.question]?.scrollIntoView({ behavior: 'smooth', block: 'center' }); }}>Show Less</button>
                           )}
                           <button className="trace-action-btn" onClick={e => { e.stopPropagation(); toggleQuestion(g.question); questionRefs.current[g.question]?.scrollIntoView({ behavior: 'smooth', block: 'center' }); }}>Collapse</button>
                         </div>
