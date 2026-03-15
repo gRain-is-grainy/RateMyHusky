@@ -490,7 +490,7 @@ function Compare() {
 			<section className="compare-controls" aria-label="Professor selection">
 				<div className="compare-control-card" ref={leftWrapperRef}>
 					<div className="compare-control-title-row">
-						<h2>Left Professor</h2>
+						<h2>Professor A</h2>
 						{leftSlug && (
 							<button className="compare-inline-btn" onClick={() => handleClear('a')}>
 								Clear
@@ -551,20 +551,9 @@ function Compare() {
 					)}
 				</div>
 
-				<div className="compare-middle-actions">
-					<button
-						type="button"
-						className="compare-swap-btn"
-						onClick={handleSwap}
-						disabled={!leftSlug && !rightSlug}
-					>
-						Swap sides
-					</button>
-				</div>
-
 				<div className="compare-control-card" ref={rightWrapperRef}>
 					<div className="compare-control-title-row">
-						<h2>Right Professor</h2>
+						<h2>Professor B</h2>
 						{rightSlug && (
 							<button className="compare-inline-btn" onClick={() => handleClear('b')}>
 								Clear
@@ -655,7 +644,7 @@ function Compare() {
 							</Link>
 						</>
 					) : (
-						<p className="compare-status">Pick a professor for the left side.</p>
+						<p className="compare-status">Pick a professor for slot A.</p>
 					)}
 				</article>
 
@@ -684,7 +673,7 @@ function Compare() {
 							</Link>
 						</>
 					) : (
-						<p className="compare-status">Pick a professor for the right side.</p>
+						<p className="compare-status">Pick a professor for slot B.</p>
 					)}
 				</article>
 			</section>
