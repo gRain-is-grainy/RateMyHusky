@@ -833,6 +833,7 @@ def _build_catalog():
             "traceRating":       round(float(row["trace_overall"]), 2) if has_trace else None,
             "totalReviews":      int(row["total_reviews"]),
             "wouldTakeAgainPct": wta,
+            "imageUrl":          photo_lookup.get(row["_name_key"], None),
             "_name_lower":       row["_name_key"],
         })
 
@@ -855,6 +856,7 @@ def _build_catalog():
             "traceRating":       avg,
             "totalReviews":      int(row["total_reviews"]),
             "wouldTakeAgainPct": None,
+            "imageUrl":          photo_lookup.get(nk, None),
             "_name_lower":       nk,
         })
 
@@ -1117,6 +1119,7 @@ def professors_catalog():
             "traceRating":       float(row["traceRating"]) if pd.notna(row["traceRating"]) else None,
             "totalReviews":      int(row["totalReviews"]),
             "wouldTakeAgainPct": float(row["wouldTakeAgainPct"]) if pd.notna(row["wouldTakeAgainPct"]) else None,
+            "imageUrl":          row["imageUrl"] if pd.notna(row.get("imageUrl")) else None,
         })
 
     return jsonify({

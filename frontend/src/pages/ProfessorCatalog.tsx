@@ -331,7 +331,27 @@ export default function ProfessorCatalog() {
                     e.key === 'Enter' && navigate(`/professors/${prof.slug}`)
                   }
                 >
-                  <div className="prof-avatar">{initials(prof.name)}</div>
+                  <div className="prof-avatar">
+                    {prof.imageUrl ? (
+                      <img
+                        src={prof.imageUrl}
+                        alt=""
+                        className="prof-avatar-img"
+                        onError={(e) => {
+                          const target = e.currentTarget;
+                          target.style.display = 'none';
+                          const fallback = target.parentElement?.querySelector('.prof-avatar-initials') as HTMLElement;
+                          if (fallback) fallback.style.display = 'flex';
+                        }}
+                      />
+                    ) : null}
+                    <span
+                      className="prof-avatar-initials"
+                      style={prof.imageUrl ? { display: 'none' } : undefined}
+                    >
+                      {initials(prof.name)}
+                    </span>
+                  </div>
                   <div className="prof-body">
                     <h3 className="prof-name">{prof.name}</h3>
                     <p className="prof-dept">{prof.department}</p>
