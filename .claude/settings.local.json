@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find 'c:\\\\Users\\\\Ben\\\\Desktop\\\\College Stuff\\\\Oasis\\\\s26-group-8' -name .env* -o -name *.pem -o -name *.key)"
+    ]
+  }
+}

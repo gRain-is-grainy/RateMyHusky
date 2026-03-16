@@ -1179,6 +1179,7 @@ def _get_redirect_uri():
 @app.route("/api/auth/google")
 def auth_google():
     """Redirect user to Google's consent screen (restricted to husky.neu.edu)."""
+    return_to = request.args.get("returnTo", "/")
     params = {
         "client_id": GOOGLE_CLIENT_ID,
         "redirect_uri": _get_redirect_uri(),
@@ -1187,7 +1188,9 @@ def auth_google():
         "hd": "husky.neu.edu",
         "prompt": "select_account",
     }
-    return redirect(f"{GOOGLE_AUTH_URL}?{urlencode(params)}")
+    resp = make_response(redirect(f"{GOOGLE_AUTH_URL}?{urlencode(params)}"))
+    resp.set_cookie("auth_return_to", return_to, max_age=600, httponly=True, samesite="Lax")
+    return resp
 
 
 @app.route("/api/auth/google/callback")
@@ -1233,8 +1236,13 @@ def auth_google_callback():
     }
     token = pyjwt.encode(payload, JWT_SECRET, algorithm="HS256")
 
-    # Set cookie and redirect to frontend
-    resp = make_response(redirect(FRONTEND_URL))
+    # Set cookie and redirect to the page the user was on
+    return_to = request.cookies.get("auth_return_to", "/")
+    # Ensure returnTo is a relative path to prevent open redirect
+    if not return_to.startswith("/"):
+        return_to = "/"
+    resp = make_response(redirect(f"{FRONTEND_URL}{return_to}"))
+    resp.delete_cookie("auth_return_to")
     resp.set_cookie(
         "auth_token",
         token,

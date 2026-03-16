@@ -8,6 +8,8 @@ import StarRating from '../components/StarRating';
 import RatingBar from '../components/RatingBar';
 import { fetchProfessorData } from '../api/api';
 import type { ProfessorProfile, ProfessorReview, TraceComment } from '../api/api';
+import { useAuth } from '../context/AuthContext';
+import SignInModal from '../components/SignInModal';
 import neuIcon from '../assets/neu-circle-icon.png';
 import './Professor.css';
 
@@ -149,6 +151,8 @@ function deduplicateByText<T>(items: T[], getText: (item: T) => string): T[] {
 /* ═══════════════════════════════════════ */
 const Professor = () => {
   const { slug } = useParams<{ slug: string }>();
+  const { user } = useAuth();
+  const [showSignIn, setShowSignIn] = useState(false);
   const reviewsRef = useRef<HTMLElement>(null);
   const chartsRef = useRef<HTMLElement>(null);
   const gradesRef = useRef<HTMLDivElement>(null);
@@ -829,18 +833,20 @@ const Professor = () => {
 
         {reviewTab === 'trace' && (
           <div className="prof-trace-container">
-            <div className="prof-trace-controls">
-              <div className="trace-search-container">
-                <input 
-                  type="text" 
-                  className="trace-search-input" 
-                  placeholder="Search comments or questions..." 
-                  value={traceSearch} 
-                  onChange={e => setTraceSearch(e.target.value)} 
-                />
+            {user && (
+              <div className="prof-trace-controls">
+                <div className="trace-search-container">
+                  <input
+                    type="text"
+                    className="trace-search-input"
+                    placeholder="Search comments or questions..."
+                    value={traceSearch}
+                    onChange={e => setTraceSearch(e.target.value)}
+                  />
+                </div>
+                <Dropdown className="trace-sort-dropdown" options={traceSortOptions} value={traceSort} onChange={setTraceSort} />
               </div>
-              <Dropdown className="trace-sort-dropdown" options={traceSortOptions} value={traceSort} onChange={setTraceSort} />
-            </div>
+            )}
             <div className="prof-trace-categories">
               {groupedTrace.map(g => {
                 const isExpanded = expandedQuestions[g.question];
@@ -856,15 +862,25 @@ const Professor = () => {
                       </div>
                       <svg className="trace-chevron" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
                     </div>
-                    {isExpanded && (
+                    {isExpanded && !user && (
+                      <div className="trace-category-paywall">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="paywall-lock-icon-sm">
+                          <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                          <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                        </svg>
+                        <p>Sign in with your <strong>husky.neu.edu</strong> account to read these comments.</p>
+                        <button className="paywall-signin-btn small" onClick={(e) => { e.stopPropagation(); setShowSignIn(true); }}>Sign In</button>
+                      </div>
+                    )}
+                    {isExpanded && user && (
                       <div className="trace-category-content">
                         {g.comments.slice(0, visibleCount).map((c, ci) => {
                           const termRaw = termIdMap.get(c.termId) || '';
                           const term = cleanTerm(termRaw);
                           const hasYear = /\b20\d{2}\b/.test(term);
                           return (
-                          <div 
-                            key={ci} 
+                          <div
+                            key={ci}
                             className={`trace-comment-bubble ${c.courseUrl ? 'clickable' : ''}`}
                             onClick={() => c.courseUrl && window.open(c.courseUrl, '_blank')}
                             title={c.courseUrl ? "Click to view original TRACE report" : ""}
@@ -901,7 +917,8 @@ const Professor = () => {
 
       <Footer />
       <ThemeToggle />
-      <button 
+      <SignInModal open={showSignIn} onClose={() => setShowSignIn(false)} />
+      <button
         className={`prof-back-to-top ${showBackToTop ? 'visible' : ''}`} 
         onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} 
         aria-label="Back to top"

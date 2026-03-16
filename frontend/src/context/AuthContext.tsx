@@ -36,7 +36,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = useCallback(() => {
-    window.location.href = `${API_BASE}/api/auth/google`;
+    const returnTo = window.location.pathname + window.location.search;
+    window.location.href = `${API_BASE}/api/auth/google?returnTo=${encodeURIComponent(returnTo)}`;
   }, []);
 
   const logout = useCallback(async () => {
