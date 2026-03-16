@@ -362,10 +362,13 @@
   .navbar-right .signin-btn {
     margin-top: 20px;
     width: 100%;
-    text-align: center;
-    padding: 12px 20px;
+    text-align: left;
+    padding: 12px 0;
     font-size: 1rem;
-    border-radius: 12px;
+    border-radius: 0;
+    background: none;
+    color: #d6394c;
+    font-weight: 800;
   }
 
   .navbar-right .navbar-user {
@@ -375,7 +378,7 @@
 
   .navbar-right .navbar-user-btn {
     width: 100%;
-    padding: 10px 12px;
+    padding: 10px 0;
   }
 
   .navbar-right .navbar-user-dropdown {

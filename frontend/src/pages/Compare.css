@@ -464,7 +464,7 @@
 }
 
 .dark .compare-page {
-	background: #101112;
+	background: #1a1a1a;
 	color: #e8e8e8;
 }
 
@@ -473,7 +473,7 @@
 	background:
 		radial-gradient(circle at 88% -24%, rgba(214, 57, 76, 0.22), transparent 48%),
 		radial-gradient(circle at 12% 8%, rgba(214, 57, 76, 0.12), transparent 44%),
-		#17181a;
+		#1f2022;
 }
 
 .dark .compare-hero::after {
@@ -487,7 +487,7 @@
 .dark .compare-control-card,
 .dark .compare-profile-card,
 .dark .compare-table {
-	background: #1a1c1f;
+	background: #242628;
 	border-color: #2c3035;
 	box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
 }
@@ -507,7 +507,7 @@
 }
 
 .dark .compare-search {
-	background: #141619;
+	background: #1e2023;
 	border-color: #343941;
 	color: #e9edf1;
 }
@@ -523,7 +523,7 @@
 
 .dark .compare-suggestion {
 	border-color: #2f343a;
-	background: #17191c;
+	background: #212325;
 }
 
 .dark .compare-suggestion:hover {
@@ -576,11 +576,11 @@
 }
 
 .dark .compare-row:hover {
-	background: #1f2124;
+	background: #282a2d;
 }
 
 .dark .compare-cell-label {
-	background: #16181b;
+	background: #1e2023;
 	border-left-color: #2c3035;
 	border-right-color: #2c3035;
 	color: #8f98a2;
