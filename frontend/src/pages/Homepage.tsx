@@ -1,7 +1,7 @@
 /*
 Primary Homepage Codespace
 */
-import { useState, useEffect, useRef, useCallback, useLayoutEffect } from 'react';
+import { useState, useEffect, useRef, useCallback, useLayoutEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import SearchBar from '../components/SearchBar';
 import Footer from '../components/Footer';
@@ -269,36 +269,60 @@ const Homepage = () => {
   }, [selectedCollege]);
 
   const [slotResult, setSlotResult] = useState<{ name: string; dept: string; college: string; slug: string } | null>(null);
-  const [slotSpinning, setSlotSpinning] = useState(false);
-  const [slotNames, setSlotNames] = useState<string[]>([]);
+  const [handlePulled, setHandlePulled] = useState(false);
+  const [reelState, setReelState] = useState<'hidden' | 'spinning' | 'landing'>('hidden');
+  const [landNames, setLandNames] = useState<string[]>([]);
+  const [landOffset, setLandOffset] = useState(0);
+  const ITEM_H = 44;
+
+  const PLACEHOLDERS = [
+    'Albert Einstein', 'Marie Curie', 'Isaac Newton', 'Ada Lovelace',
+    'Nikola Tesla', 'Grace Hopper', 'Alan Turing', 'Rosalind Franklin',
+    'Richard Feynman', 'Emmy Noether', 'Linus Torvalds', 'Barbara Liskov',
+    'Noam Chomsky', 'Katherine Johnson', 'John von Neumann', 'Dorothy Vaughan',
+  ];
+
+  // Repeat many times for a long seamless CSS loop
+  const loopNames = useMemo(() => {
+    const arr: string[] = [];
+    for (let i = 0; i < 20; i++) arr.push(...PLACEHOLDERS);
+    return arr;
+  }, []);
 
   const handleShuffle = async () => {
+    if (shuffling) return;
     setShuffling(true);
     setSlotResult(null);
-    setSlotSpinning(true);
-
-    // Start spinning placeholder names immediately
-    const placeholders = [
-      'Albert Einstein', 'Marie Curie', 'Isaac Newton', 'Ada Lovelace',
-      'Nikola Tesla', 'Grace Hopper', 'Alan Turing', 'Rosalind Franklin',
-      'Richard Feynman', 'Emmy Noether', 'Linus Torvalds', 'Barbara Liskov',
-    ];
-    // Shuffle them for variety
-    const shuffled = [...placeholders].sort(() => Math.random() - 0.5);
-    setSlotNames(shuffled);
+    setHandlePulled(true);
+    setReelState('spinning');
 
     try {
       const prof = await fetchRandomProfessor();
       const slug = prof.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 
-      // Let the spin animation play for at least 1.5s
-      await new Promise(r => setTimeout(r, 1500));
+      // Build landing reel: shuffled names + winner at end
+      const shuffled = [...PLACEHOLDERS].sort(() => Math.random() - 0.5);
+      const finalReel = [...shuffled, ...shuffled, ...shuffled, prof.name];
+      const targetOffset = (finalReel.length - 1) * ITEM_H;
 
-      setSlotSpinning(false);
+      setLandNames(finalReel);
+      setLandOffset(0);
+      setReelState('landing');
+
+      // Wait for mount at offset 0, then animate
+      await new Promise<void>(r => requestAnimationFrame(() => requestAnimationFrame(() => r())));
+      setLandOffset(targetOffset);
+
+      // Wait for 2.2s CSS transition
+      await new Promise(r => setTimeout(r, 2400));
+
       setSlotResult({ name: prof.name, dept: prof.dept ?? '', college: prof.college ?? '', slug });
+      setReelState('hidden');
+      setHandlePulled(false);
     } catch (err) {
       console.error('Failed to fetch random professor:', err);
-      setSlotSpinning(false);
+      setReelState('hidden');
+      setHandlePulled(false);
     } finally {
       setShuffling(false);
     }
@@ -444,43 +468,83 @@ const Homepage = () => {
             </button>
           </div>
 
-          <div className="slot-machine">
-            <div className="slot-frame">
-              <div className="slot-window">
-                {!slotSpinning && !slotResult && (
-                  <div className="slot-idle">
-                    <span className="slot-idle-icon">🎰</span>
-                    <span className="slot-idle-text">Press shuffle!</span>
-                  </div>
-                )}
-                {slotSpinning && (
-                  <div className="slot-reel" key="spinning">
-                    {slotNames.concat(slotNames).map((name, i) => (
-                      <div key={i} className="slot-name">{name}</div>
-                    ))}
-                  </div>
-                )}
-                {!slotSpinning && slotResult && (
-                  <div
-                    className="slot-result"
-                    onClick={() => navigate(`/professors/${slotResult.slug}`)}
-                    role="button"
-                    tabIndex={0}
-                    onKeyDown={e => e.key === 'Enter' && navigate(`/professors/${slotResult.slug}`)}
-                  >
-                    <span className="slot-result-name">{slotResult.name}</span>
-                    <span className="slot-result-dept">{slotResult.dept}</span>
-                    <span className="slot-result-college">{slotResult.college}</span>
-                    <span className="slot-result-cta">View Profile →</span>
-                  </div>
-                )}
+          <div className="slot-machine" onClick={handleShuffle} role="button" tabIndex={0} onKeyDown={e => e.key === 'Enter' && handleShuffle()}>
+            {/* Machine body */}
+            <div className="sm-body">
+              {/* Top cap */}
+              <div className="sm-top">
+                <div className="sm-top-light" />
+                <div className="sm-top-light" />
+                <div className="sm-top-light" />
               </div>
-              <div className="slot-shine" />
+
+              {/* Reel window */}
+              <div className="sm-window-frame">
+                {/* Center indicator arrow */}
+                <div className="sm-indicator sm-indicator-left">
+                  <svg viewBox="0 0 10 16" fill="#d6394c"><polygon points="0,8 10,0 10,16" /></svg>
+                </div>
+                <div className="sm-indicator sm-indicator-right">
+                  <svg viewBox="0 0 10 16" fill="#d6394c"><polygon points="10,8 0,0 0,16" /></svg>
+                </div>
+                <div className="sm-center-line" />
+
+                <div className="sm-window">
+                  {reelState === 'hidden' && !slotResult && (
+                    <div className="sm-idle-text">PULL!</div>
+                  )}
+                  {reelState === 'hidden' && slotResult && (
+                    <div
+                      className="sm-result"
+                      onClick={(e) => { e.stopPropagation(); navigate(`/professors/${slotResult.slug}`); }}
+                    >
+                      <span className="sm-result-name">{slotResult.name}</span>
+                      <span className="sm-result-sub">{slotResult.dept}</span>
+                      <span className="sm-result-cta">View Profile →</span>
+                    </div>
+                  )}
+                  {reelState === 'spinning' && (
+                    <div className="sm-reel sm-reel-loop">
+                      {loopNames.map((name, i) => (
+                        <div key={i} className="sm-reel-item" style={{ height: ITEM_H }}>
+                          {name}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {reelState === 'landing' && (
+                    <div
+                      className="sm-reel"
+                      style={{
+                        transform: `translateY(-${landOffset}px)`,
+                        transition: landOffset > 0
+                          ? 'transform 2.2s cubic-bezier(0.12, 0, 0.18, 1)'
+                          : 'none',
+                      }}
+                    >
+                      {landNames.map((name, i) => (
+                        <div key={i} className="sm-reel-item" style={{ height: ITEM_H }}>
+                          {name}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Bottom base */}
+              <div className="sm-bottom">
+                <div className="sm-coin-slot" />
+              </div>
             </div>
-            <div className="slot-base">
-              <div className="slot-base-stripe" />
-              <div className="slot-base-stripe" />
-              <div className="slot-base-stripe" />
+
+            {/* Handle (lever) */}
+            <div className={`sm-handle ${handlePulled ? 'pulled' : ''}`}>
+              <div className="sm-handle-arm">
+                <div className="sm-handle-knob" />
+                <div className="sm-handle-rod" />
+              </div>
+              <div className="sm-handle-pivot" />
             </div>
           </div>
         </div>

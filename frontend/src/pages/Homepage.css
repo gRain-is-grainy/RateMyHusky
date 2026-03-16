@@ -540,171 +540,275 @@
 .slot-machine {
   flex-shrink: 0;
   display: flex;
-  flex-direction: column;
-  align-items: center;
+  align-items: flex-start;
+  cursor: pointer;
+  user-select: none;
 }
 
-.slot-frame {
-  position: relative;
-  width: 240px;
-  height: 120px;
+/* Machine body */
+.sm-body {
+  width: 200px;
   border-radius: 16px;
-  border: 3px solid #d6394c;
-  background: linear-gradient(180deg, #fff5f5 0%, #fff 100%);
-  overflow: hidden;
-  box-shadow:
-    0 4px 20px rgba(214, 57, 76, 0.15),
-    inset 0 2px 8px rgba(214, 57, 76, 0.06);
-}
-
-.slot-window {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  background: linear-gradient(180deg, #e8e0e0 0%, #d4cccc 100%);
+  border: 2px solid #bbb;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.6);
   overflow: hidden;
   position: relative;
 }
 
-.slot-shine {
+/* Top cap with lights */
+.sm-top {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  padding: 8px 0 6px;
+  background: linear-gradient(180deg, #c22, #d6394c);
+  border-bottom: 2px solid #a82030;
+}
+
+.sm-top-light {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #ffda44;
+  box-shadow: 0 0 6px 2px rgba(255,218,68,0.5);
+  animation: smBlink 1.2s ease-in-out infinite alternate;
+}
+
+.sm-top-light:nth-child(2) { animation-delay: 0.4s; }
+.sm-top-light:nth-child(3) { animation-delay: 0.8s; }
+
+@keyframes smBlink {
+  0%, 40% { opacity: 0.4; box-shadow: 0 0 4px 1px rgba(255,218,68,0.3); }
+  60%, 100% { opacity: 1; box-shadow: 0 0 8px 3px rgba(255,218,68,0.7); }
+}
+
+/* Reel window frame */
+.sm-window-frame {
+  position: relative;
+  margin: 10px 14px;
+  border-radius: 8px;
+  border: 2px solid #999;
+  background: #fff;
+  box-shadow: inset 0 2px 6px rgba(0,0,0,0.15);
+  overflow: hidden;
+}
+
+/* Center line indicator */
+.sm-center-line {
   position: absolute;
-  top: 0;
   left: 0;
   right: 0;
-  height: 40%;
-  background: linear-gradient(180deg, rgba(255,255,255,0.5) 0%, transparent 100%);
+  top: 50%;
+  transform: translateY(-50%);
+  height: 2px;
+  background: #d6394c;
+  z-index: 5;
+  opacity: 0.6;
   pointer-events: none;
-  border-radius: 13px 13px 0 0;
 }
 
-/* Idle state */
-.slot-idle {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  animation: float 3s ease-in-out infinite;
+.sm-indicator {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 6;
+  pointer-events: none;
 }
 
-.slot-idle-icon {
-  font-size: 2.8rem;
-  line-height: 1;
+.sm-indicator svg {
+  width: 8px;
+  height: 14px;
+  display: block;
 }
 
-.slot-idle-text {
-  font-size: 0.78rem;
-  font-weight: 700;
-  color: #bbb;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+.sm-indicator-left {
+  left: 2px;
 }
 
-@keyframes float {
-  0%, 100% { transform: translateY(0); }
-  50%      { transform: translateY(-6px); }
+.sm-indicator-right {
+  right: 2px;
 }
 
-/* Spinning reel */
-.slot-reel {
-  display: flex;
-  flex-direction: column;
-  animation: slotSpin 1.5s cubic-bezier(0.2, 0, 0.2, 1) forwards;
-  will-change: transform;
-}
-
-.slot-name {
-  height: 120px;
+/* Reel window inner */
+.sm-window {
+  height: 132px;
+  overflow: hidden;
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1rem;
-  font-weight: 800;
+}
+
+/* Idle text */
+.sm-idle-text {
+  font-size: 1.1rem;
+  font-weight: 900;
   color: #d6394c;
+  letter-spacing: 0.1em;
+  animation: smPulse 2s ease-in-out infinite;
+}
+
+@keyframes smPulse {
+  0%, 100% { opacity: 0.6; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.05); }
+}
+
+/* Reel */
+.sm-reel {
+  display: flex;
+  flex-direction: column;
+  will-change: transform;
+  padding-top: 44px;
+}
+
+/* Looping reel: scrolls one set of 16 items, repeats seamlessly */
+.sm-reel-loop {
+  animation: smReelLoop 0.5s linear infinite;
+}
+
+@keyframes smReelLoop {
+  from { transform: translateY(0); }
+  to   { transform: translateY(calc(-44px * 16)); }
+}
+
+.sm-reel-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #333;
   white-space: nowrap;
-  padding: 0 16px;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  padding: 0 12px;
 }
 
-@keyframes slotSpin {
-  0%   { transform: translateY(0); }
-  70%  { transform: translateY(calc(-120px * 10)); }
-  85%  { transform: translateY(calc(-120px * 9.7)); }
-  100% { transform: translateY(calc(-120px * 10)); }
-}
-
-/* Result state */
-.slot-result {
+/* Result display */
+.sm-result {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 3px;
-  padding: 12px 16px;
-  cursor: pointer;
-  animation: slotReveal 0.4s ease-out;
   text-align: center;
+  gap: 2px;
+  padding: 8px;
+  cursor: pointer;
+  animation: smReveal 0.4s ease-out;
 }
 
-.slot-result:hover .slot-result-cta {
-  color: #b82e3f;
-  transform: translateX(3px);
-}
-
-.slot-result-name {
-  font-size: 1.05rem;
+.sm-result-name {
+  font-size: 0.92rem;
   font-weight: 900;
   color: #d6394c;
-  line-height: 1.2;
 }
 
-.slot-result-dept {
-  font-size: 0.76rem;
+.sm-result-sub {
+  font-size: 0.7rem;
   color: #888;
   font-weight: 600;
 }
 
-.slot-result-college {
-  font-size: 0.68rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: #aaa;
-  background: #f3f4f6;
-  padding: 2px 8px;
-  border-radius: 4px;
-  margin-top: 2px;
-}
-
-.slot-result-cta {
-  font-size: 0.78rem;
+.sm-result-cta {
+  font-size: 0.72rem;
   font-weight: 800;
   color: #d6394c;
   margin-top: 4px;
-  transition: color 0.15s, transform 0.15s;
+  transition: transform 0.15s;
 }
 
-@keyframes slotReveal {
-  0%   { opacity: 0; transform: scale(0.85); }
-  60%  { transform: scale(1.04); }
+.sm-result:hover .sm-result-cta {
+  transform: translateX(3px);
+}
+
+@keyframes smReveal {
+  0% { opacity: 0; transform: scale(0.9); }
   100% { opacity: 1; transform: scale(1); }
 }
 
-/* Decorative base */
-.slot-base {
+/* Bottom base */
+.sm-bottom {
+  padding: 10px 0 12px;
   display: flex;
-  gap: 6px;
-  margin-top: 8px;
+  justify-content: center;
+  background: linear-gradient(180deg, #d0c8c8 0%, #c4bcbc 100%);
+  border-top: 1px solid #bbb;
 }
 
-.slot-base-stripe {
-  width: 50px;
-  height: 4px;
-  border-radius: 2px;
-  background: #d6394c;
-  opacity: 0.25;
+.sm-coin-slot {
+  width: 40px;
+  height: 6px;
+  border-radius: 3px;
+  background: #666;
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.4);
 }
 
-.slot-base-stripe:nth-child(2) {
-  opacity: 0.45;
+/* ── Handle (lever) ── */
+.sm-handle {
+  position: relative;
+  width: 30px;
+  height: 90px;
+  margin-left: -2px;
+  margin-top: 40px;
+}
+
+/* Pivot point — fixed to the machine body */
+.sm-handle-pivot {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #888;
+  border: 2px solid #777;
+  z-index: 2;
+}
+
+/* The arm — shrinks vertically to simulate pulling toward the viewer */
+.sm-handle-arm {
+  position: absolute;
+  bottom: 5px;
+  left: 50%;
+  margin-left: -2.5px;
+  transform-origin: bottom center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sm-handle.pulled .sm-handle-arm {
+  transform: scaleY(0.35);
+}
+
+.sm-handle-rod {
+  width: 5px;
+  height: 56px;
+  background: linear-gradient(90deg, #999 0%, #ccc 50%, #999 100%);
+  border-radius: 2.5px;
+}
+
+.sm-handle-knob {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 35%, #ff5555, #d6394c 60%, #a82030);
+  border: 2px solid #a82030;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+  order: -1;
+  transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Counter-scale the knob so it stays round when the arm squishes */
+.sm-handle.pulled .sm-handle-knob {
+  transform: scaleY(2.86) scaleX(1);
+}
+
+.dark .sm-handle-pivot {
+  background: #555;
+  border-color: #444;
 }
 
 /* ==============================
@@ -795,29 +899,41 @@
   color: #999;
 }
 
-.dark .slot-frame {
-  background: linear-gradient(180deg, #2a2020 0%, #232323 100%);
-  border-color: #d6394c;
-  box-shadow:
-    0 4px 20px rgba(214, 57, 76, 0.2),
-    inset 0 2px 8px rgba(214, 57, 76, 0.08);
+.dark .sm-body {
+  background: linear-gradient(180deg, #333 0%, #2a2a2a 100%);
+  border-color: #555;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.08);
 }
 
-.dark .slot-shine {
-  background: linear-gradient(180deg, rgba(255,255,255,0.06) 0%, transparent 100%);
+.dark .sm-window-frame {
+  background: #1a1a1a;
+  border-color: #555;
+  box-shadow: inset 0 2px 6px rgba(0,0,0,0.4);
 }
 
-.dark .slot-idle-text {
-  color: #555;
+.dark .sm-reel-item {
+  color: #ddd;
 }
 
-.dark .slot-result-dept {
+.dark .sm-idle-text {
+  color: #d6394c;
+}
+
+.dark .sm-result-sub {
   color: #777;
 }
 
-.dark .slot-result-college {
-  background: #2a2a2a;
-  color: #777;
+.dark .sm-bottom {
+  background: linear-gradient(180deg, #2e2e2e 0%, #262626 100%);
+  border-top-color: #444;
+}
+
+.dark .sm-coin-slot {
+  background: #444;
+}
+
+.dark .sm-handle-rod {
+  background: linear-gradient(90deg, #555 0%, #777 50%, #555 100%);
 }
 
 .dark .stars-empty {
@@ -896,20 +1012,12 @@
     justify-content: center;
   }
 
-  .slot-frame {
-    width: 220px;
-    height: 110px;
+  .sm-body {
+    width: 180px;
   }
 
-  .slot-name {
-    height: 110px;
-  }
-
-  @keyframes slotSpin {
-    0%   { transform: translateY(0); }
-    70%  { transform: translateY(calc(-110px * 10)); }
-    85%  { transform: translateY(calc(-110px * 9.7)); }
-    100% { transform: translateY(calc(-110px * 10)); }
+  .sm-handle-rod {
+    height: 46px;
   }
 
   /* Horizontal scroll for the leaderboard — all columns stay visible */
@@ -1034,25 +1142,29 @@
     font-size: 0.95rem;
   }
 
-  .slot-frame {
-    width: 200px;
-    height: 100px;
+  .sm-body {
+    width: 160px;
   }
 
-  .slot-name {
-    height: 100px;
-    font-size: 0.9rem;
+  .sm-window {
+    height: 110px;
   }
 
-  .slot-idle-icon {
-    font-size: 2.2rem;
+  .sm-reel-item {
+    font-size: 0.75rem;
   }
 
-  @keyframes slotSpin {
-    0%   { transform: translateY(0); }
-    70%  { transform: translateY(calc(-100px * 10)); }
-    85%  { transform: translateY(calc(-100px * 9.7)); }
-    100% { transform: translateY(calc(-100px * 10)); }
+  .sm-handle-rod {
+    height: 40px;
+  }
+
+  .sm-handle-knob {
+    width: 18px;
+    height: 18px;
+  }
+
+  .sm-handle {
+    height: 74px;
   }
 
   .stars-wrapper {

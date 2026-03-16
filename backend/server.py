@@ -1207,7 +1207,6 @@ def auth_google():
         "response_type": "code",
         "scope": "openid email profile",
         "hd": "husky.neu.edu",
-        "prompt": "select_account",
     }
     is_popup = request.args.get("popup") == "1"
     resp = make_response(redirect(f"{GOOGLE_AUTH_URL}?{urlencode(params)}"))
