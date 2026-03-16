@@ -17,7 +17,7 @@ interface TraceSnapshot {
 
 type WinnerSide = 'left' | 'right' | null;
 
-const CATALOG_LIMIT = 5000;
+const CATALOG_LIMIT = 10000;
 
 const slugify = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 
@@ -53,15 +53,23 @@ const pickWinner = (
 	leftValue: number | null | undefined,
 	rightValue: number | null | undefined,
 	mode: 'higher' | 'lower' = 'higher',
+	decimals = 2,
 ): WinnerSide => {
 	const left = parseMaybeNumber(leftValue);
 	const right = parseMaybeNumber(rightValue);
 
-	if (left === null || right === null) return null;
-	if (left === right) return null;
+	if (left === null && right === null) return null;
+	if (left === null) return 'right';
+	if (right === null) return 'left';
 
-	if (mode === 'higher') return left > right ? 'left' : 'right';
-	return left < right ? 'left' : 'right';
+	// Round to displayed precision so ties match what the user sees
+	const factor = 10 ** decimals;
+	const l = Math.round(left * factor) / factor;
+	const r = Math.round(right * factor) / factor;
+	if (l === r) return null;
+
+	if (mode === 'higher') return l > r ? 'left' : 'right';
+	return l < r ? 'left' : 'right';
 };
 
 const getRecentTraceSnapshot = (profile: ProfessorProfile | null): TraceSnapshot | null => {
@@ -403,11 +411,22 @@ function Compare() {
 	const leftTrace = leftProfile?.traceRating ?? leftCatalogProfessor?.traceRating ?? null;
 	const rightTrace = rightProfile?.traceRating ?? rightCatalogProfessor?.traceRating ?? null;
 
+	const leftDept = leftCatalogProfessor
+		? `${leftCatalogProfessor.department} (${leftCatalogProfessor.college})`
+		: leftProfile?.department
+			? leftProfile.department
+			: 'N/A';
+	const rightDept = rightCatalogProfessor
+		? `${rightCatalogProfessor.department} (${rightCatalogProfessor.college})`
+		: rightProfile?.department
+			? rightProfile.department
+			: 'N/A';
+
 	const compareRows = [
 		{
 			label: 'Department',
-			left: leftCatalogProfessor ? `${leftCatalogProfessor.department} (${leftCatalogProfessor.college})` : 'N/A',
-			right: rightCatalogProfessor ? `${rightCatalogProfessor.department} (${rightCatalogProfessor.college})` : 'N/A',
+			left: leftDept,
+			right: rightDept,
 			winner: null,
 		},
 		{
@@ -440,7 +459,7 @@ function Compare() {
 			label: 'Total Reviews',
 			left: leftProfile?.totalRatings?.toLocaleString() ?? leftCatalogProfessor?.totalReviews?.toLocaleString() ?? 'N/A',
 			right: rightProfile?.totalRatings?.toLocaleString() ?? rightCatalogProfessor?.totalReviews?.toLocaleString() ?? 'N/A',
-			winner: pickWinner(leftProfile?.totalRatings ?? leftCatalogProfessor?.totalReviews, rightProfile?.totalRatings ?? rightCatalogProfessor?.totalReviews),
+			winner: pickWinner(leftProfile?.totalRatings ?? leftCatalogProfessor?.totalReviews, rightProfile?.totalRatings ?? rightCatalogProfessor?.totalReviews, 'higher', 0),
 		},
 		{
 			label: 'Would Take Again',
@@ -452,7 +471,7 @@ function Compare() {
 				rightProfile?.wouldTakeAgainPct === null || rightProfile?.wouldTakeAgainPct === undefined
 					? 'N/A'
 					: `${rightProfile.wouldTakeAgainPct.toFixed(0)}%`,
-			winner: pickWinner(leftProfile?.wouldTakeAgainPct, rightProfile?.wouldTakeAgainPct),
+			winner: pickWinner(leftProfile?.wouldTakeAgainPct, rightProfile?.wouldTakeAgainPct, 'higher', 0),
 		},
 		{
 			label: 'Recent TRACE Snapshot',
@@ -473,6 +492,61 @@ function Compare() {
 	];
 
 	const bothSelected = Boolean(leftSlug) && Boolean(rightSlug);
+	const bothReady = bothSelected && !leftLoading && !rightLoading;
+
+	const renderProfileCard = (
+		slug: string,
+		catalogProf: CatalogProfessor | null,
+		profile: ProfessorProfile | null,
+		isLoading: boolean,
+		error: string | null,
+		slotLabel: string,
+	) => {
+		if (isLoading) return <p className="compare-status">Loading profile...</p>;
+		if (error && !profile && !catalogProf) return <p className="compare-status compare-status-error">{error}</p>;
+
+		const source = catalogProf || profile;
+		if (!source) return <p className="compare-status">Pick a professor for slot {slotLabel}.</p>;
+
+		const name = catalogProf?.name ?? profile?.name ?? '';
+		const dept = catalogProf?.department ?? profile?.department ?? '';
+		const imgUrl = profile?.imageUrl ?? catalogProf?.imageUrl ?? null;
+		const rating = profile?.avgRating ?? catalogProf?.avgRating ?? null;
+		const profSlug = catalogProf?.slug ?? slug;
+
+		return (
+			<>
+				<div className="compare-avatar-wrap">
+					{imgUrl ? (
+						<>
+							<img
+								src={imgUrl}
+								alt={name}
+								className="compare-avatar-img"
+								onError={(e) => {
+									e.currentTarget.style.display = 'none';
+									const fb = e.currentTarget.parentElement?.querySelector('.compare-avatar-fallback') as HTMLElement;
+									if (fb) fb.style.display = 'flex';
+								}}
+							/>
+							<div className="compare-avatar-fallback" style={{ display: 'none' }}>{getInitials(name)}</div>
+						</>
+					) : (
+						<div className="compare-avatar-fallback">{getInitials(name)}</div>
+					)}
+				</div>
+				<h3>{name}</h3>
+				<p>{dept}</p>
+				<div className="compare-rating-line">
+					<strong>{formatMetric(rating)}</strong>
+					<StarRating rating={rating ?? 0} size="sm" />
+				</div>
+				<Link className="compare-profile-link" to={`/professors/${profSlug}`}>
+					View profile
+				</Link>
+			</>
+		);
+	};
 
 	return (
 		<>
@@ -490,7 +564,7 @@ function Compare() {
 			<section className="compare-controls" aria-label="Professor selection">
 				<div className="compare-control-card" ref={leftWrapperRef}>
 					<div className="compare-control-title-row">
-						<h2>Left Professor</h2>
+						<h2>Professor A</h2>
 						{leftSlug && (
 							<button className="compare-inline-btn" onClick={() => handleClear('a')}>
 								Clear
@@ -551,20 +625,9 @@ function Compare() {
 					)}
 				</div>
 
-				<div className="compare-middle-actions">
-					<button
-						type="button"
-						className="compare-swap-btn"
-						onClick={handleSwap}
-						disabled={!leftSlug && !rightSlug}
-					>
-						Swap sides
-					</button>
-				</div>
-
 				<div className="compare-control-card" ref={rightWrapperRef}>
 					<div className="compare-control-title-row">
-						<h2>Right Professor</h2>
+						<h2>Professor B</h2>
 						{rightSlug && (
 							<button className="compare-inline-btn" onClick={() => handleClear('b')}>
 								Clear
@@ -626,66 +689,15 @@ function Compare() {
 				</div>
 			</section>
 
-			{catalogLoading && <p className="compare-status">Loading professor catalog...</p>}
 			{catalogError && <p className="compare-status compare-status-error">{catalogError}</p>}
 
 			<section className="compare-panels" aria-live="polite">
 				<article className="compare-profile-card">
-					{leftLoading ? (
-						<p className="compare-status">Loading left profile...</p>
-					) : leftError ? (
-						<p className="compare-status compare-status-error">{leftError}</p>
-					) : leftCatalogProfessor ? (
-						<>
-							<div className="compare-avatar-wrap">
-								{leftProfile?.imageUrl ? (
-									<img src={leftProfile.imageUrl} alt={leftCatalogProfessor.name} className="compare-avatar-img" />
-								) : (
-									<div className="compare-avatar-fallback">{getInitials(leftCatalogProfessor.name)}</div>
-								)}
-							</div>
-							<h3>{leftCatalogProfessor.name}</h3>
-							<p>{leftCatalogProfessor.department}</p>
-							<div className="compare-rating-line">
-								<strong>{formatMetric(leftProfile?.avgRating ?? leftCatalogProfessor.avgRating)}</strong>
-								<StarRating rating={leftProfile?.avgRating ?? leftCatalogProfessor.avgRating ?? 0} size="sm" />
-							</div>
-							<Link className="compare-profile-link" to={`/professors/${leftCatalogProfessor.slug}`}>
-								View profile
-							</Link>
-						</>
-					) : (
-						<p className="compare-status">Pick a professor for the left side.</p>
-					)}
+					{renderProfileCard(leftSlug, leftCatalogProfessor, leftProfile, leftLoading, leftError, 'A')}
 				</article>
 
 				<article className="compare-profile-card">
-					{rightLoading ? (
-						<p className="compare-status">Loading right profile...</p>
-					) : rightError ? (
-						<p className="compare-status compare-status-error">{rightError}</p>
-					) : rightCatalogProfessor ? (
-						<>
-							<div className="compare-avatar-wrap">
-								{rightProfile?.imageUrl ? (
-									<img src={rightProfile.imageUrl} alt={rightCatalogProfessor.name} className="compare-avatar-img" />
-								) : (
-									<div className="compare-avatar-fallback">{getInitials(rightCatalogProfessor.name)}</div>
-								)}
-							</div>
-							<h3>{rightCatalogProfessor.name}</h3>
-							<p>{rightCatalogProfessor.department}</p>
-							<div className="compare-rating-line">
-								<strong>{formatMetric(rightProfile?.avgRating ?? rightCatalogProfessor.avgRating)}</strong>
-								<StarRating rating={rightProfile?.avgRating ?? rightCatalogProfessor.avgRating ?? 0} size="sm" />
-							</div>
-							<Link className="compare-profile-link" to={`/professors/${rightCatalogProfessor.slug}`}>
-								View profile
-							</Link>
-						</>
-					) : (
-						<p className="compare-status">Pick a professor for the right side.</p>
-					)}
+					{renderProfileCard(rightSlug, rightCatalogProfessor, rightProfile, rightLoading, rightError, 'B')}
 				</article>
 			</section>
 
@@ -693,9 +705,10 @@ function Compare() {
 				<header className="compare-metrics-header">
 					<h2>Key Comparison Metrics</h2>
 					{!bothSelected && <p>Select both professors to unlock full comparison.</p>}
+					{bothSelected && !bothReady && <p>Loading comparison...</p>}
 				</header>
 
-				<div className="compare-table" role="table" aria-label="Professor metrics comparison table">
+				{bothReady && <div className="compare-table" role="table" aria-label="Professor metrics comparison table">
 					{compareRows.map((row) => (
 						<div className="compare-row" role="row" key={row.label}>
 							<div
@@ -717,7 +730,7 @@ function Compare() {
 							</div>
 						</div>
 					))}
-				</div>
+				</div>}
 			</section>
 
 			</main>

@@ -483,7 +483,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 48px;
-  max-width: 800px;
+  max-width: 900px;
   margin: 0 auto;
 }
 
@@ -535,18 +535,280 @@
   height: 20px;
 }
 
-.randomizer-visual {
+/* ── Slot Machine ── */
+
+.slot-machine {
   flex-shrink: 0;
+  display: flex;
+  align-items: flex-start;
+  cursor: pointer;
+  user-select: none;
 }
 
-.randomizer-dice {
-  font-size: 6rem;
-  animation: float 3s ease-in-out infinite;
+/* Machine body */
+.sm-body {
+  width: 200px;
+  border-radius: 16px;
+  background: linear-gradient(180deg, #e8e0e0 0%, #d4cccc 100%);
+  border: 2px solid #bbb;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.6);
+  overflow: hidden;
+  position: relative;
 }
 
-@keyframes float {
-  0%, 100% { transform: translateY(0); }
-  50%      { transform: translateY(-12px); }
+/* Top cap with lights */
+.sm-top {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  padding: 8px 0 6px;
+  background: linear-gradient(180deg, #c22, #d6394c);
+  border-bottom: 2px solid #a82030;
+}
+
+.sm-top-light {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #ffda44;
+  box-shadow: 0 0 6px 2px rgba(255,218,68,0.5);
+  animation: smBlink 1.2s ease-in-out infinite alternate;
+}
+
+.sm-top-light:nth-child(2) { animation-delay: 0.4s; }
+.sm-top-light:nth-child(3) { animation-delay: 0.8s; }
+
+@keyframes smBlink {
+  0%, 40% { opacity: 0.4; box-shadow: 0 0 4px 1px rgba(255,218,68,0.3); }
+  60%, 100% { opacity: 1; box-shadow: 0 0 8px 3px rgba(255,218,68,0.7); }
+}
+
+/* Reel window frame */
+.sm-window-frame {
+  position: relative;
+  margin: 10px 14px;
+  border-radius: 8px;
+  border: 2px solid #999;
+  background: #fff;
+  box-shadow: inset 0 2px 6px rgba(0,0,0,0.15);
+  overflow: hidden;
+}
+
+/* Center line indicator */
+.sm-center-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 2px;
+  background: #d6394c;
+  z-index: 5;
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.sm-indicator {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 6;
+  pointer-events: none;
+}
+
+.sm-indicator svg {
+  width: 8px;
+  height: 14px;
+  display: block;
+}
+
+.sm-indicator-left {
+  left: 2px;
+}
+
+.sm-indicator-right {
+  right: 2px;
+}
+
+/* Reel window inner */
+.sm-window {
+  height: 132px;
+  overflow: hidden;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Idle text */
+.sm-idle-text {
+  font-size: 1.1rem;
+  font-weight: 900;
+  color: #d6394c;
+  letter-spacing: 0.1em;
+  animation: smPulse 2s ease-in-out infinite;
+}
+
+@keyframes smPulse {
+  0%, 100% { opacity: 0.6; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.05); }
+}
+
+/* Reel */
+.sm-reel {
+  display: flex;
+  flex-direction: column;
+  will-change: transform;
+  padding-top: 44px;
+}
+
+/* Looping reel: scrolls one set of 16 items, repeats seamlessly */
+.sm-reel-loop {
+  animation: smReelLoop 0.5s linear infinite;
+}
+
+@keyframes smReelLoop {
+  from { transform: translateY(0); }
+  to   { transform: translateY(calc(-44px * 16)); }
+}
+
+.sm-reel-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #333;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  padding: 0 12px;
+}
+
+/* Result display */
+.sm-result {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 2px;
+  padding: 8px;
+  cursor: pointer;
+  animation: smReveal 0.4s ease-out;
+}
+
+.sm-result-name {
+  font-size: 0.92rem;
+  font-weight: 900;
+  color: #d6394c;
+}
+
+.sm-result-sub {
+  font-size: 0.7rem;
+  color: #888;
+  font-weight: 600;
+}
+
+.sm-result-cta {
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: #d6394c;
+  margin-top: 4px;
+  transition: transform 0.15s;
+}
+
+.sm-result:hover .sm-result-cta {
+  transform: translateX(3px);
+}
+
+@keyframes smReveal {
+  0% { opacity: 0; transform: scale(0.9); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+/* Bottom base */
+.sm-bottom {
+  padding: 10px 0 12px;
+  display: flex;
+  justify-content: center;
+  background: linear-gradient(180deg, #d0c8c8 0%, #c4bcbc 100%);
+  border-top: 1px solid #bbb;
+}
+
+.sm-coin-slot {
+  width: 40px;
+  height: 6px;
+  border-radius: 3px;
+  background: #666;
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.4);
+}
+
+/* ── Handle (lever) ── */
+.sm-handle {
+  position: relative;
+  width: 30px;
+  height: 90px;
+  margin-left: -2px;
+  margin-top: 40px;
+}
+
+/* Pivot point — fixed to the machine body */
+.sm-handle-pivot {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #888;
+  border: 2px solid #777;
+  z-index: 2;
+}
+
+/* The arm — shrinks vertically to simulate pulling toward the viewer */
+.sm-handle-arm {
+  position: absolute;
+  bottom: 5px;
+  left: 50%;
+  margin-left: -2.5px;
+  transform-origin: bottom center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sm-handle.pulled .sm-handle-arm {
+  transform: scaleY(0.35);
+}
+
+.sm-handle-rod {
+  width: 5px;
+  height: 56px;
+  background: linear-gradient(90deg, #999 0%, #ccc 50%, #999 100%);
+  border-radius: 2.5px;
+}
+
+.sm-handle-knob {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 35%, #ff5555, #d6394c 60%, #a82030);
+  border: 2px solid #a82030;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+  order: -1;
+  transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Counter-scale the knob so it stays round when the arm squishes */
+.sm-handle.pulled .sm-handle-knob {
+  transform: scaleY(2.86) scaleX(1);
+}
+
+.dark .sm-handle-pivot {
+  background: #555;
+  border-color: #444;
 }
 
 /* ==============================
@@ -637,6 +899,43 @@
   color: #999;
 }
 
+.dark .sm-body {
+  background: linear-gradient(180deg, #333 0%, #2a2a2a 100%);
+  border-color: #555;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.08);
+}
+
+.dark .sm-window-frame {
+  background: #1a1a1a;
+  border-color: #555;
+  box-shadow: inset 0 2px 6px rgba(0,0,0,0.4);
+}
+
+.dark .sm-reel-item {
+  color: #ddd;
+}
+
+.dark .sm-idle-text {
+  color: #d6394c;
+}
+
+.dark .sm-result-sub {
+  color: #777;
+}
+
+.dark .sm-bottom {
+  background: linear-gradient(180deg, #2e2e2e 0%, #262626 100%);
+  border-top-color: #444;
+}
+
+.dark .sm-coin-slot {
+  background: #444;
+}
+
+.dark .sm-handle-rod {
+  background: linear-gradient(90deg, #555 0%, #777 50%, #555 100%);
+}
+
 .dark .stars-empty {
   color: #444;
 }
@@ -713,8 +1012,12 @@
     justify-content: center;
   }
 
-  .randomizer-dice {
-    font-size: 4rem;
+  .sm-body {
+    width: 180px;
+  }
+
+  .sm-handle-rod {
+    height: 46px;
   }
 
   /* Horizontal scroll for the leaderboard — all columns stay visible */
@@ -839,8 +1142,29 @@
     font-size: 0.95rem;
   }
 
-  .randomizer-dice {
-    font-size: 3.5rem;
+  .sm-body {
+    width: 160px;
+  }
+
+  .sm-window {
+    height: 110px;
+  }
+
+  .sm-reel-item {
+    font-size: 0.75rem;
+  }
+
+  .sm-handle-rod {
+    height: 40px;
+  }
+
+  .sm-handle-knob {
+    width: 18px;
+    height: 18px;
+  }
+
+  .sm-handle {
+    height: 74px;
   }
 
   .stars-wrapper {

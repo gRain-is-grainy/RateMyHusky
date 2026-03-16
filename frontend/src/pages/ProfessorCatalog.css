@@ -31,6 +31,7 @@
   border: 1px solid #e8e8e8;
   padding: 20px;
   max-height: calc(100vh - 108px);
+  overflow-x: hidden;
   overflow-y: auto;
 }
 
@@ -171,7 +172,7 @@
   padding: 4px;
 }
 
-/* Rating slider */
+/* Rating / range slider */
 
 .slider-value {
   font-weight: 600;
@@ -181,32 +182,133 @@
   letter-spacing: 0;
 }
 
-.rating-slider {
+/* ── Dual-range slider ── */
+
+.dual-range {
+  position: relative;
+  height: 28px;
   width: 100%;
-  accent-color: #d6394c;
-  cursor: pointer;
 }
 
-.slider-ticks {
+.dual-range-track {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 4px;
+  transform: translateY(-50%);
+  background: #e0e0e0;
+  border-radius: 2px;
+  pointer-events: none;
+}
+
+.dual-range-fill {
+  position: absolute;
+  height: 100%;
+  background: #d6394c;
+  border-radius: 2px;
+}
+
+.dual-range-input {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  background: none;
+  pointer-events: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.dual-range-input::-webkit-slider-runnable-track {
+  height: 4px;
+  background: transparent;
+}
+
+.dual-range-input::-moz-range-track {
+  height: 4px;
+  background: transparent;
+  border: none;
+}
+
+.dual-range-input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #d6394c;
+  border: 2px solid #fff;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.18);
+  cursor: pointer;
+  pointer-events: auto;
+  margin-top: -6px;
+}
+
+.dual-range-input::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #d6394c;
+  border: 2px solid #fff;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.18);
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+/* Tick marks */
+
+.slider-tick-marks {
   display: flex;
   justify-content: space-between;
-  font-size: 0.72rem;
-  color: #bbb;
-  margin-top: 4px;
+  padding: 0 2px;
+  margin-top: 2px;
 }
+
+.tick-mark {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 1px;
+}
+
+.tick-line {
+  width: 1px;
+  height: 6px;
+  background: #ccc;
+}
+
+.tick-label {
+  font-size: 0.65rem;
+  color: #aaa;
+  margin-top: 2px;
+  min-height: 12px;
+}
+
+/* Reviews inputs */
 
 .reviews-input-row {
   display: flex;
   align-items: center;
   gap: 8px;
+  margin-top: 8px;
+  max-width: 100%;
+  overflow: hidden;
 }
 
-.reviews-input-row .rating-slider {
-  flex: 1;
+.reviews-separator {
+  color: #aaa;
+  font-weight: 600;
+  font-size: 0.85rem;
 }
 
 .reviews-number-input {
-  width: 58px;
+  flex: 1;
+  width: 0;
+  min-width: 0;
+  max-width: 50%;
   padding: 4px 7px;
   border-radius: 7px;
   border: 1.5px solid #e0e0e0;
@@ -230,6 +332,32 @@
 .reviews-number-input:focus {
   border-color: #d6394c;
   background: #fff;
+}
+
+/* ── Dark mode for dual-range & ticks ── */
+
+.dark .dual-range-track {
+  background: #444;
+}
+
+.dark .dual-range-input::-webkit-slider-thumb {
+  border-color: #232323;
+}
+
+.dark .dual-range-input::-moz-range-thumb {
+  border-color: #232323;
+}
+
+.dark .tick-line {
+  background: #555;
+}
+
+.dark .tick-label {
+  color: #666;
+}
+
+.dark .reviews-separator {
+  color: #666;
 }
 
 /* ─── MAIN CONTENT ─────────────────────────────────────────── */
@@ -419,6 +547,8 @@
   height: 100%;
   object-fit: cover;
   border-radius: 50%;
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: crisp-edges;
 }
 
 .catalog-page .prof-avatar-initials {

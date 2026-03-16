@@ -1,0 +1,196 @@
+.signin-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  animation: modalFadeIn 0.2s ease;
+}
+
+@keyframes modalFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes modalSlideUp {
+  from { opacity: 0; transform: translateY(20px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.signin-modal {
+  position: relative;
+  background: #fff;
+  border-radius: 20px;
+  padding: 40px 36px 32px;
+  max-width: 400px;
+  width: 100%;
+  text-align: center;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+  animation: modalSlideUp 0.3s ease;
+  font-family: 'Nunito', sans-serif;
+}
+
+.signin-modal-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 8px;
+  transition: background 0.15s;
+}
+
+.signin-modal-close:hover {
+  background: #f0f0f0;
+}
+
+.signin-modal-close svg {
+  width: 20px;
+  height: 20px;
+  color: #999;
+}
+
+.signin-modal-title {
+  font-size: 1.5rem;
+  font-weight: 900;
+  color: #1a1a1a;
+  margin-bottom: 12px;
+}
+
+.signin-modal-desc {
+  font-size: 0.9rem;
+  color: #666;
+  line-height: 1.55;
+  margin-bottom: 24px;
+}
+
+.signin-modal-desc strong {
+  color: #d6394c;
+  font-weight: 800;
+}
+
+.signin-modal-logo {
+  width: 64px;
+  height: 64px;
+  margin-bottom: 24px;
+  opacity: 0.9;
+}
+
+.signin-modal-terms {
+  font-size: 0.75rem;
+  color: #aaa;
+  line-height: 1.5;
+  margin-bottom: 20px;
+}
+
+.signin-modal-terms a {
+  color: #999;
+  text-decoration: underline;
+  transition: color 0.15s;
+}
+
+.signin-modal-terms a:hover {
+  color: #d6394c;
+}
+
+.signin-modal-google-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  padding: 12px 24px;
+  background: #fff;
+  border: 1.5px solid #e0e0e0;
+  border-radius: 12px;
+  font-family: 'Nunito', sans-serif;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #333;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+}
+
+.signin-modal-google-btn:hover {
+  border-color: #ccc;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  background: #fafafa;
+}
+
+.signin-modal-google-btn:active {
+  transform: scale(0.98);
+}
+
+.google-icon {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+/* ── Dark mode ── */
+
+.dark .signin-modal {
+  background: #232323;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.dark .signin-modal-close:hover {
+  background: #333;
+}
+
+.dark .signin-modal-close svg {
+  color: #666;
+}
+
+.dark .signin-modal-title {
+  color: #e0e0e0;
+}
+
+.dark .signin-modal-desc {
+  color: #999;
+}
+
+.dark .signin-modal-terms {
+  color: #666;
+}
+
+.dark .signin-modal-terms a {
+  color: #888;
+}
+
+.dark .signin-modal-google-btn {
+  background: #1a1a1a;
+  border-color: #3a3a3a;
+  color: #e0e0e0;
+}
+
+.dark .signin-modal-google-btn:hover {
+  border-color: #555;
+  background: #2a2a2a;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* ── Mobile ── */
+
+@media (max-width: 480px) {
+  .signin-modal {
+    padding: 32px 24px 24px;
+    border-radius: 16px;
+  }
+
+  .signin-modal-title {
+    font-size: 1.3rem;
+  }
+
+  .signin-modal-logo {
+    width: 52px;
+    height: 52px;
+  }
+}

@@ -8,6 +8,8 @@ import StarRating from '../components/StarRating';
 import RatingBar from '../components/RatingBar';
 import { fetchProfessorData } from '../api/api';
 import type { ProfessorProfile, ProfessorReview, TraceComment } from '../api/api';
+import { useAuth } from '../context/AuthContext';
+import SignInModal from '../components/SignInModal';
 import neuIcon from '../assets/neu-circle-icon.png';
 import './Professor.css';
 
@@ -113,9 +115,44 @@ const GRADE_COLORS: Record<string, string> = {
   'F':'#a50026','W':'#7f8c8d','WF':'#636e72','P':'#2980b9','NP':'#8e44ad','I':'#999',
 };
 
+/* ───────── near-duplicate detection ───────── */
+function normalizeText(s: string): string {
+  return s.toLowerCase().replace(/\s+/g, ' ').trim();
+}
+
+function deduplicateByText<T>(items: T[], getText: (item: T) => string): T[] {
+  const seen = new Set<string>();
+  const result: T[] = [];
+  for (const item of items) {
+    const raw = getText(item);
+    if (!raw.trim()) { result.push(item); continue; }
+    // Use a truncated normalized form as a fingerprint — catches exact and near-exact dupes
+    const norm = normalizeText(raw);
+    // Check exact match first
+    if (seen.has(norm)) continue;
+    // Check prefix-based match (catches 95%+ similar: same text with minor trailing differences)
+    const prefix = norm.slice(0, Math.floor(norm.length * 0.9));
+    let isDupe = false;
+    for (const s of seen) {
+      if (s.startsWith(prefix) || norm.startsWith(s.slice(0, Math.floor(s.length * 0.9)))) {
+        // Confirm length similarity (within 10%)
+        const ratio = Math.min(s.length, norm.length) / Math.max(s.length, norm.length);
+        if (ratio >= 0.9) { isDupe = true; break; }
+      }
+    }
+    if (!isDupe) {
+      seen.add(norm);
+      result.push(item);
+    }
+  }
+  return result;
+}
+
 /* ═══════════════════════════════════════ */
 const Professor = () => {
   const { slug } = useParams<{ slug: string }>();
+  const { user } = useAuth();
+  const [showSignIn, setShowSignIn] = useState(false);
   const reviewsRef = useRef<HTMLElement>(null);
   const chartsRef = useRef<HTMLElement>(null);
   const gradesRef = useRef<HTMLDivElement>(null);
@@ -262,7 +299,8 @@ const Professor = () => {
   }, [allCourseCodes]);
 
   const filteredRmpReviews = useMemo(() => {
-    return reviews.filter(r => selectedCourses.has(getFormattedCourseCode(r.course).toUpperCase()));
+    const filtered = reviews.filter(r => selectedCourses.has(getFormattedCourseCode(r.course).toUpperCase()));
+    return deduplicateByText(filtered, r => r.comment);
   }, [reviews, selectedCourses, getFormattedCourseCode]);
 
   const filteredTraceCourses = useMemo(() => {
@@ -452,6 +490,10 @@ const Professor = () => {
         groups[c.question].push(c);
       }
     });
+    // Deduplicate near-identical comments within each question group
+    for (const q of Object.keys(groups)) {
+      groups[q] = deduplicateByText(groups[q], c => c.comment);
+    }
     const searchLower = traceSearch.toLowerCase();
     return Object.entries(groups).map(([q, cs]) => ({
       question: q,
@@ -791,18 +833,20 @@ const Professor = () => {
 
         {reviewTab === 'trace' && (
           <div className="prof-trace-container">
-            <div className="prof-trace-controls">
-              <div className="trace-search-container">
-                <input 
-                  type="text" 
-                  className="trace-search-input" 
-                  placeholder="Search comments or questions..." 
-                  value={traceSearch} 
-                  onChange={e => setTraceSearch(e.target.value)} 
-                />
+            {user && (
+              <div className="prof-trace-controls">
+                <div className="trace-search-container">
+                  <input
+                    type="text"
+                    className="trace-search-input"
+                    placeholder="Search comments or questions..."
+                    value={traceSearch}
+                    onChange={e => setTraceSearch(e.target.value)}
+                  />
+                </div>
+                <Dropdown className="trace-sort-dropdown" options={traceSortOptions} value={traceSort} onChange={setTraceSort} />
               </div>
-              <Dropdown className="trace-sort-dropdown" options={traceSortOptions} value={traceSort} onChange={setTraceSort} />
-            </div>
+            )}
             <div className="prof-trace-categories">
               {groupedTrace.map(g => {
                 const isExpanded = expandedQuestions[g.question];
@@ -818,15 +862,25 @@ const Professor = () => {
                       </div>
                       <svg className="trace-chevron" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
                     </div>
-                    {isExpanded && (
+                    {isExpanded && !user && (
+                      <div className="trace-category-paywall">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="paywall-lock-icon-sm">
+                          <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                          <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                        </svg>
+                        <p>Sign in with your <strong>husky.neu.edu</strong> account to read these comments.</p>
+                        <button className="paywall-signin-btn small" onClick={(e) => { e.stopPropagation(); setShowSignIn(true); }}>Sign In</button>
+                      </div>
+                    )}
+                    {isExpanded && user && (
                       <div className="trace-category-content">
                         {g.comments.slice(0, visibleCount).map((c, ci) => {
                           const termRaw = termIdMap.get(c.termId) || '';
                           const term = cleanTerm(termRaw);
                           const hasYear = /\b20\d{2}\b/.test(term);
                           return (
-                          <div 
-                            key={ci} 
+                          <div
+                            key={ci}
                             className={`trace-comment-bubble ${c.courseUrl ? 'clickable' : ''}`}
                             onClick={() => c.courseUrl && window.open(c.courseUrl, '_blank')}
                             title={c.courseUrl ? "Click to view original TRACE report" : ""}
@@ -863,7 +917,8 @@ const Professor = () => {
 
       <Footer />
       <ThemeToggle />
-      <button 
+      <SignInModal open={showSignIn} onClose={() => setShowSignIn(false)} />
+      <button
         className={`prof-back-to-top ${showBackToTop ? 'visible' : ''}`} 
         onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} 
         aria-label="Back to top"

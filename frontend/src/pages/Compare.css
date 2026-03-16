@@ -83,7 +83,7 @@
 	margin: 24px auto 0;
 	padding: 0 24px;
 	display: grid;
-	grid-template-columns: 1fr auto 1fr;
+	grid-template-columns: 1fr 1fr;
 	gap: 14px;
 	align-items: start;
 	animation: compareFadeUp 0.55s ease both;
@@ -231,6 +231,12 @@
 	font-size: 0.9rem;
 }
 
+.compare-profile-card .compare-status {
+	margin: auto;
+	padding: 0;
+	text-align: center;
+}
+
 .compare-status-error {
 	color: #c0392b;
 	font-weight: 700;
@@ -257,7 +263,8 @@
 	flex-direction: column;
 	align-items: center;
 	text-align: center;
-	gap: 7px;
+	gap: 0;
+	justify-content: space-evenly;
 	transition: box-shadow 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
 }
 
@@ -284,6 +291,8 @@
 	width: 100%;
 	height: 100%;
 	object-fit: cover;
+	image-rendering: -webkit-optimize-contrast;
+	image-rendering: crisp-edges;
 }
 
 .compare-avatar-fallback {
@@ -310,7 +319,6 @@
 }
 
 .compare-rating-line {
-	margin-top: 6px;
 	display: flex;
 	align-items: center;
 	gap: 8px;
@@ -322,7 +330,6 @@
 }
 
 .compare-profile-link {
-	margin-top: auto;
 	text-decoration: none;
 	color: #d6394c;
 	font-weight: 800;
@@ -342,6 +349,7 @@
 
 .compare-metrics-header {
 	margin-bottom: 10px;
+	text-align: center;
 }
 
 .compare-metrics-header h2 {
@@ -416,11 +424,11 @@
 }
 
 .compare-cell-left {
-	text-align: right;
+	text-align: center;
 }
 
 .compare-cell-right {
-	text-align: left;
+	text-align: center;
 }
 
 .compare-cell-label {
@@ -456,7 +464,7 @@
 }
 
 .dark .compare-page {
-	background: #101112;
+	background: #1a1a1a;
 	color: #e8e8e8;
 }
 
@@ -465,7 +473,7 @@
 	background:
 		radial-gradient(circle at 88% -24%, rgba(214, 57, 76, 0.22), transparent 48%),
 		radial-gradient(circle at 12% 8%, rgba(214, 57, 76, 0.12), transparent 44%),
-		#17181a;
+		#1f2022;
 }
 
 .dark .compare-hero::after {
@@ -479,7 +487,7 @@
 .dark .compare-control-card,
 .dark .compare-profile-card,
 .dark .compare-table {
-	background: #1a1c1f;
+	background: #242628;
 	border-color: #2c3035;
 	box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
 }
@@ -499,7 +507,7 @@
 }
 
 .dark .compare-search {
-	background: #141619;
+	background: #1e2023;
 	border-color: #343941;
 	color: #e9edf1;
 }
@@ -515,7 +523,7 @@
 
 .dark .compare-suggestion {
 	border-color: #2f343a;
-	background: #17191c;
+	background: #212325;
 }
 
 .dark .compare-suggestion:hover {
@@ -568,11 +576,11 @@
 }
 
 .dark .compare-row:hover {
-	background: #1f2124;
+	background: #282a2d;
 }
 
 .dark .compare-cell-label {
-	background: #16181b;
+	background: #1e2023;
 	border-left-color: #2c3035;
 	border-right-color: #2c3035;
 	color: #8f98a2;
@@ -608,29 +616,59 @@
 		min-width: 0;
 	}
 
+	/* Keep profile cards side-by-side on mobile */
 	.compare-panels {
-		grid-template-columns: 1fr;
+		grid-template-columns: 1fr 1fr;
+		gap: 10px;
 	}
 
+	.compare-profile-card {
+		min-height: 160px;
+		padding: 14px 10px;
+	}
+
+	.compare-avatar-wrap {
+		width: 56px;
+		height: 56px;
+	}
+
+	.compare-avatar-fallback {
+		font-size: 1.1rem;
+	}
+
+	.compare-profile-card h3 {
+		font-size: 0.95rem;
+	}
+
+	.compare-profile-card p {
+		font-size: 0.78rem;
+	}
+
+	.compare-rating-line strong {
+		font-size: 0.88rem;
+	}
+
+	.compare-profile-link {
+		font-size: 0.78rem;
+	}
+
+	/* Keep metrics table in 3-column layout on mobile */
 	.compare-row {
-		grid-template-columns: 1fr;
+		grid-template-columns: 1fr 100px 1fr;
+	}
+
+	.compare-cell {
+		padding: 10px 8px;
+		font-size: 0.82rem;
 	}
 
 	.compare-cell-label {
-		order: -1;
-		border: none;
-		border-top: 1px solid #efefef;
-		border-bottom: 1px solid #efefef;
+		font-size: 0.65rem;
+		letter-spacing: 0.04em;
 	}
 
-	.dark .compare-cell-label {
-		border-top-color: #2c3035;
-		border-bottom-color: #2c3035;
-	}
-
-	.compare-cell-left,
-	.compare-cell-right {
-		text-align: left;
+	.compare-cell small {
+		font-size: 0.65rem;
 	}
 }
 
@@ -667,11 +705,65 @@
 	.compare-status,
 	.compare-panels,
 	.compare-metrics {
-		padding-left: 16px;
-		padding-right: 16px;
+		padding-left: 12px;
+		padding-right: 12px;
+	}
+
+	.compare-panels {
+		grid-template-columns: 1fr 1fr;
+		gap: 8px;
 	}
 
 	.compare-profile-card {
-		padding: 15px;
+		min-height: 140px;
+		padding: 12px 8px;
+		gap: 4px;
+	}
+
+	.compare-avatar-wrap {
+		width: 46px;
+		height: 46px;
+	}
+
+	.compare-avatar-fallback {
+		font-size: 0.95rem;
+	}
+
+	.compare-profile-card h3 {
+		font-size: 0.82rem;
+	}
+
+	.compare-profile-card p {
+		font-size: 0.7rem;
+	}
+
+	.compare-rating-line {
+		gap: 4px;
+	}
+
+	.compare-rating-line strong {
+		font-size: 0.8rem;
+	}
+
+	.compare-profile-link {
+		font-size: 0.72rem;
+	}
+
+	.compare-row {
+		grid-template-columns: 1fr 80px 1fr;
+	}
+
+	.compare-cell {
+		padding: 8px 6px;
+		font-size: 0.76rem;
+	}
+
+	.compare-cell-label {
+		font-size: 0.6rem;
+		padding: 8px 4px;
+	}
+
+	.compare-cell small {
+		font-size: 0.6rem;
 	}
 }

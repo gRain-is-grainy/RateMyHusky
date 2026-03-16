@@ -379,6 +379,116 @@
   gap: 12px;
 }
 
+/* ── TRACE Paywall ── */
+.prof-trace-paywall {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 48px 24px;
+  background: #fff;
+  border-radius: 16px;
+  border: 1.5px dashed #e0e0e0;
+  margin-top: 8px;
+}
+
+.paywall-lock-icon {
+  width: 40px;
+  height: 40px;
+  color: #d6394c;
+  margin-bottom: 16px;
+}
+
+.prof-trace-paywall h3 {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: #1a1a1a;
+  margin-bottom: 8px;
+}
+
+.prof-trace-paywall p {
+  font-size: 0.88rem;
+  color: #888;
+  line-height: 1.5;
+  max-width: 400px;
+  margin-bottom: 20px;
+}
+
+.paywall-signin-btn {
+  background: #d6394c;
+  color: #fff;
+  border: none;
+  border-radius: 12px;
+  padding: 11px 32px;
+  font-family: 'Nunito', sans-serif;
+  font-size: 0.95rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.15s;
+}
+
+.paywall-signin-btn:hover {
+  background: #b82e3f;
+  transform: scale(1.03);
+}
+
+.dark .prof-trace-paywall {
+  background: #1e1e1e;
+  border-color: #333;
+}
+
+.dark .prof-trace-paywall h3 {
+  color: #e0e0e0;
+}
+
+.dark .prof-trace-paywall p {
+  color: #777;
+}
+
+/* ── Inline paywall per question ── */
+.trace-category-paywall {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 24px 16px;
+  border-top: 1px solid #f0f0f0;
+}
+
+.paywall-lock-icon-sm {
+  width: 28px;
+  height: 28px;
+  color: #d6394c;
+  margin-bottom: 10px;
+}
+
+.trace-category-paywall p {
+  font-size: 0.82rem;
+  color: #888;
+  line-height: 1.5;
+  max-width: 320px;
+  margin-bottom: 12px;
+}
+
+.trace-category-paywall p strong {
+  color: #d6394c;
+  font-weight: 800;
+}
+
+.paywall-signin-btn.small {
+  padding: 8px 24px;
+  font-size: 0.85rem;
+  border-radius: 10px;
+}
+
+.dark .trace-category-paywall {
+  border-top-color: #333;
+}
+
+.dark .trace-category-paywall p {
+  color: #777;
+}
+
 .trace-category-item {
   background: #fff;
   border-radius: 14px;
@@ -756,6 +866,8 @@
   width: 100%; height: 100%;
   object-fit: cover;
   border-radius: 50%;
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: crisp-edges;
 }
 
 .prof-avatar-initials {

@@ -9,8 +9,17 @@ Run:           python backend/server.py
 import os, re, unicodedata
 import numpy as np
 import pandas as pd
-from flask import Flask, jsonify, request
+from dotenv import load_dotenv
+from flask import Flask, jsonify, request, redirect, make_response
 from flask_cors import CORS
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+import jwt as pyjwt
+import requests as http_requests
+from urllib.parse import urlencode
+from datetime import datetime, timedelta, timezone
+
+load_dotenv()
 
 
 def normalize_name(name):
@@ -22,8 +31,35 @@ def normalize_name(name):
     s = re.sub(r'\s+', ' ', s).strip()
     return s
 
+import html as _html
+
+def sanitize(text: str) -> str:
+    """Escape HTML entities in user-generated content as defense-in-depth."""
+    return _html.escape(str(text), quote=False)
+
 app = Flask(__name__)
-CORS(app)
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
+CORS(app, supports_credentials=True, origins=[FRONTEND_URL])
+limiter = Limiter(get_remote_address, app=app, default_limits=["120 per minute"])
+
+@app.after_request
+def set_security_headers(response):
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    return response
+
+# ──────────────────────────────────────────────
+#  Google OAuth config
+# ──────────────────────────────────────────────
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
+GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "")
+JWT_SECRET = os.getenv("JWT_SECRET")
+if not JWT_SECRET:
+    raise RuntimeError("JWT_SECRET environment variable is required — set it in backend/.env")
+GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
+GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
+GOOGLE_USERINFO_URL = "https://www.googleapis.com/oauth2/v2/userinfo"
 
 # ──────────────────────────────────────────────
 #  Load CSVs once at startup
@@ -37,14 +73,18 @@ trace_scores  = pd.read_csv(os.path.join(DATA_DIR, "trace_scores.csv"))
 trace_comments = pd.read_csv(os.path.join(DATA_DIR, "trace_comments.csv"))
 
 # Load professor photos
+def _upgrade_image_url(url: str) -> str:
+    """Strip WordPress thumbnail size suffix to get the full-resolution original."""
+    return re.sub(r'-\d+x\d+(?=\.\w+$)', '', url)
+
 photo_lookup = {}
 photos_path = os.path.join(DATA_DIR, "professor_photos.csv")
 if os.path.exists(photos_path):
     _photos = pd.read_csv(photos_path)
     for _, row in _photos.iterrows():
         key = normalize_name(str(row['name']))
-        photo_lookup[key] = str(row['image_url'])
-    print(f"[startup] Loaded {len(photo_lookup)} professor photos")
+        photo_lookup[key] = _upgrade_image_url(str(row['image_url']))
+    print(f"[startup] Loaded {len(photo_lookup)} professor photos (upgraded to full-res)")
 else:
     print("[startup] No professor_photos.csv found — photos disabled")
 
@@ -478,17 +518,16 @@ stat_professor_count = len(_all_prof_names)
 trace_courses["_course_code"] = trace_courses["displayName"].astype(str).str.split(":").str[0]
 stat_course_count = trace_courses["_course_code"].str.upper().nunique()
 
-# Evaluations = RMP reviews + TRACE completed evaluations (deduplicated per section)
-_trace_sections_deduped = trace_scores.drop_duplicates(subset=["courseId", "instructorId", "termId"])
-trace_eval_count = int(_trace_sections_deduped["completed"].fillna(0).astype(int).sum())
+# Comments = RMP reviews + TRACE comments
 rmp_review_count = len(rmp_reviews)
-stat_total_evaluations = rmp_review_count + trace_eval_count
+trace_comment_count = len(trace_comments)
+stat_total_comments = rmp_review_count + trace_comment_count
 
 # Departments = unique department names, case-insensitive
 stat_department_count = trace_courses["departmentName"].str.lower().str.strip().nunique()
 
 print(f"[stats] {stat_professor_count} professors, {stat_course_count} courses, "
-      f"{stat_total_evaluations} evaluations ({rmp_review_count} RMP + {trace_eval_count} TRACE), "
+      f"{stat_total_comments} comments ({rmp_review_count} RMP + {trace_comment_count} TRACE), "
       f"{stat_department_count} departments")
 
 
@@ -500,7 +539,7 @@ def stats():
     return jsonify([
         {"label": "Professors",  "value": friendly_count(stat_professor_count)},
         {"label": "Courses",     "value": friendly_count(stat_course_count)},
-        {"label": "Evaluations", "value": friendly_count(stat_total_evaluations)},
+        {"label": "Comments", "value": friendly_count(stat_total_comments)},
         {"label": "Departments", "value": friendly_count(stat_department_count)},
     ])
 
@@ -515,7 +554,7 @@ def colleges():
 @app.route("/api/goat-professors")
 def goat_professors():
     college     = request.args.get("college", "Khoury")
-    limit       = int(request.args.get("limit", "10"))
+    limit       = min(int(request.args.get("limit", "10")), 50)
     min_reviews = int(request.args.get("min_reviews", "10"))
 
     # Small colleges get no minimum review requirement
@@ -731,7 +770,7 @@ def _professor_search_matches(query: str) -> pd.DataFrame:
 def search():
     q = normalize_name(request.args.get("q", ""))
     search_type = request.args.get("type", "Professor")
-    limit = int(request.args.get("limit", "5"))
+    limit = min(int(request.args.get("limit", "5")), 20)
 
     if len(q) < 2:
         return jsonify([])
@@ -890,16 +929,18 @@ def professor_profile(slug):
         if "would_take_again_pct" in row.index:
             raw_val = str(row["would_take_again_pct"]).strip().replace("%", "")
             try:
-                wta = float(raw_val)
-                if wta < 0: wta = None
+                val = float(raw_val)
+                if pd.notna(val) and val >= 0:
+                    wta = val
             except (ValueError, TypeError):
                 pass
 
         difficulty = None
         if "level_of_difficulty" in row.index:
             try:
-                difficulty = float(row["level_of_difficulty"])
-                if pd.isna(difficulty) or difficulty <= 0: difficulty = None
+                val = float(row["level_of_difficulty"])
+                if pd.notna(val) and val > 0:
+                    difficulty = val
             except (ValueError, TypeError):
                 pass
 
@@ -997,7 +1038,7 @@ def professor_profile(slug):
             "grade": str(r["grade"]) if pd.notna(r["grade"]) else "",
             "textbook": str(r["textbook"]) if pd.notna(r["textbook"]) else "",
             "online_class": str(r["online_class"]) if pd.notna(r["online_class"]) else "",
-            "comment": str(r["comment"]) if pd.notna(r["comment"]) else "",
+            "comment": sanitize(r["comment"]) if pd.notna(r["comment"]) else "",
         })
     profile["reviews"] = reviews
 
@@ -1016,7 +1057,7 @@ def professor_profile(slug):
         matching = trace_comments[mask]
         comments = []
         for _, c in matching.iterrows():
-            comment_text = str(c["comment"]) if pd.notna(c["comment"]) else ""
+            comment_text = sanitize(c["comment"]) if pd.notna(c["comment"]) else ""
             if not comment_text.strip():
                 continue
             
@@ -1028,7 +1069,7 @@ def professor_profile(slug):
                 sp_matches = re.findall(r"sp=(\d+)", url)
                 if len(sp_matches) >= 3:
                     term_id = int(sp_matches[2])
-            except:
+            except (ValueError, IndexError):
                 pass
 
             comments.append({
@@ -1064,7 +1105,7 @@ def professors_catalog():
     dept       = request.args.get("dept", "")
     sort       = request.args.get("sort", "alpha")
     page       = int(request.args.get("page", "1"))
-    limit      = int(request.args.get("limit", "20"))
+    limit      = min(int(request.args.get("limit", "20")), 10000)
 
     try:
         min_rating = float(request.args.get("minRating", "0"))
@@ -1072,9 +1113,20 @@ def professors_catalog():
         min_rating = 0.0
 
     try:
+        max_rating = float(request.args.get("maxRating", "5"))
+    except (ValueError, TypeError):
+        max_rating = 5.0
+
+    try:
         min_reviews = int(request.args.get("minReviews", "1"))
     except (ValueError, TypeError):
         min_reviews = 1
+
+    max_reviews_raw = request.args.get("maxReviews")
+    try:
+        max_reviews = int(max_reviews_raw) if max_reviews_raw is not None else None
+    except (ValueError, TypeError):
+        max_reviews = None
 
     # Always exclude professors with no rating data
     subset = catalog_df[catalog_df["avgRating"].notna()].copy()
@@ -1091,8 +1143,12 @@ def professors_catalog():
             subset = subset[subset["_name_lower"].str.contains(q, na=False)]
     if min_rating > 0:
         subset = subset[subset["avgRating"] >= min_rating]
+    if max_rating < 5:
+        subset = subset[subset["avgRating"] <= max_rating]
     if min_reviews > 1:
         subset = subset[subset["totalReviews"] >= min_reviews]
+    if max_reviews is not None:
+        subset = subset[subset["totalReviews"] <= max_reviews]
 
     if sort == "rating":
         subset = subset.sort_values("avgRating", ascending=False, na_position="last")
@@ -1132,8 +1188,146 @@ def professors_catalog():
     })
 
 
+# ──────────────────────────────────────────────
+#  Google OAuth routes
+# ──────────────────────────────────────────────
+
+def _get_redirect_uri():
+    return request.host_url.rstrip("/") + "/api/auth/google/callback"
+
+
+@app.route("/api/auth/google")
+@limiter.limit("10 per minute")
+def auth_google():
+    """Redirect user to Google's consent screen (restricted to husky.neu.edu)."""
+    return_to = request.args.get("returnTo", "/")
+    params = {
+        "client_id": GOOGLE_CLIENT_ID,
+        "redirect_uri": _get_redirect_uri(),
+        "response_type": "code",
+        "scope": "openid email profile",
+        "hd": "husky.neu.edu",
+    }
+    is_popup = request.args.get("popup") == "1"
+    resp = make_response(redirect(f"{GOOGLE_AUTH_URL}?{urlencode(params)}"))
+    resp.set_cookie("auth_return_to", return_to, max_age=600, httponly=True, samesite="Lax")
+    if is_popup:
+        resp.set_cookie("auth_popup", "1", max_age=600, httponly=True, samesite="Lax")
+    return resp
+
+
+@app.route("/api/auth/google/callback")
+@limiter.limit("10 per minute")
+def auth_google_callback():
+    """Exchange auth code for tokens, verify domain, set JWT cookie."""
+    code = request.args.get("code")
+    if not code:
+        return redirect(f"{FRONTEND_URL}?auth_error=no_code")
+
+    # Exchange code for tokens
+    token_resp = http_requests.post(GOOGLE_TOKEN_URL, data={
+        "code": code,
+        "client_id": GOOGLE_CLIENT_ID,
+        "client_secret": GOOGLE_CLIENT_SECRET,
+        "redirect_uri": _get_redirect_uri(),
+        "grant_type": "authorization_code",
+    })
+    if token_resp.status_code != 200:
+        return redirect(f"{FRONTEND_URL}?auth_error=token_exchange_failed")
+
+    access_token = token_resp.json().get("access_token")
+
+    # Fetch user info
+    user_resp = http_requests.get(GOOGLE_USERINFO_URL, headers={
+        "Authorization": f"Bearer {access_token}",
+    })
+    if user_resp.status_code != 200:
+        return redirect(f"{FRONTEND_URL}?auth_error=userinfo_failed")
+
+    user_info = user_resp.json()
+
+    # Restrict to husky.neu.edu
+    if user_info.get("hd") != "husky.neu.edu":
+        return redirect(f"{FRONTEND_URL}?auth_error=invalid_domain")
+
+    # Create JWT
+    payload = {
+        "sub": user_info["id"],
+        "email": user_info["email"],
+        "name": user_info.get("name", ""),
+        "picture": user_info.get("picture", ""),
+        "exp": datetime.now(timezone.utc) + timedelta(days=7),
+    }
+    token = pyjwt.encode(payload, JWT_SECRET, algorithm="HS256")
+
+    # Set auth cookie
+    is_popup = request.cookies.get("auth_popup") == "1"
+
+    if is_popup:
+        # Close popup and notify opener
+        resp = make_response("""
+        <html><body><script>
+          window.opener && window.opener.postMessage("auth_complete", "*");
+          window.close();
+        </script></body></html>
+        """)
+        resp.delete_cookie("auth_popup")
+    else:
+        # Fallback: redirect to the page the user was on
+        return_to = request.cookies.get("auth_return_to", "/")
+        from urllib.parse import urlparse
+        parsed = urlparse(return_to)
+        if parsed.scheme or parsed.netloc or not return_to.startswith("/"):
+            return_to = "/"
+        resp = make_response(redirect(f"{FRONTEND_URL}{return_to}"))
+        resp.delete_cookie("auth_return_to")
+
+    resp.set_cookie(
+        "auth_token",
+        token,
+        httponly=True,
+        samesite="Lax",
+        max_age=7 * 24 * 3600,
+        secure=request.scheme == "https",
+    )
+    return resp
+
+
+@app.route("/api/auth/me")
+@limiter.limit("30 per minute")
+def auth_me():
+    """Return current user from JWT cookie, or 401."""
+    token = request.cookies.get("auth_token")
+    if not token:
+        return jsonify(None), 401
+
+    try:
+        payload = pyjwt.decode(token, JWT_SECRET, algorithms=["HS256"])
+        return jsonify({
+            "email": payload["email"],
+            "name": payload["name"],
+            "picture": payload.get("picture", ""),
+        })
+    except pyjwt.ExpiredSignatureError:
+        return jsonify(None), 401
+    except pyjwt.InvalidTokenError:
+        return jsonify(None), 401
+
+
+@app.route("/api/auth/logout", methods=["POST"])
+@limiter.limit("10 per minute")
+def auth_logout():
+    """Clear the auth cookie."""
+    origin = request.headers.get("Origin", "")
+    if origin and origin != FRONTEND_URL:
+        return jsonify({"error": "forbidden"}), 403
+    resp = make_response(jsonify({"ok": True}))
+    resp.delete_cookie("auth_token")
+    return resp
+
+
 if __name__ == "__main__":
     print(f"Loaded {len(rmp_profs)} RMP professors, {len(rmp_reviews)} RMP reviews")
     print(f"Stats → {stat_professor_count} professors, {stat_course_count} courses, "
-          f"{stat_total_evaluations} evaluations, {stat_department_count} departments")
+          f"{stat_total_comments} comments, {stat_department_count} departments")
     app.run(debug=True, port=5001, use_reloader=True)

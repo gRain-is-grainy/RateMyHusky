@@ -161,7 +161,9 @@ export function fetchProfessorsCatalog(params: {
   college?: string;
   dept?: string;
   minRating?: number;
+  maxRating?: number;
   minReviews?: number;
+  maxReviews?: number;
   sort?: 'alpha' | 'rating' | 'reviews';
   page?: number;
   limit?: number;
@@ -171,7 +173,9 @@ export function fetchProfessorsCatalog(params: {
   if (params.college) sp.set('college', params.college);
   if (params.dept) sp.set('dept', params.dept);
   if (params.minRating) sp.set('minRating', String(params.minRating));
+  if (params.maxRating !== undefined && params.maxRating < 5) sp.set('maxRating', String(params.maxRating));
   if (params.minReviews) sp.set('minReviews', String(params.minReviews));
+  if (params.maxReviews !== undefined) sp.set('maxReviews', String(params.maxReviews));
   if (params.sort) sp.set('sort', params.sort);
   if (params.page) sp.set('page', String(params.page));
   if (params.limit) sp.set('limit', String(params.limit));

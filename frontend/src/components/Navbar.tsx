@@ -1,9 +1,15 @@
 import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import SignInModal from './SignInModal';
 import './Navbar.css';
 
 const Navbar = () => {
+  const { user, loading: authLoading, logout } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [showSignIn, setShowSignIn] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement>(null);
   const [pillStyle, setPillStyle] = useState({ left: 0, width: 0, opacity: 0 });
   const [isReady, setIsReady] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -56,7 +62,19 @@ const Navbar = () => {
     };
   }, [updatePill]);
 
+  // Close user dropdown on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
+        setShowUserMenu(false);
+      }
+    };
+    if (showUserMenu) document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showUserMenu]);
+
   return (
+    <>
     <nav className="navbar">
       <Link to="/" className="navbar-logo">
         <span>Rate</span>MyHusky
@@ -110,12 +128,30 @@ const Navbar = () => {
             Compare
           </NavLink>
         </div>
-        <button className="signin-btn" onClick={() => setMenuOpen(false)}>Sign In</button>
+        {authLoading ? null : user ? (
+          <div className="navbar-user" ref={userMenuRef}>
+            <button className="navbar-user-btn" onClick={() => setShowUserMenu(v => !v)}>
+              {user.picture && <img src={user.picture} alt="" className="navbar-user-avatar" referrerPolicy="no-referrer" />}
+              <span className="navbar-user-name">{user.name.split(' ')[0]}</span>
+            </button>
+            {showUserMenu && (
+              <div className="navbar-user-dropdown">
+                <p className="navbar-user-email">{user.email}</p>
+                <button className="navbar-user-signout" onClick={() => { logout(); setShowUserMenu(false); setMenuOpen(false); }}>Sign Out</button>
+              </div>
+            )}
+          </div>
+        ) : (
+          <button className="signin-btn" onClick={() => { setShowSignIn(true); setMenuOpen(false); }}>Sign In</button>
+        )}
       </div>
 
       {/* Overlay behind mobile menu */}
       {menuOpen && <div className="navbar-overlay" onClick={() => setMenuOpen(false)} />}
+
     </nav>
+    <SignInModal open={showSignIn} onClose={() => setShowSignIn(false)} />
+    </>
   );
 };
 
