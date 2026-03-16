@@ -31,10 +31,23 @@ def normalize_name(name):
     s = re.sub(r'\s+', ' ', s).strip()
     return s
 
+import html as _html
+
+def sanitize(text: str) -> str:
+    """Escape HTML entities in user-generated content as defense-in-depth."""
+    return _html.escape(str(text), quote=False)
+
 app = Flask(__name__)
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
 CORS(app, supports_credentials=True, origins=[FRONTEND_URL])
 limiter = Limiter(get_remote_address, app=app, default_limits=["120 per minute"])
+
+@app.after_request
+def set_security_headers(response):
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    return response
 
 # ──────────────────────────────────────────────
 #  Google OAuth config
@@ -541,7 +554,7 @@ def colleges():
 @app.route("/api/goat-professors")
 def goat_professors():
     college     = request.args.get("college", "Khoury")
-    limit       = int(request.args.get("limit", "10"))
+    limit       = min(int(request.args.get("limit", "10")), 50)
     min_reviews = int(request.args.get("min_reviews", "10"))
 
     # Small colleges get no minimum review requirement
@@ -757,7 +770,7 @@ def _professor_search_matches(query: str) -> pd.DataFrame:
 def search():
     q = normalize_name(request.args.get("q", ""))
     search_type = request.args.get("type", "Professor")
-    limit = int(request.args.get("limit", "5"))
+    limit = min(int(request.args.get("limit", "5")), 20)
 
     if len(q) < 2:
         return jsonify([])
@@ -1023,7 +1036,7 @@ def professor_profile(slug):
             "grade": str(r["grade"]) if pd.notna(r["grade"]) else "",
             "textbook": str(r["textbook"]) if pd.notna(r["textbook"]) else "",
             "online_class": str(r["online_class"]) if pd.notna(r["online_class"]) else "",
-            "comment": str(r["comment"]) if pd.notna(r["comment"]) else "",
+            "comment": sanitize(r["comment"]) if pd.notna(r["comment"]) else "",
         })
     profile["reviews"] = reviews
 
@@ -1042,7 +1055,7 @@ def professor_profile(slug):
         matching = trace_comments[mask]
         comments = []
         for _, c in matching.iterrows():
-            comment_text = str(c["comment"]) if pd.notna(c["comment"]) else ""
+            comment_text = sanitize(c["comment"]) if pd.notna(c["comment"]) else ""
             if not comment_text.strip():
                 continue
             
@@ -1054,7 +1067,7 @@ def professor_profile(slug):
                 sp_matches = re.findall(r"sp=(\d+)", url)
                 if len(sp_matches) >= 3:
                     term_id = int(sp_matches[2])
-            except:
+            except (ValueError, IndexError):
                 pass
 
             comments.append({
@@ -1090,7 +1103,7 @@ def professors_catalog():
     dept       = request.args.get("dept", "")
     sort       = request.args.get("sort", "alpha")
     page       = int(request.args.get("page", "1"))
-    limit      = int(request.args.get("limit", "20"))
+    limit      = min(int(request.args.get("limit", "20")), 100)
 
     try:
         min_rating = float(request.args.get("minRating", "0"))
@@ -1288,6 +1301,9 @@ def auth_me():
 @limiter.limit("10 per minute")
 def auth_logout():
     """Clear the auth cookie."""
+    origin = request.headers.get("Origin", "")
+    if origin and origin != FRONTEND_URL:
+        return jsonify({"error": "forbidden"}), 403
     resp = make_response(jsonify({"ok": True}))
     resp.delete_cookie("auth_token")
     return resp
