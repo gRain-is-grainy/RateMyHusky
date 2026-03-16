@@ -98,7 +98,7 @@ function Compare() {
 	const [searchParams, setSearchParams] = useSearchParams();
 
 	const [catalog, setCatalog] = useState<CatalogProfessor[]>([]);
-	const [catalogLoading, setCatalogLoading] = useState(true);
+	const [, setCatalogLoading] = useState(true);
 	const [catalogError, setCatalogError] = useState<string | null>(null);
 
 	const [leftQuery, setLeftQuery] = useState('');
@@ -287,11 +287,7 @@ function Compare() {
 		else updateSlugs({ b: '' });
 	};
 
-	const handleSwap = () => {
-		updateSlugs({ a: rightSlug, b: leftSlug });
-	};
-
-	const getSlugForSuggestion = (name: string) => {
+const getSlugForSuggestion = (name: string) => {
 		const lowered = name.toLowerCase();
 		const exactMatch = catalog.find((prof) => prof.name.toLowerCase() === lowered);
 		if (exactMatch) return exactMatch.slug;
