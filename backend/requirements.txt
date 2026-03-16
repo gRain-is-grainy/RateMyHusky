@@ -1,0 +1,9 @@
+flask
+flask-cors
+flask-limiter
+pandas
+numpy
+pyjwt
+requests
+python-dotenv
+gunicorn
