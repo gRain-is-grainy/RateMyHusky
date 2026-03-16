@@ -2,13 +2,14 @@
 Backend API server for NEU Professor Ratings.
 Place this file in: backend/server.py
 
-Install deps:  pip install flask flask-cors pandas
+Install deps:  pip install flask flask-cors pandas psycopg2-binary
 Run:           python backend/server.py
 """
 
 import os, re, unicodedata
 import numpy as np
 import pandas as pd
+import psycopg2
 from dotenv import load_dotenv
 from flask import Flask, jsonify, request, redirect, make_response
 from flask_cors import CORS
@@ -62,15 +63,35 @@ GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
 GOOGLE_USERINFO_URL = "https://www.googleapis.com/oauth2/v2/userinfo"
 
 # ──────────────────────────────────────────────
-#  Load CSVs once at startup
+#  Load data from CockroachDB at startup
 # ──────────────────────────────────────────────
-DATA_DIR = os.path.join(os.path.dirname(__file__), "Better_Scraper", "output_data")
+CRDB_DATABASE_URL = os.getenv("CRDB_DATABASE_URL")
+if not CRDB_DATABASE_URL:
+    raise RuntimeError("CRDB_DATABASE_URL environment variable is required — set it in backend/.env")
 
-rmp_profs    = pd.read_csv(os.path.join(DATA_DIR, "rmp_professors.csv"))
-rmp_reviews  = pd.read_csv(os.path.join(DATA_DIR, "rmp_reviews.csv"))
-trace_courses = pd.read_csv(os.path.join(DATA_DIR, "trace_courses.csv"))
-trace_scores  = pd.read_csv(os.path.join(DATA_DIR, "trace_scores.csv"))
-trace_comments = pd.read_csv(os.path.join(DATA_DIR, "trace_comments.csv"))
+def _load_from_crdb():
+    conn = psycopg2.connect(CRDB_DATABASE_URL, sslmode="require")
+    tables = {}
+    for table in ["rmp_professors", "rmp_reviews", "trace_courses", "trace_scores", "trace_comments", "professor_photos"]:
+        tables[table] = pd.read_sql(f"SELECT * FROM {table}", conn)
+        print(f"[startup] Loaded {len(tables[table])} rows from {table}")
+    conn.close()
+    return tables
+
+_data = _load_from_crdb()
+rmp_profs = _data["rmp_professors"]
+rmp_reviews = _data["rmp_reviews"]
+trace_courses = _data["trace_courses"].rename(columns={
+    "course_id": "courseId", "school_code": "schoolCode", "term_id": "termId",
+    "term_title": "termTitle", "instructor_id": "instructorId",
+    "term_end_date": "termEndDate", "instructor_first_name": "instructorFirstName",
+    "instructor_last_name": "instructorLastName", "department_name": "departmentName",
+    "display_name": "displayName",
+})
+trace_scores = _data["trace_scores"].rename(columns={
+    "course_id": "courseId", "instructor_id": "instructorId", "term_id": "termId",
+})
+trace_comments = _data["trace_comments"]
 
 # Load professor photos
 def _upgrade_image_url(url: str) -> str:
@@ -78,15 +99,14 @@ def _upgrade_image_url(url: str) -> str:
     return re.sub(r'-\d+x\d+(?=\.\w+$)', '', url)
 
 photo_lookup = {}
-photos_path = os.path.join(DATA_DIR, "professor_photos.csv")
-if os.path.exists(photos_path):
-    _photos = pd.read_csv(photos_path)
+_photos = _data["professor_photos"]
+if not _photos.empty:
     for _, row in _photos.iterrows():
         key = normalize_name(str(row['name']))
         photo_lookup[key] = _upgrade_image_url(str(row['image_url']))
     print(f"[startup] Loaded {len(photo_lookup)} professor photos (upgraded to full-res)")
 else:
-    print("[startup] No professor_photos.csv found — photos disabled")
+    print("[startup] No professor photos found — photos disabled")
 
 # Clean RMP data
 rmp_profs["rating"]      = pd.to_numeric(rmp_profs["rating"], errors="coerce")
@@ -143,7 +163,7 @@ def merge_rmp_aliases(df):
                 if diffs.notna().any():
                     primary["level_of_difficulty"] = (diffs.fillna(0) * g["num_ratings"]).sum() / g.loc[diffs.notna(), "num_ratings"].sum()
             if "would_take_again_pct" in g.columns:
-                wtas = g["would_take_again_pct"].astype(str).str.replace("%", "").replace("N/A", "nan").astype(float)
+                wtas = pd.to_numeric(g["would_take_again_pct"].astype(str).str.replace("%", "").replace({"N/A": None, "": None}), errors="coerce")
                 if wtas.notna().any():
                     val = (wtas.fillna(0) * g["num_ratings"]).sum() / g.loc[wtas.notna(), "num_ratings"].sum()
                     primary["would_take_again_pct"] = f"{round(val, 1)}%"
@@ -1345,6 +1365,6 @@ def auth_logout():
 
 if __name__ == "__main__":
     print(f"Loaded {len(rmp_profs)} RMP professors, {len(rmp_reviews)} RMP reviews")
-    print(f"Stats → {stat_professor_count} professors, {stat_course_count} courses, "
+    print(f"Stats: {stat_professor_count} professors, {stat_course_count} courses, "
           f"{stat_total_comments} comments, {stat_department_count} departments")
     app.run(debug=True, port=5001, use_reloader=True)
