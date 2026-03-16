@@ -929,16 +929,18 @@ def professor_profile(slug):
         if "would_take_again_pct" in row.index:
             raw_val = str(row["would_take_again_pct"]).strip().replace("%", "")
             try:
-                wta = float(raw_val)
-                if wta < 0: wta = None
+                val = float(raw_val)
+                if pd.notna(val) and val >= 0:
+                    wta = val
             except (ValueError, TypeError):
                 pass
 
         difficulty = None
         if "level_of_difficulty" in row.index:
             try:
-                difficulty = float(row["level_of_difficulty"])
-                if pd.isna(difficulty) or difficulty <= 0: difficulty = None
+                val = float(row["level_of_difficulty"])
+                if pd.notna(val) and val > 0:
+                    difficulty = val
             except (ValueError, TypeError):
                 pass
 

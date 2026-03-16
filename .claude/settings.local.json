@@ -1,7 +1,11 @@
 {
   "permissions": {
     "allow": [
-      "Bash(find 'c:\\\\Users\\\\Ben\\\\Desktop\\\\College Stuff\\\\Oasis\\\\s26-group-8' -name .env* -o -name *.pem -o -name *.key)"
+      "Bash(find 'c:\\\\Users\\\\Ben\\\\Desktop\\\\College Stuff\\\\Oasis\\\\s26-group-8' -name .env* -o -name *.pem -o -name *.key)",
+      "Bash(openssl rand:*)",
+      "Bash(python -c \":*)",
+      "Bash(curl -s \"http://localhost:5001/api/professors/a-zilleruelo\")",
+      "Bash(curl -s \"http://localhost:5001/api/professors/a-zilleruelo\" -H \"Origin: http://localhost:5173\" -v)"
     ]
   }
 }
