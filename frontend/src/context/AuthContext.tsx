@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
 import type { ReactNode } from 'react';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5001';
+const TOKEN_KEY = 'auth_token';
 
 interface User {
   email: string;
@@ -23,16 +24,58 @@ const AuthContext = createContext<AuthContextType>({
   logout: async () => {},
 });
 
+function getStoredToken(): string | null {
+  return localStorage.getItem(TOKEN_KEY);
+}
+
+function storeToken(token: string) {
+  localStorage.setItem(TOKEN_KEY, token);
+}
+
+function clearToken() {
+  localStorage.removeItem(TOKEN_KEY);
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const popupRef = useRef<Window | null>(null);
 
   const fetchUser = useCallback(() => {
-    return fetch(`${API_BASE}/api/auth/me`, { credentials: 'include' })
+    const token = getStoredToken();
+    if (!token) {
+      setUser(null);
+      return Promise.resolve();
+    }
+    return fetch(`${API_BASE}/api/auth/me`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
       .then(res => (res.ok ? res.json() : null))
-      .then(data => setUser(data ?? null))
-      .catch(() => setUser(null));
+      .then(data => {
+        if (data) {
+          setUser(data);
+        } else {
+          clearToken();
+          setUser(null);
+        }
+      })
+      .catch(() => {
+        clearToken();
+        setUser(null);
+      });
+  }, []);
+
+  // Check for token in URL fragment (mobile redirect flow)
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (hash.includes('auth_token=')) {
+      const token = hash.split('auth_token=')[1]?.split('&')[0];
+      if (token) {
+        storeToken(token);
+        // Clean up URL
+        window.history.replaceState(null, '', window.location.pathname + window.location.search);
+      }
+    }
   }, []);
 
   useEffect(() => {
@@ -42,6 +85,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Listen for popup completion
   useEffect(() => {
     const handler = (e: MessageEvent) => {
+      if (e.origin !== new URL(API_BASE).origin) return;
+      if (e.data?.type === 'auth_complete' && e.data?.token) {
+        storeToken(e.data.token);
+        fetchUser();
+        popupRef.current = null;
+      }
+      // Backwards compat
       if (e.data === 'auth_complete') {
         fetchUser();
         popupRef.current = null;
@@ -56,12 +106,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const returnTo = window.location.pathname + window.location.search;
 
     if (isMobile) {
-      // Mobile: full redirect (popups don't work reliably)
       window.location.href = `${API_BASE}/api/auth/google?returnTo=${encodeURIComponent(returnTo)}`;
       return;
     }
 
-    // Desktop: popup flow to preserve page state
+    // Desktop: popup flow
     const w = 500;
     const h = 600;
     const left = window.screenX + (window.outerWidth - w) / 2;
@@ -75,7 +124,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (popup) {
       popupRef.current = popup;
-      // Fallback: poll in case postMessage fails (popup blockers, etc.)
       const interval = setInterval(() => {
         if (popup.closed) {
           clearInterval(interval);
@@ -84,16 +132,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       }, 500);
     } else {
-      // Popup blocked — fall back to redirect
       window.location.href = `${API_BASE}/api/auth/google?returnTo=${encodeURIComponent(returnTo)}`;
     }
   }, [fetchUser]);
 
   const logout = useCallback(async () => {
+    const token = getStoredToken();
     await fetch(`${API_BASE}/api/auth/logout`, {
       method: 'POST',
-      credentials: 'include',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
     });
+    clearToken();
     setUser(null);
   }, []);
 

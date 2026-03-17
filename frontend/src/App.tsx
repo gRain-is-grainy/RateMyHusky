@@ -1,4 +1,6 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { Analytics } from '@vercel/analytics/react';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 import { AuthProvider } from './context/AuthContext';
 import Homepage from './pages/Homepage';
 import Professor from './pages/Professor';
@@ -23,6 +25,8 @@ function App() {
         </Routes>
         <FeedbackTab />
       </Router>
+      <Analytics />
+      <SpeedInsights />
     </AuthProvider>
   );
 }

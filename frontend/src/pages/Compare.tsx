@@ -98,7 +98,7 @@ function Compare() {
 	const [searchParams, setSearchParams] = useSearchParams();
 
 	const [catalog, setCatalog] = useState<CatalogProfessor[]>([]);
-	const [catalogLoading, setCatalogLoading] = useState(true);
+	const [, setCatalogLoading] = useState(true);
 	const [catalogError, setCatalogError] = useState<string | null>(null);
 
 	const [leftQuery, setLeftQuery] = useState('');
@@ -285,10 +285,6 @@ function Compare() {
 	const handleClear = (side: Side) => {
 		if (side === 'a') updateSlugs({ a: '' });
 		else updateSlugs({ b: '' });
-	};
-
-	const handleSwap = () => {
-		updateSlugs({ a: rightSlug, b: leftSlug });
 	};
 
 	const getSlugForSuggestion = (name: string) => {
