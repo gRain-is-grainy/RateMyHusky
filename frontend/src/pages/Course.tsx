@@ -55,6 +55,19 @@ const Course = () => {
 			.slice(0, 6);
 	}, [course]);
 
+	const topInstructors = useMemo(() => {
+		if (!course) return [];
+		return [...course.instructors]
+			.sort((a, b) => {
+				const aRating = a.avgRating ?? -1;
+				const bRating = b.avgRating ?? -1;
+				if (bRating !== aRating) return bRating - aRating;
+				if (b.totalResponses !== a.totalResponses) return b.totalResponses - a.totalResponses;
+				return b.sections - a.sections;
+			})
+			.slice(0, 5);
+	}, [course]);
+
 	if (loading) {
 		return (
 			<div className="course-page">
@@ -116,6 +129,42 @@ const Course = () => {
 					<StatCard label="Responses" value={summary.totalResponses.toLocaleString()} />
 					<StatCard label="Latest Term" value={summary.latestTermTitle || 'Unknown'} />
 				</section>
+
+				{topInstructors.length > 0 && (
+					<section className="course-panel">
+						<div className="course-panel-header">
+							<h2>Top Professors Who Teach This Class</h2>
+						</div>
+						<div className="course-top-prof-grid">
+							{topInstructors.map((prof, index) => (
+								<article className="course-top-prof-card" key={prof.name}>
+									<div className="course-top-prof-rank">#{index + 1}</div>
+									<div className="course-top-prof-avatar" aria-hidden="true">
+										{getInitials(prof.name)}
+									</div>
+									<div className="course-top-prof-body">
+										<h3 className="course-top-prof-name">{prof.name}</h3>
+										<div className="course-top-prof-rating">
+											{prof.avgRating != null ? (
+												<>
+													<StarRating rating={prof.avgRating} size="sm" />
+													<span>{prof.avgRating.toFixed(2)}</span>
+												</>
+											) : (
+												<span>N/A</span>
+											)}
+										</div>
+										<div className="course-top-prof-meta">
+											<span>{prof.sections} section{prof.sections !== 1 ? 's' : ''}</span>
+											<span>{prof.totalResponses} responses</span>
+											<span>{prof.totalEnrollment.toLocaleString()} enrolled</span>
+										</div>
+									</div>
+								</article>
+							))}
+						</div>
+					</section>
+				)}
 
 				<section className="course-panel">
 					<div className="course-panel-header">
@@ -267,6 +316,15 @@ function StatCard({ label, value }: { label: string; value: string }) {
 			<strong>{value}</strong>
 		</article>
 	);
+}
+
+function getInitials(name: string): string {
+	return name
+		.split(' ')
+		.filter(Boolean)
+		.slice(0, 2)
+		.map((part) => part[0]?.toUpperCase() ?? '')
+		.join('');
 }
 
 export default Course;

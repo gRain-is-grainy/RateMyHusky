@@ -147,6 +147,91 @@
 	font-weight: 800;
 }
 
+.course-top-prof-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+	gap: 12px;
+}
+
+.course-top-prof-card {
+	position: relative;
+	background: #fff;
+	border: 1px solid #e8e8e8;
+	border-radius: 14px;
+	padding: 16px;
+	display: flex;
+	gap: 12px;
+	align-items: flex-start;
+	transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s;
+}
+
+.course-top-prof-card:hover {
+	transform: translateY(-2px);
+	box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+	border-color: rgba(214, 57, 76, 0.25);
+}
+
+.course-top-prof-rank {
+	position: absolute;
+	top: 10px;
+	right: 10px;
+	font-size: 0.72rem;
+	font-weight: 800;
+	color: #d6394c;
+	background: #fff2f4;
+	border: 1px solid #ffd5dd;
+	border-radius: 999px;
+	padding: 2px 8px;
+}
+
+.course-top-prof-avatar {
+	width: 42px;
+	height: 42px;
+	flex-shrink: 0;
+	border-radius: 50%;
+	background: linear-gradient(135deg, #d6394c, #a02030);
+	color: #fff;
+	font-weight: 800;
+	font-size: 0.82rem;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	letter-spacing: 0.4px;
+}
+
+.course-top-prof-body {
+	min-width: 0;
+	flex: 1;
+}
+
+.course-top-prof-name {
+	margin: 0 0 4px;
+	font-size: 0.94rem;
+	font-weight: 800;
+	color: #1b1b1b;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.course-top-prof-rating {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	margin-bottom: 8px;
+	font-size: 0.84rem;
+	font-weight: 700;
+	color: #333;
+}
+
+.course-top-prof-meta {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	font-size: 0.75rem;
+	color: #8a8a8a;
+}
+
 .course-table-wrap {
 	width: 100%;
 	overflow-x: auto;
@@ -377,6 +462,29 @@
 .dark .course-question-card {
 	background: #202020;
 	border-color: #343434;
+}
+
+.dark .course-top-prof-card {
+	background: #232323;
+	border-color: #333;
+}
+
+.dark .course-top-prof-rank {
+	color: #f06d7d;
+	background: #3a2328;
+	border-color: #59333b;
+}
+
+.dark .course-top-prof-name {
+	color: #e3e3e3;
+}
+
+.dark .course-top-prof-rating {
+	color: #d0d0d0;
+}
+
+.dark .course-top-prof-meta {
+	color: #8a8a8a;
 }
 
 .dark .course-expand-btn {
