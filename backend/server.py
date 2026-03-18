@@ -668,6 +668,28 @@ def parse_course(display_name):
         return m.group(1), m.group(2)
     return None, None
 
+
+def _format_course_code(raw: str) -> str:
+    return re.sub(r"\s+", "", str(raw).upper())
+
+
+def _safe_int(value, default: int = 0) -> int:
+    try:
+        if pd.isna(value):
+            return default
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _safe_float(value, default: float = 0.0) -> float:
+    try:
+        if pd.isna(value):
+            return default
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
 trace_courses["_parsed"] = trace_courses["displayName"].apply(parse_course)
 trace_courses["_code"] = trace_courses["_parsed"].apply(lambda x: x[0])
 trace_courses["_cname"] = trace_courses["_parsed"].apply(lambda x: x[1])
@@ -683,6 +705,101 @@ course_search["_search_lower"] = (
 )
 
 print(f"[search] Indexed {len(prof_search)} professors, {len(course_search)} courses")
+
+
+# ──────────────────────────────────────────────
+#  Course aggregates (catalog + detail pages)
+# ──────────────────────────────────────────────
+trace_courses["_code_norm"] = trace_courses["_code"].astype(str).apply(_format_course_code)
+trace_courses["_instructor_name"] = (
+    trace_courses["instructorFirstName"].fillna("").astype(str).str.strip()
+    + " "
+    + trace_courses["instructorLastName"].fillna("").astype(str).str.strip()
+).str.replace(r"\s+", " ", regex=True).str.strip()
+
+trace_courses["termId"] = pd.to_numeric(trace_courses["termId"], errors="coerce").fillna(0).astype(int)
+trace_courses["enrollment"] = pd.to_numeric(trace_courses["enrollment"], errors="coerce").fillna(0).astype(int)
+
+_course_sections = (
+    trace_courses[trace_courses["_code"].notna()]
+    [[
+        "courseId", "instructorId", "termId", "termTitle", "departmentName", "displayName",
+        "section", "enrollment", "_code", "_code_norm", "_cname", "_instructor_name",
+    ]]
+    .drop_duplicates(subset=["courseId", "instructorId", "termId"])
+    .copy()
+)
+
+_overall_scores = trace_scores[
+    trace_scores["question"].astype(str).str.lower().str.contains("overall", na=False)
+][[
+    "courseId", "instructorId", "termId", "_weighted_sum", "_total_responses", "completed"
+]].copy()
+
+_overall_combo = (
+    _overall_scores
+    .groupby(["courseId", "instructorId", "termId"], as_index=False)
+    .agg({
+        "_weighted_sum": "sum",
+        "_total_responses": "sum",
+        "completed": "sum",
+    })
+)
+_overall_combo["overallMean"] = _overall_combo.apply(
+    lambda r: (r["_weighted_sum"] / r["_total_responses"]) if r["_total_responses"] > 0 else np.nan,
+    axis=1,
+)
+
+_course_sections_scored = _course_sections.merge(
+    _overall_combo,
+    on=["courseId", "instructorId", "termId"],
+    how="left",
+)
+
+_course_latest = (
+    _course_sections.sort_values("termId", ascending=False)
+    .drop_duplicates(subset=["_code_norm"])
+    [["_code_norm", "_code", "_cname", "departmentName", "termTitle", "termId"]]
+    .rename(columns={
+        "_code": "code",
+        "_cname": "name",
+        "departmentName": "department",
+        "termTitle": "latestTermTitle",
+        "termId": "latestTermId",
+    })
+)
+
+_course_catalog_base = (
+    _course_sections_scored
+    .groupby("_code_norm", as_index=False)
+    .agg({
+        "courseId": "count",
+        "instructorId": pd.Series.nunique,
+        "enrollment": "sum",
+        "_weighted_sum": "sum",
+        "_total_responses": "sum",
+        "completed": "sum",
+    })
+    .rename(columns={
+        "courseId": "totalSections",
+        "instructorId": "totalInstructors",
+        "enrollment": "totalEnrollment",
+        "completed": "totalCompleted",
+    })
+)
+_course_catalog_base["avgRating"] = _course_catalog_base.apply(
+    lambda r: (r["_weighted_sum"] / r["_total_responses"]) if r["_total_responses"] > 0 else np.nan,
+    axis=1,
+)
+
+course_catalog_df = _course_catalog_base.merge(_course_latest, on="_code_norm", how="left")
+course_catalog_df["_search_lower"] = (
+    course_catalog_df["code"].fillna("").astype(str).str.lower() + " "
+    + course_catalog_df["name"].fillna("").astype(str).str.lower() + " "
+    + course_catalog_df["department"].fillna("").astype(str).str.lower()
+)
+
+print(f"[courses] Built course catalog with {len(course_catalog_df)} rows")
 
 
 def _professor_search_matches(query: str) -> pd.DataFrame:
@@ -1202,6 +1319,221 @@ def professors_catalog():
         "total":      total,
         "page":       page,
         "totalPages": total_pages,
+    })
+
+
+@app.route("/api/course-departments")
+def course_departments():
+    depts = sorted(
+        course_catalog_df["department"]
+        .dropna()
+        .astype(str)
+        .replace("", np.nan)
+        .dropna()
+        .unique()
+        .tolist()
+    )
+    return jsonify(depts)
+
+
+@app.route("/api/courses-catalog")
+def courses_catalog():
+    q = normalize_name(request.args.get("q", ""))
+    dept = request.args.get("dept", "")
+    sort = request.args.get("sort", "alpha")
+    page = int(request.args.get("page", "1"))
+    limit = min(int(request.args.get("limit", "20")), 10000)
+
+    try:
+        min_rating = float(request.args.get("minRating", "0"))
+    except (ValueError, TypeError):
+        min_rating = 0.0
+
+    try:
+        max_rating = float(request.args.get("maxRating", "5"))
+    except (ValueError, TypeError):
+        max_rating = 5.0
+
+    subset = course_catalog_df[course_catalog_df["avgRating"].notna()].copy()
+
+    if dept and dept != "All":
+        subset = subset[subset["department"] == dept]
+    if q:
+        subset = subset[subset["_search_lower"].str.contains(q, na=False)]
+    if min_rating > 0:
+        subset = subset[subset["avgRating"] >= min_rating]
+    if max_rating < 5:
+        subset = subset[subset["avgRating"] <= max_rating]
+
+    if sort == "rating":
+        subset = subset.sort_values("avgRating", ascending=False, na_position="last")
+    elif sort == "sections":
+        subset = subset.sort_values("totalSections", ascending=False)
+    elif sort == "recent":
+        subset = subset.sort_values("latestTermId", ascending=False)
+    else:
+        subset = subset.sort_values("code", ascending=True, key=lambda s: s.str.lower())
+
+    total = len(subset)
+    total_pages = max(1, (total + limit - 1) // limit)
+    page = max(1, min(page, total_pages))
+    start = (page - 1) * limit
+    page_data = subset.iloc[start:start + limit]
+
+    courses = []
+    for _, row in page_data.iterrows():
+        courses.append({
+            "code": row["code"],
+            "name": row["name"],
+            "department": row["department"],
+            "avgRating": round(float(row["avgRating"]), 2) if pd.notna(row["avgRating"]) else None,
+            "totalSections": int(row["totalSections"]),
+            "totalInstructors": int(row["totalInstructors"]),
+            "totalEnrollment": int(row["totalEnrollment"]),
+            "totalResponses": int(row["_total_responses"]),
+            "latestTermTitle": row["latestTermTitle"] if pd.notna(row["latestTermTitle"]) else "",
+            "latestTermId": int(row["latestTermId"]) if pd.notna(row["latestTermId"]) else 0,
+        })
+
+    return jsonify({
+        "courses": courses,
+        "total": total,
+        "page": page,
+        "totalPages": total_pages,
+    })
+
+
+@app.route("/api/courses/<code>")
+def course_profile(code):
+    code_norm = _format_course_code(code)
+    if not code_norm:
+        return jsonify({"error": "Course not found"}), 404
+
+    course_rows = _course_sections_scored[_course_sections_scored["_code_norm"] == code_norm].copy()
+    if course_rows.empty:
+        return jsonify({"error": "Course not found"}), 404
+
+    latest_row = course_rows.sort_values("termId", ascending=False).iloc[0]
+
+    total_weighted = _safe_float(course_rows["_weighted_sum"].fillna(0).sum())
+    total_responses = _safe_int(course_rows["_total_responses"].fillna(0).sum())
+    avg_rating = (total_weighted / total_responses) if total_responses > 0 else None
+
+    summary = {
+        "code": str(latest_row["_code"]),
+        "name": str(latest_row["_cname"]),
+        "department": str(latest_row["departmentName"]) if pd.notna(latest_row["departmentName"]) else "",
+        "avgRating": round(avg_rating, 2) if avg_rating is not None else None,
+        "totalSections": int(len(course_rows)),
+        "totalInstructors": int(course_rows["instructorId"].nunique()),
+        "totalEnrollment": _safe_int(course_rows["enrollment"].fillna(0).sum()),
+        "totalResponses": total_responses,
+        "latestTermTitle": str(latest_row["termTitle"]) if pd.notna(latest_row["termTitle"]) else "",
+        "latestTermId": _safe_int(latest_row["termId"]),
+    }
+
+    difficulty_lookup = {}
+    if "level_of_difficulty" in rmp_profs.columns:
+        _difficulty_series = pd.to_numeric(rmp_profs["level_of_difficulty"], errors="coerce")
+        for nk, diff in zip(rmp_profs["_name_key"], _difficulty_series):
+            key = normalize_name(nk)
+            if key and pd.notna(diff):
+                difficulty_lookup[key] = round(float(diff), 2)
+
+    instructor_meta_lookup = {}
+    _catalog_cols = ["name", "slug", "imageUrl", "_name_lower", "totalReviews", "wouldTakeAgainPct"]
+    for _, prof in catalog_df[_catalog_cols].iterrows():
+        slug = str(prof["slug"]) if pd.notna(prof["slug"]) else ""
+        image_url = str(prof["imageUrl"]) if pd.notna(prof.get("imageUrl")) else None
+        total_reviews = int(prof["totalReviews"]) if pd.notna(prof.get("totalReviews")) else 0
+        wta = float(prof["wouldTakeAgainPct"]) if pd.notna(prof.get("wouldTakeAgainPct")) else None
+        difficulty = difficulty_lookup.get(normalize_name(prof["_name_lower"]))
+        meta_payload = {
+            "slug": slug,
+            "imageUrl": image_url,
+            "totalReviews": total_reviews,
+            "wouldTakeAgainPct": round(wta, 1) if wta is not None else None,
+            "difficulty": difficulty,
+        }
+
+        key_display = normalize_name(prof["name"])
+        if key_display and key_display not in instructor_meta_lookup:
+            instructor_meta_lookup[key_display] = meta_payload
+
+        key_lower = normalize_name(prof["_name_lower"])
+        if key_lower and key_lower not in instructor_meta_lookup:
+            instructor_meta_lookup[key_lower] = meta_payload
+
+    instructor_rows = []
+    for name, g in course_rows.groupby("_instructor_name"):
+        weighted = _safe_float(g["_weighted_sum"].fillna(0).sum())
+        responses = _safe_int(g["_total_responses"].fillna(0).sum())
+        meta = instructor_meta_lookup.get(
+            normalize_name(name),
+            {
+                "slug": "",
+                "imageUrl": None,
+                "totalReviews": 0,
+                "wouldTakeAgainPct": None,
+                "difficulty": None,
+            },
+        )
+        instructor_rows.append({
+            "name": name,
+            "slug": meta["slug"],
+            "imageUrl": meta["imageUrl"],
+            "difficulty": meta["difficulty"],
+            "wouldTakeAgainPct": meta["wouldTakeAgainPct"],
+            "totalReviews": meta["totalReviews"],
+            "sections": int(len(g)),
+            "totalEnrollment": _safe_int(g["enrollment"].fillna(0).sum()),
+            "totalResponses": responses,
+            "avgRating": round(weighted / responses, 2) if responses > 0 else None,
+        })
+    instructor_rows.sort(key=lambda r: (r["avgRating"] is None, -(r["avgRating"] or 0), -r["sections"]))
+
+    section_rows = []
+    section_cols = [
+        "courseId", "instructorId", "termId", "termTitle", "section", "enrollment",
+        "_instructor_name", "overallMean", "_total_responses", "completed",
+    ]
+    for _, row in course_rows.sort_values("termId", ascending=False)[section_cols].iterrows():
+        section_rows.append({
+            "courseId": _safe_int(row["courseId"]),
+            "instructorId": _safe_int(row["instructorId"]),
+            "termId": _safe_int(row["termId"]),
+            "termTitle": str(row["termTitle"]) if pd.notna(row["termTitle"]) else "",
+            "section": str(row["section"]) if pd.notna(row["section"]) else "",
+            "instructor": str(row["_instructor_name"]),
+            "enrollment": _safe_int(row["enrollment"]),
+            "overallRating": round(float(row["overallMean"]), 2) if pd.notna(row["overallMean"]) else None,
+            "totalResponses": _safe_int(row["_total_responses"]),
+            "completed": _safe_int(row["completed"]),
+        })
+
+    course_keys = course_rows[["courseId", "instructorId", "termId"]].drop_duplicates()
+    score_subset = trace_scores.merge(course_keys, on=["courseId", "instructorId", "termId"], how="inner")
+
+    question_rows = []
+    if not score_subset.empty:
+        grouped = score_subset.groupby("question", as_index=False).agg({
+            "_weighted_sum": "sum",
+            "_total_responses": "sum",
+        })
+        for _, row in grouped.iterrows():
+            responses = _safe_int(row["_total_responses"])
+            question_rows.append({
+                "question": str(row["question"]),
+                "avgRating": round(_safe_float(row["_weighted_sum"]) / responses, 2) if responses > 0 else None,
+                "totalResponses": responses,
+            })
+    question_rows.sort(key=lambda r: (-r["totalResponses"], r["question"].lower()))
+
+    return jsonify({
+        "summary": summary,
+        "instructors": instructor_rows,
+        "sections": section_rows,
+        "questionScores": question_rows,
     })
 
 

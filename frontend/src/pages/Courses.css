@@ -1,0 +1,39 @@
+.course-card .prof-body {
+	gap: 2px;
+}
+
+.course-card .prof-name {
+	font-size: 1.08rem;
+	font-weight: 800;
+	margin-bottom: 4px;
+}
+
+.course-code {
+	display: inline-block;
+	width: fit-content;
+	font-size: 0.67rem;
+	font-weight: 800;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	background: #e9f5f2;
+	color: #1b6d5e;
+	border-radius: 5px;
+	padding: 2px 7px;
+	margin-bottom: 6px;
+}
+
+.course-suggestion-code {
+	display: inline-block;
+	font-size: 0.72rem;
+	padding: 2px 6px;
+	border-radius: 6px;
+	background: #e9f5f2;
+	color: #1b6d5e;
+	margin-right: 6px;
+}
+
+.dark .course-code,
+.dark .course-suggestion-code {
+	background: #1c3d38;
+	color: #84d4c3;
+}
