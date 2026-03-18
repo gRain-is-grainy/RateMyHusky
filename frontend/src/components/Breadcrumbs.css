@@ -1,0 +1,95 @@
+.breadcrumbs {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 12px 48px 0;
+  position: relative;
+  z-index: 1;
+}
+
+.breadcrumbs-list {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.breadcrumbs-item {
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+
+.breadcrumbs-link {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #d6394c;
+  text-decoration: none;
+  transition: color 0.15s;
+}
+
+.breadcrumbs-link:hover {
+  color: #b82e3f;
+  text-decoration: underline;
+}
+
+.breadcrumbs-separator {
+  display: flex;
+  align-items: center;
+  color: #bbb;
+  margin: 0 8px;
+}
+
+.breadcrumbs-current {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #888;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 280px;
+}
+
+/* Dark mode */
+.dark .breadcrumbs-link {
+  color: #e06070;
+}
+
+.dark .breadcrumbs-link:hover {
+  color: #d6394c;
+}
+
+.dark .breadcrumbs-separator {
+  color: #555;
+}
+
+.dark .breadcrumbs-current {
+  color: #777;
+}
+
+/* Context overrides */
+.prof-page .breadcrumbs {
+  padding-top: 80px;
+}
+
+.compare-page .breadcrumbs {
+  padding: 12px 24px 0;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .breadcrumbs {
+    padding: 10px 20px 0;
+  }
+}
+
+@media (max-width: 480px) {
+  .breadcrumbs {
+    padding: 8px 16px 0;
+  }
+
+  .breadcrumbs-current {
+    max-width: 180px;
+  }
+}

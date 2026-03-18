@@ -6,6 +6,7 @@ import NotFound from './NotFound';
 import Dropdown from '../components/Dropdown';
 import StarRating from '../components/StarRating';
 import RatingBar from '../components/RatingBar';
+import Breadcrumbs from '../components/Breadcrumbs';
 import { fetchProfessorData } from '../api/api';
 import type { ProfessorProfile, ProfessorReview, TraceComment } from '../api/api';
 import { useAuth } from '../context/AuthContext';
@@ -565,6 +566,10 @@ const Professor = () => {
 
   return (
     <div className="prof-page">
+      <Breadcrumbs items={[
+        { label: 'Professors', to: '/professors' },
+        { label: profile.name },
+      ]} />
       <header className="prof-hero">
         <div className="prof-hero-bg" style={{ backgroundImage: `url(${neuIcon})` }} />
         <div className="prof-hero-glow" />

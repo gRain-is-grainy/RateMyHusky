@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { fetchProfessorData, fetchProfessorsCatalog, fetchSearchSuggestions } from '../api/api';
 import type { CatalogProfessor, ProfessorProfile, ProfessorSuggestion } from '../api/api';
 import StarRating from '../components/StarRating';
+import Breadcrumbs from '../components/Breadcrumbs';
 import Footer from '../components/Footer';
 
 import './Compare.css';
@@ -547,6 +548,7 @@ function Compare() {
 	return (
 		<>
 			<main className="compare-page">
+			<Breadcrumbs items={[{ label: 'Compare' }]} />
 			<section className="compare-hero">
 				<div className="compare-hero-inner">
 					<p className="compare-kicker">Professor Compare</p>
