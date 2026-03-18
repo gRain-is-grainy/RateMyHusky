@@ -21,6 +21,7 @@ const SORT_OPTIONS = [
 ];
 
 const REVIEW_SLIDER_MAX = 100;
+const REVIEW_INPUT_MAX = 10000;
 
 interface Filters {
   q:          string;
@@ -106,6 +107,7 @@ export default function ProfessorCatalog() {
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading]       = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>(() => (localStorage.getItem('catalog-view') as 'grid' | 'list') || 'grid');
   const [minRatingDraft, setMinRatingDraft] = useState(() => getFiltersFromSearchParams(searchParams).minRating);
   const [maxRatingDraft, setMaxRatingDraft] = useState(() => getFiltersFromSearchParams(searchParams).maxRating);
   const [minReviewsDraft, setMinReviewsDraft] = useState(() => getFiltersFromSearchParams(searchParams).minReviews);
@@ -470,7 +472,7 @@ export default function ProfessorCatalog() {
                   placeholder="Min"
                   onChange={e => {
                     const v = parseInt(e.target.value, 10);
-                    const clamped = isNaN(v) || v < 1 ? 1 : v;
+                    const clamped = isNaN(v) || v < 1 ? 1 : Math.min(v, REVIEW_INPUT_MAX);
                     setMinReviewsDraft(clamped);
                     if (maxReviewsDraft !== null && clamped > maxReviewsDraft) {
                       setMaxReviewsDraft(clamped);
@@ -489,7 +491,7 @@ export default function ProfessorCatalog() {
                     if (isNaN(v) || e.target.value === '') {
                       setMaxReviewsDraft(null);
                     } else {
-                      const clamped = Math.max(v, minReviewsDraft);
+                      const clamped = Math.min(Math.max(v, minReviewsDraft), REVIEW_INPUT_MAX);
                       setMaxReviewsDraft(clamped);
                     }
                   }}
@@ -506,6 +508,28 @@ export default function ProfessorCatalog() {
             <span className="catalog-count">
               {loading ? '…' : `${total.toLocaleString()} result${total !== 1 ? 's' : ''}`}
             </span>
+            <div className="catalog-view-toggle">
+              <button
+                className={`catalog-view-btn ${viewMode === 'grid' ? 'active' : ''}`}
+                onClick={() => { setViewMode('grid'); localStorage.setItem('catalog-view', 'grid'); }}
+                aria-label="Grid view"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" />
+                  <rect x="3" y="14" width="7" height="7" /><rect x="14" y="14" width="7" height="7" />
+                </svg>
+              </button>
+              <button
+                className={`catalog-view-btn ${viewMode === 'list' ? 'active' : ''}`}
+                onClick={() => { setViewMode('list'); localStorage.setItem('catalog-view', 'list'); }}
+                aria-label="List view"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" />
+                  <line x1="3" y1="6" x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" />
+                </svg>
+              </button>
+            </div>
           </div>
           <div className="catalog-search-row">
             <div className="catalog-search-wrap" ref={searchWrapperRef}>
@@ -565,9 +589,9 @@ export default function ProfessorCatalog() {
           </p>
 
           {loading ? (
-            <div className="catalog-grid">
+            <div className={viewMode === 'list' ? 'catalog-list' : 'catalog-grid'}>
               {Array.from({ length: pageSize }).map((_, i) => (
-                <div key={i} className="prof-card skeleton" />
+                <div key={i} className={viewMode === 'list' ? 'prof-list-item skeleton' : 'prof-card skeleton'} />
               ))}
             </div>
           ) : professors.length === 0 ? (
@@ -576,6 +600,50 @@ export default function ProfessorCatalog() {
               <button className="clear-btn prominent" onClick={clearFilters}>
                 Clear filters
               </button>
+            </div>
+          ) : viewMode === 'list' ? (
+            <div className="catalog-list">
+              {professors.map(prof => (
+                <div
+                  key={prof.slug}
+                  className="prof-list-item"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => navigate(`/professors/${prof.slug}`)}
+                  onKeyDown={e =>
+                    e.key === 'Enter' && navigate(`/professors/${prof.slug}`)
+                  }
+                >
+                  <div className="prof-list-avatar">
+                    {prof.imageUrl ? (
+                      <img
+                        src={prof.imageUrl}
+                        alt=""
+                        className="prof-avatar-img"
+                        onError={(e) => {
+                          const target = e.currentTarget;
+                          target.style.display = 'none';
+                          const fallback = target.parentElement?.querySelector('.prof-avatar-initials') as HTMLElement;
+                          if (fallback) fallback.style.display = 'flex';
+                        }}
+                      />
+                    ) : null}
+                    <span
+                      className="prof-avatar-initials"
+                      style={prof.imageUrl ? { display: 'none' } : undefined}
+                    >
+                      {initials(prof.name)}
+                    </span>
+                  </div>
+                  <div className="prof-list-info">
+                    <span className="prof-list-name">{prof.name}</span>
+                    <span className="prof-list-dept">{prof.department}</span>
+                  </div>
+                  <span className="prof-list-rating">
+                    {prof.avgRating != null ? prof.avgRating.toFixed(2) : 'N/A'}
+                  </span>
+                </div>
+              ))}
             </div>
           ) : (
             <div className="catalog-grid">
