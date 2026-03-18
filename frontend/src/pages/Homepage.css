@@ -272,6 +272,22 @@
   to { transform: translate(-50%, -50%) rotate(360deg); }
 }
 
+.goat-view-all {
+  display: block;
+  text-align: center;
+  margin-top: 16px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #d6394c;
+  text-decoration: none;
+  transition: color 0.15s;
+}
+
+.goat-view-all:hover {
+  color: #b82e3f;
+  text-decoration: underline;
+}
+
 .goat-header-row {
   display: grid;
   grid-template-columns: 60px 2fr 1.5fr 1.5fr 0.8fr;
@@ -848,6 +864,14 @@
   color: #fff !important;
 }
 
+.dark .goat-view-all {
+  color: #e06070;
+}
+
+.dark .goat-view-all:hover {
+  color: #d6394c;
+}
+
 .dark .goat-leaderboard {
   background: #242424;
   box-shadow: 0 2px 12px rgba(0,0,0,0.2);
@@ -1025,33 +1049,6 @@
   .goat-leaderboard {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
-    position: relative;
-  }
-
-  .goat-leaderboard::after {
-    content: '';
-    position: sticky;
-    right: 0;
-    top: 0;
-    display: block;
-    width: 40px;
-    height: 100%;
-    pointer-events: none;
-    background: linear-gradient(to right, transparent, rgba(255,255,255,0.9));
-    position: absolute;
-    right: 0;
-    top: 0;
-    bottom: 0;
-    z-index: 2;
-    transition: opacity 0.3s;
-  }
-
-  .goat-leaderboard.scrolled-end::after {
-    opacity: 0;
-  }
-
-  .dark .goat-leaderboard::after {
-    background: linear-gradient(to right, transparent, rgba(30,30,30,0.9));
   }
 
   .goat-header-row,

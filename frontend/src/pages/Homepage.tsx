@@ -2,7 +2,7 @@
 Primary Homepage Codespace
 */
 import { useState, useEffect, useRef, useCallback, useLayoutEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import SearchBar from '../components/SearchBar';
 import Footer from '../components/Footer';
 
@@ -442,6 +442,15 @@ const Homepage = () => {
             ))
           )}
         </div>
+
+        {selectedCollege && (
+          <Link
+            to={`/professors?college=${encodeURIComponent(selectedCollege)}&sort=rating`}
+            className="goat-view-all"
+          >
+            View all {selectedCollege} professors →
+          </Link>
+        )}
       </section>
 
       {/* ======== Professor Randomizer ======== */}
