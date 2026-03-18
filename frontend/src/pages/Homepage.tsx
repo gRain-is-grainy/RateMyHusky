@@ -1,11 +1,10 @@
 /*
 Primary Homepage Codespace
 */
-import { useState, useEffect, useRef, useCallback, useLayoutEffect, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback, useLayoutEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import SearchBar from '../components/SearchBar';
 import Footer from '../components/Footer';
-import ThemeToggle from '../components/ThemeToggle';
 import { fetchStats, fetchColleges, fetchGoatProfessors, fetchRandomProfessor, fetchProfessorsCatalog } from '../api/api';
 import type { Stat, Professor } from '../api/api';
 import neuIcon from '../assets/neu-circle-icon.png';

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import { Analytics } from '@vercel/analytics/react';
 import { SpeedInsights } from '@vercel/speed-insights/react';
@@ -23,31 +23,6 @@ function ScrollToTop() {
   return null;
 }
 
-function AnimatedRoutes() {
-  const location = useLocation();
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    el.classList.remove('page-fade-in');
-    // Force reflow so the animation restarts
-    void el.offsetWidth;
-    el.classList.add('page-fade-in');
-  }, [location.pathname]);
-
-  return (
-    <div ref={ref} className="page-transition-wrapper page-fade-in">
-      <Routes location={location}>
-        <Route path="/" element={<Homepage />} />
-        <Route path="/professors" element={<ProfessorCatalog />} />
-        <Route path="/professors/:slug" element={<Professor />} />
-        <Route path="/compare" element={<Compare />} />
-        <Route path="*" element={<NotFound />} />
-      </Routes>
-    </div>
-  );
-}
 
 function App() {
   return (
