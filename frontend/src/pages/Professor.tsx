@@ -177,6 +177,9 @@ const Professor = () => {
   const [traceSort, setTraceSort] = useState('popular');
   const [expandedQuestions, setExpandedQuestions] = useState<Record<string, boolean>>({});
   const [visibleCommentsPerQuestion, setVisibleCommentsPerQuestion] = useState<Record<string, number>>({});
+  const [showAllCourses, setShowAllCourses] = useState(false);
+  const COURSES_COLLAPSED_LIMIT = 5;
+  const MAX_VISIBLE_TERMS = 3;
 
   /* ── review pill ── */
   const updateReviewPill = useCallback(() => {
@@ -719,7 +722,7 @@ const Professor = () => {
               </div>
             </div>
             <div className="prof-courses-compact">
-              {sorted.map(([code, sections]) => {
+              {(showAllCourses ? sorted : sorted.slice(0, COURSES_COLLAPSED_LIMIT)).map(([code, sections]) => {
                 const nameMatch = sections[0]?.displayName.match(/\((.+?)\)/);
                 const courseName = nameMatch ? nameMatch[1] : '';
                 const terms = [...new Set(sections.map(s => cleanTerm(s.termTitle)))].filter(t => /\b20\d{2}\b/.test(t)).sort((a, b) => {
@@ -731,11 +734,13 @@ const Professor = () => {
                   const seasonB = b.split(' ')[0];
                   return (order[seasonB] || 0) - (order[seasonA] || 0);
                 });
+                const visibleTerms = terms.slice(0, MAX_VISIBLE_TERMS);
+                const hiddenTermCount = terms.length - visibleTerms.length;
                 const isSelected = selectedCourses.has(code);
                 return (
-                  <div 
-                    key={code} 
-                    className={`prof-course-row ${isSelected ? 'selected' : ''}`} 
+                  <div
+                    key={code}
+                    className={`prof-course-row ${isSelected ? 'selected' : ''}`}
                     onClick={() => toggleCourse(code)}
                   >
                     <div className="prof-course-row-main">
@@ -747,12 +752,29 @@ const Professor = () => {
                     </div>
                     {terms.length > 0 && (
                       <div className="prof-course-term-tags">
-                        {terms.map(t => <span key={t} className="prof-course-term-tag">{t}</span>)}
+                        {visibleTerms.map(t => <span key={t} className="prof-course-term-tag">{t}</span>)}
+                        {hiddenTermCount > 0 && (
+                          <span className="prof-course-term-tag prof-course-term-more">+{hiddenTermCount} more</span>
+                        )}
                       </div>
                     )}
                   </div>
                 );
               })}
+              {sorted.length > COURSES_COLLAPSED_LIMIT && (
+                <button
+                  className="prof-courses-toggle"
+                  onClick={() => setShowAllCourses(v => !v)}
+                >
+                  {showAllCourses ? 'Show fewer courses' : `Show all ${sorted.length} courses`}
+                  <svg
+                    className={`prof-courses-toggle-icon ${showAllCourses ? 'expanded' : ''}`}
+                    width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+                  >
+                    <polyline points="6 9 12 15 18 9" />
+                  </svg>
+                </button>
+              )}
             </div>
           </section>
         );

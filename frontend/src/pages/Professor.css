@@ -240,6 +240,28 @@
 .prof-course-terms { font-size: 0.82rem; color: #999; font-weight: 600; white-space: nowrap; flex-shrink: 0; }
 .prof-course-term-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
 .prof-course-term-tag { font-size: 0.72rem; font-weight: 700; color: #d6394c; background: #fef0f0; padding: 2px 8px; border-radius: 8px; }
+.prof-course-term-more { color: #999; background: #f0f0f0; font-style: italic; }
+
+.prof-courses-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  padding: 14px;
+  border: none;
+  border-top: 1px solid #f0f0f0;
+  background: transparent;
+  color: #d6394c;
+  font-family: 'Nunito', sans-serif;
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.prof-courses-toggle:hover { background: #fef8f8; }
+.prof-courses-toggle-icon { transition: transform 0.3s ease; }
+.prof-courses-toggle-icon.expanded { transform: rotate(180deg); }
 
 /* ═══════════ REVIEWS ═══════════ */
 .prof-reviews-section { padding-bottom: 60px; }
@@ -774,6 +796,9 @@
 .dark .prof-course-title { color: #ccc; }
 .dark .prof-course-terms { color: #777; }
 .dark .prof-course-term-tag { color: #e06070; background: #3a2020; }
+.dark .prof-course-term-more { color: #777; background: #333; }
+.dark .prof-courses-toggle { border-top-color: #333; color: #e06070; }
+.dark .prof-courses-toggle:hover { background: #2d2020; }
 .dark .trace-comment-term { color: #e06070; background: #3a2020; }
 .dark .trace-comment-course { color: #e06070; background: #3a2020; }
 .dark .prof-action-link { color: #e06070; }
