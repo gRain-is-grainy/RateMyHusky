@@ -9,7 +9,14 @@ interface Props {
 }
 
 export default function SignInModal({ open, onClose }: Props) {
-  const { login } = useAuth();
+  const { login, user } = useAuth();
+
+  // Auto-close modal when user logs in (e.g. after mobile redirect)
+  useEffect(() => {
+    if (user && open) {
+      onClose();
+    }
+  }, [user, open, onClose]);
 
   useEffect(() => {
     if (open) {
