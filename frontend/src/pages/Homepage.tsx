@@ -1,12 +1,12 @@
 /*
 Primary Homepage Codespace
 */
-import { useState, useEffect, useRef, useCallback, useLayoutEffect, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback, useLayoutEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import SearchBar from '../components/SearchBar';
 import Footer from '../components/Footer';
 import ThemeToggle from '../components/ThemeToggle';
-import { fetchStats, fetchColleges, fetchGoatProfessors, fetchRandomProfessor } from '../api/api';
+import { fetchStats, fetchColleges, fetchGoatProfessors, fetchRandomProfessor, fetchProfessorsCatalog } from '../api/api';
 import type { Stat, Professor } from '../api/api';
 import neuIcon from '../assets/neu-circle-icon.png';
 import './Homepage.css';
@@ -269,60 +269,88 @@ const Homepage = () => {
   }, [selectedCollege]);
 
   const [slotResult, setSlotResult] = useState<{ name: string; dept: string; college: string; slug: string } | null>(null);
-  const [handlePulled, setHandlePulled] = useState(false);
-  const [reelState, setReelState] = useState<'hidden' | 'spinning' | 'landing'>('hidden');
-  const [landNames, setLandNames] = useState<string[]>([]);
-  const [landOffset, setLandOffset] = useState(0);
-  const ITEM_H = 44;
+  const [wheelState, setWheelState] = useState<'idle' | 'spinning' | 'result'>('idle');
+  const WHEEL_SLICES = 16;
+  const SLICE_DEG = 360 / WHEEL_SLICES;
+  const [wheelNames, setWheelNames] = useState<string[]>(Array.from({ length: WHEEL_SLICES }, () => ''));
+  const [wheelRotation, setWheelRotation] = useState(0);
+  const [wheelDurationMs, setWheelDurationMs] = useState(0);
 
-  const PLACEHOLDERS = [
-    'Albert Einstein', 'Marie Curie', 'Isaac Newton', 'Ada Lovelace',
-    'Nikola Tesla', 'Grace Hopper', 'Alan Turing', 'Rosalind Franklin',
-    'Richard Feynman', 'Emmy Noether', 'Linus Torvalds', 'Barbara Liskov',
-    'Noam Chomsky', 'Katherine Johnson', 'John von Neumann', 'Dorothy Vaughan',
-  ];
-
-  // Repeat many times for a long seamless CSS loop
-  const loopNames = useMemo(() => {
-    const arr: string[] = [];
-    for (let i = 0; i < 20; i++) arr.push(...PLACEHOLDERS);
-    return arr;
-  }, []);
+  const realWheelNames = Array.from(new Set(profs.map((p) => p.name).filter(Boolean)));
 
   const handleShuffle = async () => {
     if (shuffling) return;
     setShuffling(true);
     setSlotResult(null);
-    setHandlePulled(true);
-    setReelState('spinning');
+    setWheelState('spinning');
 
     try {
       const prof = await fetchRandomProfessor();
       const slug = prof.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 
-      // Build landing reel: shuffled names + winner at end
-      const shuffled = [...PLACEHOLDERS].sort(() => Math.random() - 0.5);
-      const finalReel = [...shuffled, ...shuffled, ...shuffled, prof.name];
-      const targetOffset = (finalReel.length - 1) * ITEM_H;
+      // Build a 16-slice wheel with unique real names only.
+      const uniqueNames: string[] = [];
+      const uniqueSet = new Set<string>();
 
-      setLandNames(finalReel);
-      setLandOffset(0);
-      setReelState('landing');
+      const pushUnique = (name: string) => {
+        const trimmed = name.trim();
+        if (!trimmed || uniqueSet.has(trimmed)) return;
+        uniqueSet.add(trimmed);
+        uniqueNames.push(trimmed);
+      };
 
-      // Wait for mount at offset 0, then animate
+      pushUnique(prof.name);
+      realWheelNames.forEach(pushUnique);
+
+      if (uniqueNames.length < WHEEL_SLICES) {
+        const collegeCatalog = await fetchProfessorsCatalog({
+          college: selectedCollege || undefined,
+          page: 1,
+          limit: 300,
+          sort: 'alpha',
+        });
+        collegeCatalog.professors.forEach((p) => pushUnique(p.name));
+      }
+
+      if (uniqueNames.length < WHEEL_SLICES) {
+        const globalCatalog = await fetchProfessorsCatalog({
+          page: 1,
+          limit: 500,
+          sort: 'alpha',
+        });
+        globalCatalog.professors.forEach((p) => pushUnique(p.name));
+      }
+
+      if (uniqueNames.length < WHEEL_SLICES) {
+        throw new Error('Not enough unique professor names to build a 16-slice wheel.');
+      }
+
+      const fixedPool = uniqueNames.slice(0, WHEEL_SLICES);
+      const shuffled = [...fixedPool].sort(() => Math.random() - 0.5);
+      const winnerIndex = Math.max(0, shuffled.indexOf(prof.name));
+      setWheelNames(shuffled);
+
+      const currentNormalized = ((wheelRotation % 360) + 360) % 360;
+      const winnerCenterAngle = (winnerIndex + 0.5) * SLICE_DEG;
+      // In our wheel transform system, 0deg is the top marker position.
+      const pointerAngle = 0;
+      const targetNormalized = (pointerAngle - winnerCenterAngle + 360) % 360;
+      const delta = (targetNormalized - currentNormalized + 360) % 360;
+      const extraSpins = 360 * 6;
+      const finalRotation = wheelRotation + extraSpins + delta;
+
+      setWheelDurationMs(0);
       await new Promise<void>(r => requestAnimationFrame(() => requestAnimationFrame(() => r())));
-      setLandOffset(targetOffset);
+      setWheelDurationMs(4800);
+      setWheelRotation(finalRotation);
 
-      // Wait for 2.2s CSS transition
-      await new Promise(r => setTimeout(r, 2400));
+      await new Promise(r => setTimeout(r, 5000));
 
       setSlotResult({ name: prof.name, dept: prof.dept ?? '', college: prof.college ?? '', slug });
-      setReelState('hidden');
-      setHandlePulled(false);
+      setWheelState('result');
     } catch (err) {
       console.error('Failed to fetch random professor:', err);
-      setReelState('hidden');
-      setHandlePulled(false);
+      setWheelState('idle');
     } finally {
       setShuffling(false);
     }
@@ -468,84 +496,53 @@ const Homepage = () => {
             </button>
           </div>
 
-          <div className="slot-machine" onClick={handleShuffle} role="button" tabIndex={0} onKeyDown={e => e.key === 'Enter' && handleShuffle()}>
-            {/* Machine body */}
-            <div className="sm-body">
-              {/* Top cap */}
-              <div className="sm-top">
-                <div className="sm-top-light" />
-                <div className="sm-top-light" />
-                <div className="sm-top-light" />
+          <div className={`wheel-spinner ${wheelState} ${slotResult ? 'has-result' : ''}`}>
+            <div className="wheel-pointer" />
+
+            <div className="wheel-shell">
+              <div
+                className="wheel-disc"
+                style={{
+                  transform: `rotate(${wheelRotation}deg)`,
+                  transition: wheelDurationMs > 0
+                    ? `transform ${wheelDurationMs}ms cubic-bezier(0.14, 0.78, 0.18, 1)`
+                    : 'none',
+                }}
+              >
+                <div className="wheel-face" />
+                {wheelNames.map((name, i) => (
+                  <div
+                    key={`${i}-${name || 'blank'}`}
+                    className="wheel-slice-name"
+                    style={{ transform: `rotate(${i * SLICE_DEG}deg) translateY(var(--wheel-label-radius))` }}
+                  >
+                    <span>{name}</span>
+                  </div>
+                ))}
               </div>
 
-              {/* Reel window */}
-              <div className="sm-window-frame">
-                {/* Center indicator arrow */}
-                <div className="sm-indicator sm-indicator-left">
-                  <svg viewBox="0 0 10 16" fill="#d6394c"><polygon points="0,8 10,0 10,16" /></svg>
-                </div>
-                <div className="sm-indicator sm-indicator-right">
-                  <svg viewBox="0 0 10 16" fill="#d6394c"><polygon points="10,8 0,0 0,16" /></svg>
-                </div>
-                <div className="sm-center-line" />
-
-                <div className="sm-window">
-                  {reelState === 'hidden' && !slotResult && (
-                    <div className="sm-idle-text">PULL!</div>
-                  )}
-                  {reelState === 'hidden' && slotResult && (
-                    <div
-                      className="sm-result"
-                      onClick={(e) => { e.stopPropagation(); navigate(`/professors/${slotResult.slug}`); }}
-                    >
-                      <span className="sm-result-name">{slotResult.name}</span>
-                      <span className="sm-result-sub">{slotResult.dept}</span>
-                      <span className="sm-result-cta">View Profile →</span>
-                    </div>
-                  )}
-                  {reelState === 'spinning' && (
-                    <div className="sm-reel sm-reel-loop">
-                      {loopNames.map((name, i) => (
-                        <div key={i} className="sm-reel-item" style={{ height: ITEM_H }}>
-                          {name}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  {reelState === 'landing' && (
-                    <div
-                      className="sm-reel"
-                      style={{
-                        transform: `translateY(-${landOffset}px)`,
-                        transition: landOffset > 0
-                          ? 'transform 2.2s cubic-bezier(0.12, 0, 0.18, 1)'
-                          : 'none',
-                      }}
-                    >
-                      {landNames.map((name, i) => (
-                        <div key={i} className="sm-reel-item" style={{ height: ITEM_H }}>
-                          {name}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Bottom base */}
-              <div className="sm-bottom">
-                <div className="sm-coin-slot" />
-              </div>
+              <button
+                className={`wheel-center-btn ${slotResult ? 'winner' : ''}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (slotResult && !shuffling) {
+                    navigate(`/professors/${slotResult.slug}`);
+                    return;
+                  }
+                  handleShuffle();
+                }}
+                disabled={shuffling}
+              >
+                {shuffling ? 'Spinning...' : slotResult ? 'View Winner' : 'Spin'}
+              </button>
             </div>
 
-            {/* Handle (lever) */}
-            <div className={`sm-handle ${handlePulled ? 'pulled' : ''}`}>
-              <div className="sm-handle-arm">
-                <div className="sm-handle-knob" />
-                <div className="sm-handle-rod" />
+            {slotResult && (
+              <div className="wheel-result-card" onClick={() => navigate(`/professors/${slotResult.slug}`)}>
+                <span className="wheel-result-name">{slotResult.name}</span>
+                <span className="wheel-result-sub">{slotResult.dept}</span>
               </div>
-              <div className="sm-handle-pivot" />
-            </div>
+            )}
           </div>
         </div>
       </section>

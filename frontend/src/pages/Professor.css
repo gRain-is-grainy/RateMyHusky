@@ -798,6 +798,14 @@
 
 .dark .prof-back-to-top { background: #d6394c; box-shadow: 0 4px 16px rgba(0,0,0,0.3); }
 
+.dark .prof-image-modal {
+  border-color: rgba(214, 57, 76, 0.55);
+}
+
+.dark .prof-image-modal-close {
+  background: rgba(20, 20, 20, 0.7);
+}
+
 /* ═══════════════════════════════════════
    RESPONSIVE — TABLET (hide TOC)
    ═══════════════════════════════════════ */
@@ -849,6 +857,17 @@
   .prof-review-rating-value { width: 38px; height: 38px; font-size: 0.95rem; border-radius: 10px; }
 
   .prof-back-to-top { bottom: 16px; left: 12px; width: 38px; height: 38px; }
+
+  .prof-image-modal {
+    width: min(92vw, 560px);
+    border-radius: 14px;
+  }
+
+  .prof-image-modal-close {
+    width: 32px;
+    height: 32px;
+    font-size: 1.35rem;
+  }
 }
 
 .prof-avatar {
@@ -868,6 +887,80 @@
   border-radius: 50%;
   image-rendering: -webkit-optimize-contrast;
   image-rendering: crisp-edges;
+}
+
+.prof-avatar-clickable {
+  cursor: zoom-in;
+}
+
+.prof-avatar-clickable:focus-visible {
+  outline: 3px solid rgba(214, 57, 76, 0.45);
+  outline-offset: 4px;
+}
+
+.prof-image-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(14, 12, 13, 0.72);
+  backdrop-filter: blur(4px);
+  padding: 20px;
+  animation: profImageModalFade 0.2s ease-out;
+}
+
+.prof-image-modal {
+  position: relative;
+  width: min(86vw, 720px);
+  max-height: 86vh;
+  border-radius: 20px;
+  border: 2px solid rgba(255, 255, 255, 0.7);
+  overflow: hidden;
+  box-shadow: 0 18px 56px rgba(0, 0, 0, 0.45);
+  animation: profImageModalPop 0.22s ease-out;
+}
+
+.prof-image-modal-img {
+  width: 100%;
+  height: auto;
+  max-height: 86vh;
+  display: block;
+  object-fit: contain;
+  background: #111;
+}
+
+.prof-image-modal-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.58);
+  color: #fff;
+  font-size: 1.55rem;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.prof-image-modal-close:hover {
+  background: rgba(214, 57, 76, 0.92);
+}
+
+@keyframes profImageModalFade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes profImageModalPop {
+  from { opacity: 0; transform: scale(0.94) translateY(6px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
 }
 
 .prof-avatar-initials {

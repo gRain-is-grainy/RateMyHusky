@@ -176,6 +176,7 @@ const Professor = () => {
   const [traceSort, setTraceSort] = useState('popular');
   const [expandedQuestions, setExpandedQuestions] = useState<Record<string, boolean>>({});
   const [visibleCommentsPerQuestion, setVisibleCommentsPerQuestion] = useState<Record<string, number>>({});
+  const [isImageModalOpen, setIsImageModalOpen] = useState(false);
 
   /* ── review pill ── */
   const updateReviewPill = useCallback(() => {
@@ -552,6 +553,20 @@ const Professor = () => {
 
   useEffect(() => { setVisibleReviews(10); }, [sortBy, reviewTab, selectedCourses.size]);
 
+  useEffect(() => {
+    if (!isImageModalOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsImageModalOpen(false);
+    };
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, [isImageModalOpen]);
+
   if (loading) return (
     <div className="prof-page">
       <div className="prof-loading">
@@ -570,7 +585,22 @@ const Professor = () => {
         <div className="prof-hero-bg" style={{ backgroundImage: `url(${neuIcon})` }} />
         <div className="prof-hero-glow" />
         <div className="prof-hero-inner">
-          <div className="prof-avatar">
+          <div
+            className={`prof-avatar ${profile.imageUrl ? 'prof-avatar-clickable' : ''}`}
+            onClick={() => {
+              if (profile.imageUrl) setIsImageModalOpen(true);
+            }}
+            role={profile.imageUrl ? 'button' : undefined}
+            tabIndex={profile.imageUrl ? 0 : undefined}
+            onKeyDown={(e) => {
+              if (!profile.imageUrl) return;
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                setIsImageModalOpen(true);
+              }
+            }}
+            aria-label={profile.imageUrl ? `Open larger photo of ${profile.name}` : undefined}
+          >
             {profile.imageUrl ? (
               <img
                 src={profile.imageUrl}
@@ -691,6 +721,21 @@ const Professor = () => {
           </div>
         )}
       </section>
+
+      {isImageModalOpen && profile.imageUrl && (
+        <div className="prof-image-modal-overlay" onClick={() => setIsImageModalOpen(false)}>
+          <div className="prof-image-modal" onClick={(e) => e.stopPropagation()}>
+            <button
+              className="prof-image-modal-close"
+              onClick={() => setIsImageModalOpen(false)}
+              aria-label="Close enlarged professor image"
+            >
+              ×
+            </button>
+            <img src={profile.imageUrl} alt={profile.name} className="prof-image-modal-img" />
+          </div>
+        </div>
+      )}
 
       {allCourseCodes.length > 0 && (() => {
         const grouped = new Map<string, typeof profile.traceCourses>();

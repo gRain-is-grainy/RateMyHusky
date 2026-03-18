@@ -156,6 +156,78 @@ export interface CatalogResponse {
   totalPages: number;
 }
 
+export interface CatalogCourse {
+  code: string;
+  name: string;
+  department: string;
+  avgRating: number | null;
+  totalSections: number;
+  totalInstructors: number;
+  totalEnrollment: number;
+  totalResponses: number;
+  latestTermTitle: string;
+  latestTermId: number;
+}
+
+export interface CourseCatalogResponse {
+  courses: CatalogCourse[];
+  total: number;
+  page: number;
+  totalPages: number;
+}
+
+export interface CourseSummary {
+  code: string;
+  name: string;
+  department: string;
+  avgRating: number | null;
+  totalSections: number;
+  totalInstructors: number;
+  totalEnrollment: number;
+  totalResponses: number;
+  latestTermTitle: string;
+  latestTermId: number;
+}
+
+export interface CourseInstructorBreakdown {
+  name: string;
+  slug: string;
+  imageUrl: string | null;
+  difficulty: number | null;
+  wouldTakeAgainPct: number | null;
+  totalReviews: number;
+  sections: number;
+  totalEnrollment: number;
+  totalResponses: number;
+  avgRating: number | null;
+}
+
+export interface CourseSection {
+  courseId: number;
+  instructorId: number;
+  termId: number;
+  termTitle: string;
+  section: string;
+  instructor: string;
+  enrollment: number;
+  overallRating: number | null;
+  totalResponses: number;
+  completed: number;
+}
+
+export interface CourseQuestionScore {
+  question: string;
+  avgRating: number | null;
+  totalResponses: number;
+}
+
+export interface CourseDetail {
+  summary: CourseSummary;
+  instructors: CourseInstructorBreakdown[];
+  sections: CourseSection[];
+  questionScores: CourseQuestionScore[];
+}
+
 export function fetchProfessorsCatalog(params: {
   q?: string;
   college?: string;
@@ -187,3 +259,33 @@ export const fetchDepartments = (college?: string) => {
   if (college) sp.set('college', college);
   return get<string[]>(`/api/departments?${sp.toString()}`);
 };
+
+export const fetchCourseDepartments = () => get<string[]>('/api/course-departments');
+
+export function fetchCoursesCatalog(params: {
+  q?: string;
+  dept?: string;
+  minRating?: number;
+  maxRating?: number;
+  sort?: 'alpha' | 'rating' | 'sections' | 'recent';
+  page?: number;
+  limit?: number;
+}): Promise<CourseCatalogResponse> {
+  const sp = new URLSearchParams();
+  if (params.q) sp.set('q', params.q);
+  if (params.dept) sp.set('dept', params.dept);
+  if (params.minRating) sp.set('minRating', String(params.minRating));
+  if (params.maxRating !== undefined && params.maxRating < 5) sp.set('maxRating', String(params.maxRating));
+  if (params.sort) sp.set('sort', params.sort);
+  if (params.page) sp.set('page', String(params.page));
+  if (params.limit) sp.set('limit', String(params.limit));
+  return get<CourseCatalogResponse>(`/api/courses-catalog?${sp.toString()}`);
+}
+
+export async function fetchCourseData(code: string): Promise<CourseDetail | null> {
+  try {
+    return await get<CourseDetail>(`/api/courses/${encodeURIComponent(code)}`);
+  } catch {
+    return null;
+  }
+}
