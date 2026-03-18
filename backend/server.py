@@ -1432,12 +1432,59 @@ def course_profile(code):
         "latestTermId": _safe_int(latest_row["termId"]),
     }
 
+    difficulty_lookup = {}
+    if "level_of_difficulty" in rmp_profs.columns:
+        _difficulty_series = pd.to_numeric(rmp_profs["level_of_difficulty"], errors="coerce")
+        for nk, diff in zip(rmp_profs["_name_key"], _difficulty_series):
+            key = normalize_name(nk)
+            if key and pd.notna(diff):
+                difficulty_lookup[key] = round(float(diff), 2)
+
+    instructor_meta_lookup = {}
+    _catalog_cols = ["name", "slug", "imageUrl", "_name_lower", "totalReviews", "wouldTakeAgainPct"]
+    for _, prof in catalog_df[_catalog_cols].iterrows():
+        slug = str(prof["slug"]) if pd.notna(prof["slug"]) else ""
+        image_url = str(prof["imageUrl"]) if pd.notna(prof.get("imageUrl")) else None
+        total_reviews = int(prof["totalReviews"]) if pd.notna(prof.get("totalReviews")) else 0
+        wta = float(prof["wouldTakeAgainPct"]) if pd.notna(prof.get("wouldTakeAgainPct")) else None
+        difficulty = difficulty_lookup.get(normalize_name(prof["_name_lower"]))
+        meta_payload = {
+            "slug": slug,
+            "imageUrl": image_url,
+            "totalReviews": total_reviews,
+            "wouldTakeAgainPct": round(wta, 1) if wta is not None else None,
+            "difficulty": difficulty,
+        }
+
+        key_display = normalize_name(prof["name"])
+        if key_display and key_display not in instructor_meta_lookup:
+            instructor_meta_lookup[key_display] = meta_payload
+
+        key_lower = normalize_name(prof["_name_lower"])
+        if key_lower and key_lower not in instructor_meta_lookup:
+            instructor_meta_lookup[key_lower] = meta_payload
+
     instructor_rows = []
     for name, g in course_rows.groupby("_instructor_name"):
         weighted = _safe_float(g["_weighted_sum"].fillna(0).sum())
         responses = _safe_int(g["_total_responses"].fillna(0).sum())
+        meta = instructor_meta_lookup.get(
+            normalize_name(name),
+            {
+                "slug": "",
+                "imageUrl": None,
+                "totalReviews": 0,
+                "wouldTakeAgainPct": None,
+                "difficulty": None,
+            },
+        )
         instructor_rows.append({
             "name": name,
+            "slug": meta["slug"],
+            "imageUrl": meta["imageUrl"],
+            "difficulty": meta["difficulty"],
+            "wouldTakeAgainPct": meta["wouldTakeAgainPct"],
+            "totalReviews": meta["totalReviews"],
             "sections": int(len(g)),
             "totalEnrollment": _safe_int(g["enrollment"].fillna(0).sum()),
             "totalResponses": responses,

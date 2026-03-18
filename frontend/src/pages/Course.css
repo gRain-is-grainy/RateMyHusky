@@ -163,6 +163,7 @@
 	gap: 12px;
 	align-items: flex-start;
 	transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s;
+	text-decoration: none;
 }
 
 .course-top-prof-card:hover {
@@ -199,6 +200,12 @@
 	letter-spacing: 0.4px;
 }
 
+.course-top-prof-photo {
+	object-fit: cover;
+	border: 1px solid #e2e2e2;
+	background: #f1f1f1;
+}
+
 .course-top-prof-body {
 	min-width: 0;
 	flex: 1;
@@ -230,6 +237,12 @@
 	gap: 2px;
 	font-size: 0.75rem;
 	color: #8a8a8a;
+}
+
+.course-top-prof-card.disabled {
+	cursor: default;
+	pointer-events: none;
+	opacity: 0.92;
 }
 
 .course-table-wrap {
@@ -467,6 +480,11 @@
 .dark .course-top-prof-card {
 	background: #232323;
 	border-color: #333;
+}
+
+.dark .course-top-prof-photo {
+	border-color: #3d3d3d;
+	background: #2a2a2a;
 }
 
 .dark .course-top-prof-rank {

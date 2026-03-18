@@ -191,6 +191,11 @@ export interface CourseSummary {
 
 export interface CourseInstructorBreakdown {
   name: string;
+  slug: string;
+  imageUrl: string | null;
+  difficulty: number | null;
+  wouldTakeAgainPct: number | null;
+  totalReviews: number;
   sections: number;
   totalEnrollment: number;
   totalResponses: number;

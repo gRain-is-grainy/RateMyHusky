@@ -65,7 +65,7 @@ const Course = () => {
 				if (b.totalResponses !== a.totalResponses) return b.totalResponses - a.totalResponses;
 				return b.sections - a.sections;
 			})
-			.slice(0, 5);
+			.slice(0, 10);
 	}, [course]);
 
 	if (loading) {
@@ -133,15 +133,31 @@ const Course = () => {
 				{topInstructors.length > 0 && (
 					<section className="course-panel">
 						<div className="course-panel-header">
-							<h2>Top Professors Who Teach This Class</h2>
+							<h2>Top 10 Professors Who Teach This Class</h2>
 						</div>
 						<div className="course-top-prof-grid">
 							{topInstructors.map((prof, index) => (
-								<article className="course-top-prof-card" key={prof.name}>
+								<Link
+									to={prof.slug ? `/professors/${prof.slug}` : '#'}
+									className={`course-top-prof-card${prof.slug ? '' : ' disabled'}`}
+									key={`${prof.name}-${index}`}
+									aria-label={prof.slug ? `View ${prof.name}` : `${prof.name} profile unavailable`}
+									onClick={(e) => {
+										if (!prof.slug) e.preventDefault();
+									}}
+								>
 									<div className="course-top-prof-rank">#{index + 1}</div>
-									<div className="course-top-prof-avatar" aria-hidden="true">
-										{getInitials(prof.name)}
-									</div>
+									{prof.imageUrl ? (
+										<img
+											className="course-top-prof-avatar course-top-prof-photo"
+											src={prof.imageUrl}
+											alt={prof.name}
+										/>
+									) : (
+										<div className="course-top-prof-avatar" aria-hidden="true">
+											{getInitials(prof.name)}
+										</div>
+									)}
 									<div className="course-top-prof-body">
 										<h3 className="course-top-prof-name">{prof.name}</h3>
 										<div className="course-top-prof-rating">
@@ -155,12 +171,16 @@ const Course = () => {
 											)}
 										</div>
 										<div className="course-top-prof-meta">
-											<span>{prof.sections} section{prof.sections !== 1 ? 's' : ''}</span>
-											<span>{prof.totalResponses} responses</span>
-											<span>{prof.totalEnrollment.toLocaleString()} enrolled</span>
+											<span>
+												Difficulty: {prof.difficulty != null ? `${prof.difficulty.toFixed(2)}/5` : 'N/A'}
+											</span>
+											<span>
+												Would Take Again: {prof.wouldTakeAgainPct != null ? `${prof.wouldTakeAgainPct.toFixed(1)}%` : 'N/A'}
+											</span>
+											<span>Total Reviews: {prof.totalReviews.toLocaleString()}</span>
 										</div>
 									</div>
-								</article>
+								</Link>
 							))}
 						</div>
 					</section>
