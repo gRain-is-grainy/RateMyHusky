@@ -609,9 +609,9 @@ export default function ProfessorCatalog() {
                   className="prof-list-item"
                   role="button"
                   tabIndex={0}
-                  onClick={() => navigate(`/professors/${prof.slug}`)}
+                  onClick={() => navigate(`/professors/${prof.slug}`, { state: { fromCatalog: `/professors?${searchParams.toString()}` } })}
                   onKeyDown={e =>
-                    e.key === 'Enter' && navigate(`/professors/${prof.slug}`)
+                    e.key === 'Enter' && navigate(`/professors/${prof.slug}`, { state: { fromCatalog: `/professors?${searchParams.toString()}` } })
                   }
                 >
                   <div className="prof-list-avatar">
@@ -653,9 +653,9 @@ export default function ProfessorCatalog() {
                   className="prof-card"
                   role="button"
                   tabIndex={0}
-                  onClick={() => navigate(`/professors/${prof.slug}`)}
+                  onClick={() => navigate(`/professors/${prof.slug}`, { state: { fromCatalog: `/professors?${searchParams.toString()}` } })}
                   onKeyDown={e =>
-                    e.key === 'Enter' && navigate(`/professors/${prof.slug}`)
+                    e.key === 'Enter' && navigate(`/professors/${prof.slug}`, { state: { fromCatalog: `/professors?${searchParams.toString()}` } })
                   }
                 >
                   <div className="prof-avatar">

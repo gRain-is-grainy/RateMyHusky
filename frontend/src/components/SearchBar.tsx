@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import Dropdown from './Dropdown';
 import { fetchSearchSuggestions } from '../api/api';
 import type { SearchSuggestion } from '../api/api';
@@ -12,6 +12,7 @@ const searchOptions = [
 
 const SearchBar = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchType, setSearchType] = useState('Professor');
   const [query, setQuery] = useState('');
   const [suggestions, setSuggestions] = useState<SearchSuggestion[]>([]);
@@ -137,9 +138,12 @@ const SearchBar = () => {
 
   const handleSelect = (suggestion: SearchSuggestion) => {
     setShowSuggestions(false);
+    const fromCatalog = location.pathname === '/professors'
+      ? `${location.pathname}${location.search}`
+      : undefined;
     if (suggestion.type === 'professor') {
       const slug = suggestion.slug;
-      navigate(`/professors/${slug}`);
+      navigate(`/professors/${slug}`, { state: { fromCatalog } });
     } else {
       const code = suggestion.code.toLowerCase();
       navigate(`/courses/${code}`);

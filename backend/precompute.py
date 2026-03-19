@@ -37,6 +37,10 @@ def upgrade_image_url(url):
 ALIAS_MAP = {
     "laney strange": "elena strange",
     "ben tasker": "benjamin tasker",
+    "alberto de la torre": "alberto de la torre duran",
+    "justin wang": "hsiao-an wang",
+    "sakib miazi": "md nazmus sakib miazi",
+    "nazmus miazi": "md nazmus sakib miazi",
 }
 
 COLLEGE_MAP = {
