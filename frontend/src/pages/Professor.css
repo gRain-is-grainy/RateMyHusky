@@ -240,7 +240,8 @@
 .prof-course-terms { font-size: 0.82rem; color: #999; font-weight: 600; white-space: nowrap; flex-shrink: 0; }
 .prof-course-term-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
 .prof-course-term-tag { font-size: 0.72rem; font-weight: 700; color: #d6394c; background: #fef0f0; padding: 2px 8px; border-radius: 8px; }
-.prof-course-term-more { color: #999; background: #f0f0f0; font-style: italic; }
+.prof-course-term-more { color: #999; background: #f0f0f0; font-style: italic; cursor: pointer; transition: background 0.15s, color 0.15s; }
+.prof-course-term-more:hover { background: #e4e4e4; color: #d6394c; }
 
 .prof-courses-extra {
   display: grid;
@@ -810,6 +811,7 @@
 .dark .prof-course-terms { color: #777; }
 .dark .prof-course-term-tag { color: #e06070; background: #3a2020; }
 .dark .prof-course-term-more { color: #777; background: #333; }
+.dark .prof-course-term-more:hover { background: #3a3a3a; color: #e06070; }
 .dark .prof-courses-toggle { border-top-color: #333; color: #e06070; }
 .dark .prof-courses-toggle:hover { background: #2d2020; }
 .dark .trace-comment-term { color: #e06070; background: #3a2020; }

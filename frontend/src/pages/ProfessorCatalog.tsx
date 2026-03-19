@@ -803,6 +803,7 @@ function DepartmentFilter({
   selected: string;
   onSelect: (dept: string) => void;
 }) {
+  const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   const filtered = departments.filter(d =>
     d.toLowerCase().includes(search.toLowerCase())
@@ -810,38 +811,58 @@ function DepartmentFilter({
 
   return (
     <div className="dept-filter">
-      <input
-        className="dept-search"
-        type="text"
-        placeholder="Search departments…"
-        value={search}
-        onChange={e => setSearch(e.target.value)}
-      />
-      <div className="dept-list">
-        <label className="dept-option">
+      <button
+        className={`dept-toggle ${open ? 'open' : ''}`}
+        onClick={() => setOpen(o => !o)}
+        aria-expanded={open}
+      >
+        <span className="dept-toggle-label">
+          {selected || 'All departments'}
+        </span>
+        <span className="dept-toggle-icon">
+          <span className="dept-bar" />
+          <span className="dept-bar" />
+          <span className="dept-bar" />
+        </span>
+      </button>
+
+      {open && (
+        <div className="dept-dropdown">
           <input
-            type="radio"
-            name="dept"
-            checked={!selected}
-            onChange={() => onSelect('')}
+            className="dept-search"
+            type="text"
+            placeholder="Search departments…"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            autoFocus
           />
-          <span>All departments</span>
-        </label>
-        {filtered.map(d => (
-          <label key={d} className="dept-option">
-            <input
-              type="radio"
-              name="dept"
-              checked={selected === d}
-              onChange={() => onSelect(d)}
-            />
-            <span>{d}</span>
-          </label>
-        ))}
-        {filtered.length === 0 && (
-          <p className="dept-empty">No departments found</p>
-        )}
-      </div>
+          <div className="dept-list">
+            <label className="dept-option">
+              <input
+                type="radio"
+                name="dept"
+                checked={!selected}
+                onChange={() => { onSelect(''); setOpen(false); }}
+              />
+              <span>All departments</span>
+            </label>
+            {filtered.map(d => (
+              <label key={d} className="dept-option">
+                <input
+                  type="radio"
+                  name="dept"
+                  checked={selected === d}
+                  onChange={() => { onSelect(d); setOpen(false); }}
+                />
+                <span>{d}</span>
+              </label>
+            ))}
+            {filtered.length === 0 && (
+              <p className="dept-empty">No departments found</p>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

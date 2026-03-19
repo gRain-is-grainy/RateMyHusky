@@ -178,6 +178,7 @@ const Professor = () => {
   const [expandedQuestions, setExpandedQuestions] = useState<Record<string, boolean>>({});
   const [visibleCommentsPerQuestion, setVisibleCommentsPerQuestion] = useState<Record<string, number>>({});
   const [showAllCourses, setShowAllCourses] = useState(false);
+  const [expandedTerms, setExpandedTerms] = useState<Set<string>>(new Set());
   const COURSES_COLLAPSED_LIMIT = 5;
   const MAX_VISIBLE_TERMS = 3;
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
@@ -781,8 +782,9 @@ const Professor = () => {
                   const seasonB = b.split(' ')[0];
                   return (order[seasonB] || 0) - (order[seasonA] || 0);
                 });
-                const visibleTerms = terms.slice(0, MAX_VISIBLE_TERMS);
-                const hiddenTermCount = terms.length - visibleTerms.length;
+                const termsExpanded = expandedTerms.has(code);
+                const visibleTerms = termsExpanded ? terms : terms.slice(0, MAX_VISIBLE_TERMS);
+                const hiddenTermCount = terms.length - MAX_VISIBLE_TERMS;
                 const isSelected = selectedCourses.has(code);
                 return (
                   <div
@@ -801,7 +803,12 @@ const Professor = () => {
                       <div className="prof-course-term-tags">
                         {visibleTerms.map(t => <span key={t} className="prof-course-term-tag">{t}</span>)}
                         {hiddenTermCount > 0 && (
-                          <span className="prof-course-term-tag prof-course-term-more">+{hiddenTermCount} more</span>
+                          <span
+                            className="prof-course-term-tag prof-course-term-more"
+                            onClick={(e) => { e.stopPropagation(); setExpandedTerms(prev => { const next = new Set(prev); if (next.has(code)) next.delete(code); else next.add(code); return next; }); }}
+                          >
+                            {termsExpanded ? 'Show less' : `+${hiddenTermCount} more`}
+                          </span>
                         )}
                       </div>
                     )}
@@ -823,8 +830,9 @@ const Professor = () => {
                         const seasonB = b.split(' ')[0];
                         return (order[seasonB] || 0) - (order[seasonA] || 0);
                       });
-                      const visibleTerms = terms.slice(0, MAX_VISIBLE_TERMS);
-                      const hiddenTermCount = terms.length - visibleTerms.length;
+                      const termsExpanded = expandedTerms.has(code);
+                      const visibleTerms = termsExpanded ? terms : terms.slice(0, MAX_VISIBLE_TERMS);
+                      const hiddenTermCount = terms.length - MAX_VISIBLE_TERMS;
                       const isSelected = selectedCourses.has(code);
                       return (
                         <div
@@ -843,7 +851,12 @@ const Professor = () => {
                             <div className="prof-course-term-tags">
                               {visibleTerms.map(t => <span key={t} className="prof-course-term-tag">{t}</span>)}
                               {hiddenTermCount > 0 && (
-                                <span className="prof-course-term-tag prof-course-term-more">+{hiddenTermCount} more</span>
+                                <span
+                                  className="prof-course-term-tag prof-course-term-more"
+                                  onClick={(e) => { e.stopPropagation(); setExpandedTerms(prev => { const next = new Set(prev); if (next.has(code)) next.delete(code); else next.add(code); return next; }); }}
+                                >
+                                  {termsExpanded ? 'Show less' : `+${hiddenTermCount} more`}
+                                </span>
                               )}
                             </div>
                           )}
