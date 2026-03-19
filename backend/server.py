@@ -235,7 +235,7 @@ NO_MIN_COLLEGES = {"Law", "Professional Studies"}
 def goat_professors():
     college = request.args.get("college", "Khoury")
     limit = min(int(request.args.get("limit", "10")), 50)
-    min_reviews = int(request.args.get("min_reviews", "10"))
+    min_reviews = int(request.args.get("min_reviews", "100"))
 
     if college in NO_MIN_COLLEGES:
         rows = query("""
@@ -247,10 +247,10 @@ def goat_professors():
     else:
         rows = query("""
             SELECT * FROM professors_catalog
-            WHERE college = %s AND num_ratings >= %s AND trace_reviews >= %s AND trace_rating IS NOT NULL
+            WHERE college = %s AND total_reviews >= %s AND trace_rating IS NOT NULL
             ORDER BY avg_rating DESC NULLS LAST, total_reviews DESC
             LIMIT %s
-        """, (college, min_reviews, min_reviews, limit))
+        """, (college, min_reviews, limit))
 
     result = []
     for row in rows:
@@ -377,6 +377,7 @@ def professor_profile(slug):
     if cached:
         resp = jsonify(cached)
         resp.headers["Cache-Control"] = "private, max-age=300" if is_authed else "public, max-age=300"
+        resp.headers["Vary"] = "Authorization"
         return resp
 
     # Look up professor from catalog
@@ -507,21 +508,21 @@ def professor_profile(slug):
         })
     profile["reviews"] = reviews
 
-    # ── TRACE comments (auth required) ──
-    if is_authed and trace_course_rows:
-        url_patterns = set()
+    # ── TRACE comments ──
+    # Always fetch question + counts; only include comment text when authed
+    if trace_course_rows:
+        keys = set()
         for c in trace_course_rows:
-            cid = str(int(c["course_id"]))
-            iid = str(int(c["instructor_id"]))
-            tid = str(int(c["term_id"])) if c["term_id"] else ""
-            url_patterns.add(f"sp={cid}&sp={iid}&sp={tid}")
+            cid = int(c["course_id"])
+            iid = int(c["instructor_id"])
+            tid = int(c["term_id"]) if c["term_id"] else 0
+            keys.add((cid, iid, tid))
 
-        # Build OR conditions for URL matching
         or_conditions = []
         or_params = []
-        for pat in url_patterns:
-            or_conditions.append("course_url LIKE %s")
-            or_params.append(f"%{pat}%")
+        for cid, iid, tid in keys:
+            or_conditions.append("(tc_course_id = %s AND tc_instructor_id = %s AND tc_term_id = %s)")
+            or_params.extend([cid, iid, tid])
 
         if or_conditions:
             comment_rows = query(
@@ -547,7 +548,7 @@ def professor_profile(slug):
                 comments.append({
                     "courseUrl": url,
                     "question": str(c["question"] or ""),
-                    "comment": comment_text,
+                    "comment": comment_text if is_authed else "",
                     "termId": term_id,
                 })
             profile["traceComments"] = comments
@@ -558,7 +559,8 @@ def professor_profile(slug):
 
     cache_set(cache_key, profile)
     resp = jsonify(profile)
-    resp.headers["Cache-Control"] = "public, max-age=300"
+    resp.headers["Cache-Control"] = "private, max-age=300" if is_authed else "public, max-age=300"
+    resp.headers["Vary"] = "Authorization"
     return resp
 
 
@@ -1119,23 +1121,26 @@ def auth_google_callback():
     if not code:
         return redirect(f"{FRONTEND_URL}?auth_error=no_code")
 
-    token_resp = http_requests.post(GOOGLE_TOKEN_URL, data={
-        "code": code,
-        "client_id": GOOGLE_CLIENT_ID,
-        "client_secret": GOOGLE_CLIENT_SECRET,
-        "redirect_uri": _get_redirect_uri(),
-        "grant_type": "authorization_code",
-    })
-    if token_resp.status_code != 200:
-        return redirect(f"{FRONTEND_URL}?auth_error=token_exchange_failed")
+    try:
+        token_resp = http_requests.post(GOOGLE_TOKEN_URL, data={
+            "code": code,
+            "client_id": GOOGLE_CLIENT_ID,
+            "client_secret": GOOGLE_CLIENT_SECRET,
+            "redirect_uri": _get_redirect_uri(),
+            "grant_type": "authorization_code",
+        }, timeout=10)
+        if token_resp.status_code != 200:
+            return redirect(f"{FRONTEND_URL}?auth_error=token_exchange_failed")
 
-    access_token = token_resp.json().get("access_token")
+        access_token = token_resp.json().get("access_token")
 
-    user_resp = http_requests.get(GOOGLE_USERINFO_URL, headers={
-        "Authorization": f"Bearer {access_token}",
-    })
-    if user_resp.status_code != 200:
-        return redirect(f"{FRONTEND_URL}?auth_error=userinfo_failed")
+        user_resp = http_requests.get(GOOGLE_USERINFO_URL, headers={
+            "Authorization": f"Bearer {access_token}",
+        }, timeout=10)
+        if user_resp.status_code != 200:
+            return redirect(f"{FRONTEND_URL}?auth_error=userinfo_failed")
+    except Exception:
+        return redirect(f"{FRONTEND_URL}?auth_error=timeout")
 
     user_info = user_resp.json()
 

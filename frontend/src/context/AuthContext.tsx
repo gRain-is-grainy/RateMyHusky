@@ -72,9 +72,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const token = hash.split('auth_token=')[1]?.split('&')[0];
       if (token) {
         storeToken(token);
-        // Clean up URL
         window.history.replaceState(null, '', window.location.pathname + window.location.search);
       }
+    }
+    // Handle auth errors from backend redirect
+    const params = new URLSearchParams(window.location.search);
+    const authError = params.get('auth_error');
+    if (authError) {
+      params.delete('auth_error');
+      const cleaned = params.toString();
+      window.history.replaceState(null, '', window.location.pathname + (cleaned ? `?${cleaned}` : ''));
     }
   }, []);
 

@@ -341,7 +341,6 @@ export default function ProfessorCatalog() {
           <line x1="4" y1="18" x2="20" y2="18" />
         </svg>
         Filters
-        {hasActiveFilters && <span className="filter-active-dot" />}
       </button>
 
       {sidebarOpen && (

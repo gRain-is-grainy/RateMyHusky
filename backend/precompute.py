@@ -49,6 +49,7 @@ COLLEGE_MAP = {
     "Computer amp Informational Tech.": "Khoury", "Computer  Informational Tech.": "Khoury",
     "Computer Engineering": "Khoury", "Cybersecurity": "Khoury",
     "Data Science": "Khoury", "Computer Information Systm": "Khoury",
+    "Grad Engineering - Multidiscpl": "Engineering",
     "Engineering": "Engineering", "Electrical Engineering": "Engineering",
     "Mechanical Engineering": "Engineering", "Civil Engineering": "Engineering",
     "Chemical Engineering": "Engineering", "Industrial Engineering": "Engineering",
@@ -302,6 +303,7 @@ def main():
         has_rmp = int(row["num_ratings"]) > 0 and float(row["rating"]) > 0
         has_trace = pd.notna(row["trace_overall"]) and int(row["trace_reviews"]) > 0
         dept = str(row["trace_dept"]) if pd.notna(row["trace_dept"]) else str(row["department"])
+        college = get_college(dept)
 
         wta = None
         wta_raw = str(row.get("would_take_again_pct", "")).strip().replace("%", "")
@@ -329,7 +331,7 @@ def main():
         seen_slugs.add(slug)
 
         catalog_rows.append((
-            slug, display_name, row["_name_key"], dept, row["college"],
+            slug, display_name, row["_name_key"], dept, college,
             float(row["avg_rating"]) if pd.notna(row["avg_rating"]) else None,
             round(float(row["rating"]), 2) if has_rmp else None,
             round(float(row["trace_overall"]), 2) if has_trace else None,
@@ -468,6 +470,8 @@ def main():
         conn.rollback()
         cur = conn.cursor()
 
+    cur.execute("SET experimental_enable_temp_tables = 'on'")
+
     unique_instructors = tc[["instructor_first_name", "instructor_last_name", "name_key"]].drop_duplicates()
     mapping_rows = [
         (r["instructor_first_name"], r["instructor_last_name"], r["name_key"])
@@ -505,6 +509,8 @@ def main():
     except Exception:
         conn.rollback()
         cur = conn.cursor()
+
+    cur.execute("SET experimental_enable_temp_tables = 'on'")
 
     unique_rev_names = rmp_reviews["professor_name"].dropna().unique()
     rev_mapping_rows = []
@@ -544,7 +550,7 @@ def main():
         conn.rollback()
         cur = conn.cursor()
 
-    BATCH_SIZE = 50000
+    BATCH_SIZE = 10000
     print("  Updating total_responses (batched)...")
     while True:
         cur.execute("""
@@ -584,6 +590,62 @@ def main():
 
     try:
         cur.execute("CREATE INDEX idx_ts_ids ON trace_scores (course_id, instructor_id, term_id)")
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        cur = conn.cursor()
+    print("  Done")
+
+    # 7. Add parsed course_id, instructor_id, term_id columns to trace_comments
+    print("Adding parsed ID columns to trace_comments...")
+    conn.close()
+    conn = psycopg2.connect(CRDB_URL, sslmode="require")
+    cur = conn.cursor()
+    for col in ["tc_course_id", "tc_instructor_id", "tc_term_id"]:
+        try:
+            cur.execute(f"ALTER TABLE trace_comments ADD COLUMN {col} INT")
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            cur = conn.cursor()
+
+    # Parse URLs from the CSV we already loaded, build a url→ids mapping
+    url_map = {}
+    for url in tcomments["course_url"].dropna().unique():
+        sp_matches = re.findall(r"sp=(\d+)", str(url))
+        if len(sp_matches) >= 3:
+            url_map[str(url)] = (int(sp_matches[0]), int(sp_matches[1]), int(sp_matches[2]))
+
+    # Create helper table with url→ids mapping
+    cur.execute("SET experimental_enable_temp_tables = 'on'")
+    cur.execute("CREATE TEMP TABLE _url_ids (course_url TEXT, cid INT, iid INT, tid INT)")
+    mapping_rows = [(url, cid, iid, tid) for url, (cid, iid, tid) in url_map.items()]
+    chunk_insert(cur, "INSERT INTO _url_ids (course_url, cid, iid, tid) VALUES %s", mapping_rows)
+    print(f"  Parsed {len(mapping_rows)} unique URLs")
+
+    # Batch join-update
+    while True:
+        cur.execute("""
+            UPDATE trace_comments tc SET
+                tc_course_id = m.cid,
+                tc_instructor_id = m.iid,
+                tc_term_id = m.tid
+            FROM _url_ids m
+            WHERE tc.course_url = m.course_url
+              AND tc.tc_course_id IS NULL
+            LIMIT %s
+        """, (BATCH_SIZE,))
+        updated = cur.rowcount
+        conn.commit()
+        if updated == 0:
+            break
+        print(f"    updated {updated} rows...")
+
+    cur.execute("DROP TABLE _url_ids")
+    conn.commit()
+
+    try:
+        cur.execute("CREATE INDEX idx_tc_comment_ids ON trace_comments (tc_course_id, tc_instructor_id, tc_term_id)")
         conn.commit()
     except Exception:
         conn.rollback()
