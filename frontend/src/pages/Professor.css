@@ -242,6 +242,19 @@
 .prof-course-term-tag { font-size: 0.72rem; font-weight: 700; color: #d6394c; background: #fef0f0; padding: 2px 8px; border-radius: 8px; }
 .prof-course-term-more { color: #999; background: #f0f0f0; font-style: italic; }
 
+.prof-courses-extra {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.prof-courses-extra.open {
+  grid-template-rows: 1fr;
+}
+.prof-courses-extra > div {
+  min-height: 0;
+  overflow: hidden;
+}
+
 .prof-courses-toggle {
   display: flex;
   align-items: center;

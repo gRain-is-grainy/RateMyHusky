@@ -425,8 +425,13 @@ def professor_profile(slug):
             score_params.extend([cid, iid, tid])
 
         all_scores = query(
-            f"SELECT course_id, instructor_id, term_id, question, mean, median, std_dev, "
-            f"enrollment, completed, total_responses, count_1, count_2, count_3, count_4, count_5 "
+            f"SELECT course_id, instructor_id, term_id, question, median, std_dev, "
+            f"enrollment, completed, count_1, count_2, count_3, count_4, count_5, "
+            f"COALESCE(count_1,0)+COALESCE(count_2,0)+COALESCE(count_3,0)+COALESCE(count_4,0)+COALESCE(count_5,0) AS total_responses, "
+            f"CASE WHEN COALESCE(count_1,0)+COALESCE(count_2,0)+COALESCE(count_3,0)+COALESCE(count_4,0)+COALESCE(count_5,0) > 0 "
+            f"THEN (1.0*COALESCE(count_1,0)+2.0*COALESCE(count_2,0)+3.0*COALESCE(count_3,0)+4.0*COALESCE(count_4,0)+5.0*COALESCE(count_5,0)) "
+            f"/ (COALESCE(count_1,0)+COALESCE(count_2,0)+COALESCE(count_3,0)+COALESCE(count_4,0)+COALESCE(count_5,0)) "
+            f"ELSE mean END AS mean "
             f"FROM trace_scores WHERE {' OR '.join(or_clauses)}",
             score_params
         )

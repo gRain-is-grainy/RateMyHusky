@@ -453,6 +453,7 @@ def main():
     conn.close()
     conn = psycopg2.connect(CRDB_URL, sslmode="require")
     cur = conn.cursor()
+    cur.execute("SET experimental_enable_temp_tables = 'on'")
 
     # 4. Add name_key to trace_courses (batch via temp table)
     print("Adding name_key to trace_courses...")
@@ -492,6 +493,7 @@ def main():
     conn.close()
     conn = psycopg2.connect(CRDB_URL, sslmode="require")
     cur = conn.cursor()
+    cur.execute("SET experimental_enable_temp_tables = 'on'")
 
     try:
         cur.execute("ALTER TABLE rmp_reviews ADD COLUMN name_key TEXT")
@@ -538,24 +540,43 @@ def main():
         conn.rollback()
         cur = conn.cursor()
 
-    print("  Updating total_responses (single batch)...")
-    cur.execute("""
-        UPDATE trace_scores SET
-            total_responses = COALESCE(count_1,0) + COALESCE(count_2,0) + COALESCE(count_3,0) + COALESCE(count_4,0) + COALESCE(count_5,0)
-    """)
-    conn.commit()
+    BATCH_SIZE = 50000
+    print("  Updating total_responses (batched)...")
+    while True:
+        cur.execute("""
+            UPDATE trace_scores SET
+                total_responses = COALESCE(count_1,0) + COALESCE(count_2,0) + COALESCE(count_3,0) + COALESCE(count_4,0) + COALESCE(count_5,0)
+            WHERE total_responses IS NULL
+            LIMIT %s
+        """, (BATCH_SIZE,))
+        updated = cur.rowcount
+        conn.commit()
+        if updated == 0:
+            break
+        print(f"    updated {updated} rows...")
 
-    print("  Updating mean (single batch)...")
+    print("  Updating mean (batched)...")
     cur.execute("""
         UPDATE trace_scores SET
-            mean = CASE
-                WHEN COALESCE(count_1,0) + COALESCE(count_2,0) + COALESCE(count_3,0) + COALESCE(count_4,0) + COALESCE(count_5,0) > 0
-                THEN (1.0*COALESCE(count_1,0) + 2.0*COALESCE(count_2,0) + 3.0*COALESCE(count_3,0) + 4.0*COALESCE(count_4,0) + 5.0*COALESCE(count_5,0))
-                     / (COALESCE(count_1,0) + COALESCE(count_2,0) + COALESCE(count_3,0) + COALESCE(count_4,0) + COALESCE(count_5,0))
-                ELSE NULL
-            END
+            mean = NULL
+        WHERE COALESCE(count_1,0) + COALESCE(count_2,0) + COALESCE(count_3,0) + COALESCE(count_4,0) + COALESCE(count_5,0) = 0
+          AND mean IS NOT NULL
     """)
     conn.commit()
+    while True:
+        cur.execute("""
+            UPDATE trace_scores SET
+                mean = (1.0*COALESCE(count_1,0) + 2.0*COALESCE(count_2,0) + 3.0*COALESCE(count_3,0) + 4.0*COALESCE(count_4,0) + 5.0*COALESCE(count_5,0))
+                     / (COALESCE(count_1,0) + COALESCE(count_2,0) + COALESCE(count_3,0) + COALESCE(count_4,0) + COALESCE(count_5,0))
+            WHERE total_responses > 0
+              AND mean IS NULL
+            LIMIT %s
+        """, (BATCH_SIZE,))
+        updated = cur.rowcount
+        conn.commit()
+        if updated == 0:
+            break
+        print(f"    updated {updated} rows...")
 
     try:
         cur.execute("CREATE INDEX idx_ts_ids ON trace_scores (course_id, instructor_id, term_id)")

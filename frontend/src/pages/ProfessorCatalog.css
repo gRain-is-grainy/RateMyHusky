@@ -137,8 +137,6 @@
 }
 
 .dept-list {
-  max-height: 190px;
-  overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 2px;

@@ -555,7 +555,9 @@ const Professor = () => {
     setVisibleCommentsPerQuestion(p => ({ ...p, [q]: (p[q] || 5) + 10 }));
   };
 
-  useEffect(() => { setVisibleReviews(10); }, [sortBy, reviewTab, selectedCourses.size]);
+  useEffect(() => { setVisibleReviews(10); }, [sortBy, reviewTab]);
+  // Reset visible reviews when course filter changes, but only if the filtered list got smaller
+  useEffect(() => { setVisibleReviews(v => Math.min(v, Math.max(10, filteredRmpReviews.length))); }, [selectedCourses.size, filteredRmpReviews.length]);
 
   useEffect(() => {
     if (!isImageModalOpen) return;
@@ -767,7 +769,7 @@ const Professor = () => {
               </div>
             </div>
             <div className="prof-courses-compact">
-              {(showAllCourses ? sorted : sorted.slice(0, COURSES_COLLAPSED_LIMIT)).map(([code, sections]) => {
+              {sorted.slice(0, COURSES_COLLAPSED_LIMIT).map(([code, sections]) => {
                 const nameMatch = sections[0]?.displayName.match(/\((.+?)\)/);
                 const courseName = nameMatch ? nameMatch[1] : '';
                 const terms = [...new Set(sections.map(s => cleanTerm(s.termTitle)))].filter(t => /\b20\d{2}\b/.test(t)).sort((a, b) => {
@@ -807,18 +809,61 @@ const Professor = () => {
                 );
               })}
               {sorted.length > COURSES_COLLAPSED_LIMIT && (
-                <button
-                  className="prof-courses-toggle"
-                  onClick={() => setShowAllCourses(v => !v)}
-                >
-                  {showAllCourses ? 'Show fewer courses' : `Show all ${sorted.length} courses`}
-                  <svg
-                    className={`prof-courses-toggle-icon ${showAllCourses ? 'expanded' : ''}`}
-                    width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+                <>
+                  <div className={`prof-courses-extra ${showAllCourses ? 'open' : ''}`}>
+                    <div>{sorted.slice(COURSES_COLLAPSED_LIMIT).map(([code, sections]) => {
+                      const nameMatch = sections[0]?.displayName.match(/\((.+?)\)/);
+                      const courseName = nameMatch ? nameMatch[1] : '';
+                      const terms = [...new Set(sections.map(s => cleanTerm(s.termTitle)))].filter(t => /\b20\d{2}\b/.test(t)).sort((a, b) => {
+                        const yA = parseInt(a.match(/\d{4}/)?.[0] || '0');
+                        const yB = parseInt(b.match(/\d{4}/)?.[0] || '0');
+                        if (yA !== yB) return yB - yA;
+                        const order: Record<string, number> = { Spring: 1, Summer: 2, Fall: 3, Winter: 4 };
+                        const seasonA = a.split(' ')[0];
+                        const seasonB = b.split(' ')[0];
+                        return (order[seasonB] || 0) - (order[seasonA] || 0);
+                      });
+                      const visibleTerms = terms.slice(0, MAX_VISIBLE_TERMS);
+                      const hiddenTermCount = terms.length - visibleTerms.length;
+                      const isSelected = selectedCourses.has(code);
+                      return (
+                        <div
+                          key={code}
+                          className={`prof-course-row ${isSelected ? 'selected' : ''}`}
+                          onClick={() => toggleCourse(code)}
+                        >
+                          <div className="prof-course-row-main">
+                            <span className="prof-course-code">{code}</span>
+                            <span className="prof-course-title">{courseName || 'Course data from reviews'}</span>
+                            <span className="prof-course-terms">
+                              {sections.length > 0 ? `${sections.length} section${sections.length > 1 ? 's' : ''}` : 'RMP reviews only'}
+                            </span>
+                          </div>
+                          {terms.length > 0 && (
+                            <div className="prof-course-term-tags">
+                              {visibleTerms.map(t => <span key={t} className="prof-course-term-tag">{t}</span>)}
+                              {hiddenTermCount > 0 && (
+                                <span className="prof-course-term-tag prof-course-term-more">+{hiddenTermCount} more</span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}</div>
+                  </div>
+                  <button
+                    className="prof-courses-toggle"
+                    onClick={() => setShowAllCourses(v => !v)}
                   >
-                    <polyline points="6 9 12 15 18 9" />
-                  </svg>
-                </button>
+                    {showAllCourses ? 'Show fewer' : `+${sorted.length - COURSES_COLLAPSED_LIMIT} more courses`}
+                    <svg
+                      className={`prof-courses-toggle-icon ${showAllCourses ? 'expanded' : ''}`}
+                      width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+                    >
+                      <polyline points="6 9 12 15 18 9" />
+                    </svg>
+                  </button>
+                </>
               )}
             </div>
           </section>
