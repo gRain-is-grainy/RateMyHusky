@@ -706,29 +706,33 @@ function Compare() {
 					{bothSelected && !bothReady && <p>Loading comparison...</p>}
 				</header>
 
-				{bothReady && <div className="compare-table" role="table" aria-label="Professor metrics comparison table">
-					{compareRows.map((row) => (
-						<div className="compare-row" role="row" key={row.label}>
-							<div
-								className={`compare-cell compare-cell-left ${row.leftClass ?? ''} ${row.winner === 'left' ? 'compare-cell-winner' : ''}`}
-								role="cell"
-							>
-								<span>{row.left}</span>
-								{row.footnoteLeft && <small>{row.footnoteLeft}</small>}
+				<div className="compare-table" role="table" aria-label="Professor metrics comparison table">
+					{compareRows.map((row) => {
+						const showLeft = Boolean(leftSlug) && !leftLoading;
+						const showRight = Boolean(rightSlug) && !rightLoading;
+						return (
+							<div className="compare-row" role="row" key={row.label}>
+								<div
+									className={`compare-cell compare-cell-left ${showLeft ? (row.leftClass ?? '') : ''} ${showLeft && row.winner === 'left' ? 'compare-cell-winner' : ''}`}
+									role="cell"
+								>
+									<span>{showLeft ? row.left : '—'}</span>
+									{showLeft && row.footnoteLeft && <small>{row.footnoteLeft}</small>}
+								</div>
+								<div className="compare-cell compare-cell-label" role="columnheader">
+									{row.label}
+								</div>
+								<div
+									className={`compare-cell compare-cell-right ${showRight ? (row.rightClass ?? '') : ''} ${showRight && row.winner === 'right' ? 'compare-cell-winner' : ''}`}
+									role="cell"
+								>
+									<span>{showRight ? row.right : '—'}</span>
+									{showRight && row.footnoteRight && <small>{row.footnoteRight}</small>}
+								</div>
 							</div>
-							<div className="compare-cell compare-cell-label" role="columnheader">
-								{row.label}
-							</div>
-							<div
-								className={`compare-cell compare-cell-right ${row.rightClass ?? ''} ${row.winner === 'right' ? 'compare-cell-winner' : ''}`}
-								role="cell"
-							>
-								<span>{row.right}</span>
-								{row.footnoteRight && <small>{row.footnoteRight}</small>}
-							</div>
-						</div>
-					))}
-				</div>}
+						);
+					})}
+				</div>
 			</section>
 
 			</main>

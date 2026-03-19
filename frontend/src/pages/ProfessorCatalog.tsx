@@ -802,7 +802,17 @@ function CollegeFilter({
   onSelect: (college: string) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
   const selectedSet = useMemo(() => new Set(selected ? selected.split(',') : []), [selected]);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
 
   const toggleCollege = (c: string) => {
     const next = new Set(selectedSet);
@@ -818,7 +828,7 @@ function CollegeFilter({
       : `${selectedSet.size} colleges`;
 
   return (
-    <div className="dept-filter">
+    <div className="dept-filter" ref={ref}>
       <button
         className={`dept-toggle ${open ? 'open' : ''}`}
         onClick={() => setOpen(o => !o)}
@@ -867,10 +877,20 @@ function DepartmentFilter({
 }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
+  const ref = useRef<HTMLDivElement>(null);
   const filtered = departments.filter(d =>
     d.toLowerCase().includes(search.toLowerCase())
   );
   const selectedSet = useMemo(() => new Set(selected ? selected.split(',') : []), [selected]);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
 
   const toggleDept = (d: string) => {
     const next = new Set(selectedSet);
@@ -886,7 +906,7 @@ function DepartmentFilter({
       : `${selectedSet.size} departments`;
 
   return (
-    <div className="dept-filter">
+    <div className="dept-filter" ref={ref}>
       <button
         className={`dept-toggle ${open ? 'open' : ''}`}
         onClick={() => setOpen(o => !o)}
