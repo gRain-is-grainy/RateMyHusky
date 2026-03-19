@@ -419,10 +419,14 @@ const Professor = () => {
     });
     const total = Object.values(counts).reduce((a, b) => a + b, 0);
     if (total === 0) return [];
-    return GRADE_ORDER.filter(g => counts[g]).map(g => ({
+    // Find the range of grades that appear and include all in-between
+    const presentIndices = GRADE_ORDER.map((g, i) => counts[g] ? i : -1).filter(i => i >= 0);
+    const minIdx = Math.min(...presentIndices);
+    const maxIdx = Math.max(...presentIndices);
+    return GRADE_ORDER.slice(minIdx, maxIdx + 1).map(g => ({
       grade: g,
-      count: counts[g],
-      pct: (counts[g] / total) * 100,
+      count: counts[g] || 0,
+      pct: ((counts[g] || 0) / total) * 100,
       color: GRADE_COLORS[g] || '#999'
     }));
   }, [filteredRmpReviews]);
