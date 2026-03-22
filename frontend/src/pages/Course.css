@@ -426,6 +426,90 @@
 	}
 }
 
+@media (max-width: 540px) {
+	.course-shell {
+		padding: 0 10px 32px;
+	}
+
+	.course-hero {
+		padding: 16px;
+		border-radius: 12px;
+	}
+
+	.course-hero h1 {
+		font-size: 1.2rem;
+	}
+
+	.course-panel {
+		padding: 14px 12px;
+		border-radius: 12px;
+	}
+
+	.course-panel-header h2 {
+		font-size: 1rem;
+	}
+
+	/* Stats: 2 compact columns */
+	.course-stats-grid {
+		grid-template-columns: repeat(2, 1fr);
+		gap: 8px;
+	}
+
+	.course-stat-card {
+		padding: 10px 12px;
+		gap: 4px;
+	}
+
+	.course-stat-card span {
+		font-size: 0.7rem;
+	}
+
+	.course-stat-card strong {
+		font-size: 0.9rem;
+	}
+
+	/* Top prof cards: single column, allow name to wrap */
+	.course-top-prof-grid {
+		grid-template-columns: 1fr;
+	}
+
+	.course-top-prof-name {
+		white-space: normal;
+		overflow: visible;
+		text-overflow: unset;
+	}
+
+	/* Tables: drop Enrollment & Responses columns, reduce min-width */
+	.course-table {
+		min-width: 0;
+		width: 100%;
+	}
+
+	.instructor-table th:nth-child(4),
+	.instructor-table td:nth-child(4),
+	.instructor-table th:nth-child(5),
+	.instructor-table td:nth-child(5) {
+		display: none;
+	}
+
+	.section-table th:nth-child(5),
+	.section-table td:nth-child(5),
+	.section-table th:nth-child(6),
+	.section-table td:nth-child(6) {
+		display: none;
+	}
+
+	.course-table th,
+	.course-table td {
+		padding: 8px 6px;
+		font-size: 0.8rem;
+	}
+
+	.course-table th {
+		font-size: 0.68rem;
+	}
+}
+
 .dark .course-page {
 	background: #1a1a1a;
 }
