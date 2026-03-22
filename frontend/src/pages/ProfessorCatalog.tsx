@@ -705,7 +705,7 @@ export default function ProfessorCatalog() {
                       {prof.wouldTakeAgainPct != null && (
                         <>
                           <span className="meta-dot">·</span>
-                          <span>{prof.wouldTakeAgainPct}% again</span>
+                          <span>{prof.wouldTakeAgainPct}% Again</span>
                         </>
                       )}
                     </div>
