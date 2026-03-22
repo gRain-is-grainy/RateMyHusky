@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
 	fetchCourseDepartments,
@@ -518,13 +519,26 @@ function DepartmentFilter({
 	const [open, setOpen] = useState(false);
 	const [search, setSearch] = useState('');
 	const ref = useRef<HTMLDivElement>(null);
+	const triggerRef = useRef<HTMLButtonElement>(null);
+	const dropdownRef = useRef<HTMLDivElement>(null);
+	const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0, width: 0 });
 	const selectedSet = useMemo(() => new Set(selected ? selected.split(',') : []), [selected]);
 	const filtered = departments.filter((d) => d.toLowerCase().includes(search.toLowerCase()));
+
+	useLayoutEffect(() => {
+		if (open && triggerRef.current) {
+			const r = triggerRef.current.getBoundingClientRect();
+			setDropdownPos({ top: r.bottom + 4, left: r.left, width: r.width });
+		}
+	}, [open]);
 
 	useEffect(() => {
 		if (!open) return;
 		const handler = (e: MouseEvent) => {
-			if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+			if (
+				ref.current && !ref.current.contains(e.target as Node) &&
+				dropdownRef.current && !dropdownRef.current.contains(e.target as Node)
+			) setOpen(false);
 		};
 		document.addEventListener('mousedown', handler);
 		return () => document.removeEventListener('mousedown', handler);
@@ -548,6 +562,7 @@ function DepartmentFilter({
 		<div className="dept-filter" ref={ref}>
 			<div className="dept-filter-trigger">
 				<button
+					ref={triggerRef}
 					className={`dept-toggle ${open ? 'open' : ''}`}
 					onClick={() => setOpen((o) => !o)}
 					aria-expanded={open}
@@ -560,8 +575,12 @@ function DepartmentFilter({
 					</span>
 				</button>
 
-				{open && (
-					<div className="dept-dropdown">
+				{open && createPortal(
+					<div
+						ref={dropdownRef}
+						className="dept-dropdown"
+						style={{ top: dropdownPos.top, left: dropdownPos.left, width: dropdownPos.width }}
+					>
 						<input
 							className="dept-search"
 							type="text"
@@ -583,7 +602,8 @@ function DepartmentFilter({
 							))}
 							{filtered.length === 0 && <p className="dept-empty">No departments found</p>}
 						</div>
-					</div>
+					</div>,
+					document.body
 				)}
 			</div>
 
