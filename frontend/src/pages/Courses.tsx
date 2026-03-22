@@ -359,7 +359,7 @@ export default function Courses() {
 					</p>
 
 					{loading ? (
-						<div className="catalog-grid">
+						<div className="catalog-grid courses-grid">
 							{Array.from({ length: pageSize }).map((_, i) => (
 								<div key={i} className="prof-card skeleton" />
 							))}
@@ -372,7 +372,7 @@ export default function Courses() {
 							</button>
 						</div>
 					) : (
-						<div className="catalog-grid">
+						<div className="catalog-grid courses-grid">
 							{courses.map((course) => (
 								<div
 									key={course.code}
