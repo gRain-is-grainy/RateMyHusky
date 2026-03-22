@@ -19,6 +19,12 @@
   width: 290px;
   flex-shrink: 0;
   padding-top: 24px;
+  font-family: 'Nunito', sans-serif;
+}
+
+.catalog-sidebar button,
+.catalog-sidebar input {
+  font-family: 'Nunito', sans-serif;
 }
 
 .sidebar-inner {
@@ -180,6 +186,7 @@
   border-radius: 8px;
   border: 1px solid #e0e0e0;
   background: #f8f8f8;
+  font-family: 'Nunito', sans-serif;
   font-size: 0.82rem;
   color: #333;
   cursor: pointer;
@@ -255,6 +262,7 @@
   background: #fff;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
   animation: dept-slide-in 0.2s ease;
+  font-family: 'Nunito', sans-serif;
 }
 
 @keyframes dept-slide-in {
@@ -267,6 +275,7 @@
   padding: 7px 10px;
   border-radius: 8px;
   border: 1px solid #e0e0e0;
+  font-family: 'Nunito', sans-serif;
   font-size: 0.82rem;
   background: #f8f8f8;
   color: #333;
@@ -304,6 +313,7 @@
   padding: 5px 6px;
   border-radius: 6px;
   cursor: pointer;
+  font-family: 'Nunito', sans-serif;
   font-size: 0.82rem;
   color: #444;
 }
