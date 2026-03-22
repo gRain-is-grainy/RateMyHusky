@@ -43,14 +43,6 @@
    ============================== */
 @media (max-width: 480px) {
   .theme-toggle {
-    width: 36px;
-    height: 36px;
-    right: 16px;
-    bottom: 16px;
-  }
-
-  .theme-toggle svg {
-    width: 16px;
-    height: 16px;
+    display: none;
   }
 }

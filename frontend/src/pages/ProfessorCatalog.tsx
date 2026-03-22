@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useLayoutEffect, useCallback, useRef, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   fetchProfessorsCatalog,
@@ -21,7 +22,7 @@ const SORT_OPTIONS = [
   { value: 'reviews', label: 'Most Reviews' },
 ];
 
-const REVIEW_SLIDER_MAX = 100;
+const REVIEW_SLIDER_MAX = 1000;
 const REVIEW_INPUT_MAX = 10000;
 
 interface Filters {
@@ -42,7 +43,7 @@ const DEFAULT_FILTERS: Filters = {
   dept:       '',
   minRating:  0,
   maxRating:  5,
-  minReviews: 1,
+  minReviews: 0,
   maxReviews: null,
   sort:       'alpha',
   page:       1,
@@ -56,7 +57,7 @@ function getFiltersFromSearchParams(sp: URLSearchParams): Filters {
 
   const minRating = Number(sp.get('minRating') || '0');
   const maxRating = Number(sp.get('maxRating') || '5');
-  const minReviews = Number(sp.get('minReviews') || '1');
+  const minReviews = Number(sp.get('minReviews') || '0');
   const maxReviewsRaw = sp.get('maxReviews');
   const maxReviews = maxReviewsRaw !== null ? Number(maxReviewsRaw) : null;
   const page = Number(sp.get('page') || '1');
@@ -67,8 +68,8 @@ function getFiltersFromSearchParams(sp: URLSearchParams): Filters {
     dept:       sp.get('dept') || '',
     minRating:  Number.isFinite(minRating) ? Math.max(0, Math.min(5, minRating)) : 0,
     maxRating:  Number.isFinite(maxRating) ? Math.max(0, Math.min(5, maxRating)) : 5,
-    minReviews: Number.isFinite(minReviews) ? Math.max(1, Math.floor(minReviews)) : 1,
-    maxReviews: maxReviews !== null && Number.isFinite(maxReviews) ? Math.max(1, Math.floor(maxReviews)) : null,
+    minReviews: Number.isFinite(minReviews) ? Math.max(0, Math.floor(minReviews)) : 0,
+    maxReviews: maxReviews !== null && Number.isFinite(maxReviews) ? Math.max(0, Math.floor(maxReviews)) : null,
     sort,
     page:       Number.isFinite(page) ? Math.max(1, Math.floor(page)) : 1,
   };
@@ -81,7 +82,7 @@ function buildSearchParamsFromFilters(filters: Filters): URLSearchParams {
   if (filters.dept) next.set('dept', filters.dept);
   if (filters.minRating > 0) next.set('minRating', String(filters.minRating));
   if (filters.maxRating < 5) next.set('maxRating', String(filters.maxRating));
-  if (filters.minReviews > 1) next.set('minReviews', String(filters.minReviews));
+  if (filters.minReviews > 0) next.set('minReviews', String(filters.minReviews));
   if (filters.maxReviews !== null) next.set('maxReviews', String(filters.maxReviews));
   if (filters.sort !== 'alpha') next.set('sort', filters.sort);
   if (filters.page > 1) next.set('page', String(filters.page));
@@ -121,6 +122,35 @@ export default function ProfessorCatalog() {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const [searchFocused, setSearchFocused] = useState(false);
+  const [typingPlaceholder, setTypingPlaceholder] = useState('');
+  const profExamples = useMemo(() => [
+    'Alan Mislove', 'Ravi Sundaram', 'Cristina Nita-Rotaru',
+    'Stacy Marsella', 'Kathleen Durant', 'Gene Cooperman',
+    'Dan Felushko', 'Ousmane Hicham',
+  ], []);
+  useEffect(() => {
+    if (searchFocused || filters.q) {
+      setTypingPlaceholder('Search professor name…');
+      return;
+    }
+    let idx = Math.floor(Math.random() * profExamples.length);
+    let text = '';
+    let deleting = false;
+    let speed = 100;
+    const tick = () => {
+      const full = profExamples[idx];
+      if (deleting) { text = full.substring(0, text.length - 1); speed = 50; }
+      else          { text = full.substring(0, text.length + 1); speed = 100; }
+      setTypingPlaceholder(`Search for "${text}"`);
+      if (!deleting && text === full)        { deleting = true;  speed = 2000; }
+      else if (deleting && text === '')      { deleting = false; idx = (idx + 1) % profExamples.length; speed = 500; }
+      tid = setTimeout(tick, speed);
+    };
+    let tid = setTimeout(tick, speed);
+    return () => clearTimeout(tid);
+  }, [searchFocused, filters.q, profExamples]);
+
   // Responsive page size: fewer cards on smaller screens
   const [viewportWidth, setViewportWidth] = useState(() => window.innerWidth);
   useEffect(() => {
@@ -129,8 +159,8 @@ export default function ProfessorCatalog() {
     return () => window.removeEventListener('resize', onResize);
   }, []);
   const pageSize = useMemo(() => {
-    if (viewportWidth <= 480) return 6;
-    if (viewportWidth <= 768) return 9;
+    if (viewportWidth <= 480) return 10;
+    if (viewportWidth <= 768) return 10;
     return 20;
   }, [viewportWidth]);
 
@@ -155,7 +185,7 @@ export default function ProfessorCatalog() {
       dept:       filters.dept       || undefined,
       minRating:  filters.minRating  > 0 ? filters.minRating  : undefined,
       maxRating:  filters.maxRating  < 5 ? filters.maxRating  : undefined,
-      minReviews: filters.minReviews > 1 ? filters.minReviews : undefined,
+      minReviews: filters.minReviews > 0 ? filters.minReviews : undefined,
       maxReviews: filters.maxReviews ?? undefined,
       sort:       filters.sort as 'alpha' | 'rating' | 'reviews',
       page:       filters.page,
@@ -325,24 +355,10 @@ export default function ProfessorCatalog() {
   }, []);
 
   const hasActiveFilters =
-    !!filters.q || !!filters.college || !!filters.dept || filters.minRating > 0 || filters.maxRating < 5 || filters.minReviews > 1 || filters.maxReviews !== null;
+    !!filters.q || !!filters.college || !!filters.dept || filters.minRating > 0 || filters.maxRating < 5 || filters.minReviews > 0 || filters.maxReviews !== null;
 
   return (
     <div className="catalog-page">
-      {/* Mobile sidebar toggle */}
-      <button
-        className="catalog-filter-toggle"
-        onClick={() => setSidebarOpen(o => !o)}
-        aria-label="Toggle filters"
-      >
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <line x1="4" y1="6" x2="20" y2="6" />
-          <line x1="4" y1="12" x2="20" y2="12" />
-          <line x1="4" y1="18" x2="20" y2="18" />
-        </svg>
-        Filters
-      </button>
-
       {sidebarOpen && (
         <div className="catalog-overlay" onClick={() => setSidebarOpen(false)} />
       )}
@@ -443,9 +459,9 @@ export default function ProfessorCatalog() {
               <p className="filter-label">
                 Reviews
                 <span className="slider-value">
-                  {minReviewsDraft <= 1 && maxReviewsDraft === null
+                  {minReviewsDraft <= 0 && maxReviewsDraft === null
                     ? 'Any'
-                    : minReviewsDraft <= 1
+                    : minReviewsDraft <= 0
                       ? `≤ ${maxReviewsDraft}`
                       : maxReviewsDraft === null
                         ? `${minReviewsDraft}+`
@@ -453,9 +469,9 @@ export default function ProfessorCatalog() {
                 </span>
               </p>
               <DualRangeSlider
-                min={1}
+                min={0}
                 max={REVIEW_SLIDER_MAX}
-                step={1}
+                step={50}
                 valueLow={Math.min(minReviewsDraft, REVIEW_SLIDER_MAX)}
                 valueHigh={Math.min(maxReviewsDraft ?? REVIEW_SLIDER_MAX, REVIEW_SLIDER_MAX)}
                 onChangeLow={v => setMinReviewsDraft(v)}
@@ -465,12 +481,12 @@ export default function ProfessorCatalog() {
                 <input
                   type="number"
                   className="reviews-number-input"
-                  min="1"
-                  value={minReviewsDraft === 1 ? '' : minReviewsDraft}
+                  min="0"
+                  value={minReviewsDraft === 0 ? '' : minReviewsDraft}
                   placeholder="Min"
                   onChange={e => {
                     const v = parseInt(e.target.value, 10);
-                    const clamped = isNaN(v) || v < 1 ? 1 : Math.min(v, REVIEW_INPUT_MAX);
+                    const clamped = isNaN(v) || v < 0 ? 0 : Math.min(v, REVIEW_INPUT_MAX);
                     setMinReviewsDraft(clamped);
                     if (maxReviewsDraft !== null && clamped > maxReviewsDraft) {
                       setMaxReviewsDraft(clamped);
@@ -535,12 +551,14 @@ export default function ProfessorCatalog() {
                 ref={searchInputRef}
                 type="text"
                 className="catalog-search"
-                placeholder="Search professor name…"
+                placeholder={typingPlaceholder}
                 value={filters.q}
                 onChange={e => updateFilter('q', e.target.value)}
                 onFocus={() => {
+                  setSearchFocused(true);
                   if (searchSuggestions.length > 0) setShowSearchSuggestions(true);
                 }}
+                onBlur={() => setSearchFocused(false)}
                 onKeyDown={(e) => {
                   if (!showSearchSuggestions || searchSuggestions.length === 0) return;
 
@@ -580,6 +598,18 @@ export default function ProfessorCatalog() {
                 </ul>
               )}
             </div>
+            <button
+              className="catalog-filter-toggle"
+              onClick={() => setSidebarOpen(o => !o)}
+              aria-label="Toggle filters"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="4" y1="6" x2="20" y2="6" />
+                <line x1="4" y1="12" x2="20" y2="12" />
+                <line x1="4" y1="18" x2="20" y2="18" />
+              </svg>
+              Filters
+            </button>
           </div>
           <p className="catalog-disclaimer">
             Professors without any rating data are not shown.{' '}
@@ -804,12 +834,25 @@ function CollegeFilter({
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0, width: 0 });
   const selectedSet = useMemo(() => new Set(selected ? selected.split(',') : []), [selected]);
+
+  useLayoutEffect(() => {
+    if (open && triggerRef.current) {
+      const r = triggerRef.current.getBoundingClientRect();
+      setDropdownPos({ top: r.bottom + 4, left: r.left, width: r.width });
+    }
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
     const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      if (
+        ref.current && !ref.current.contains(e.target as Node) &&
+        dropdownRef.current && !dropdownRef.current.contains(e.target as Node)
+      ) setOpen(false);
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
@@ -830,35 +873,53 @@ function CollegeFilter({
 
   return (
     <div className="dept-filter" ref={ref}>
-      <button
-        className={`dept-toggle ${open ? 'open' : ''}`}
-        onClick={() => setOpen(o => !o)}
-        aria-expanded={open}
-      >
-        <span className="dept-toggle-label">
-          {label}
-        </span>
-        <span className="dept-toggle-icon">
-          <span className="dept-bar" />
-          <span className="dept-bar" />
-          <span className="dept-bar" />
-        </span>
-      </button>
+      <div className="dept-filter-trigger">
+        <button
+          ref={triggerRef}
+          className={`dept-toggle ${open ? 'open' : ''}`}
+          onClick={() => setOpen(o => !o)}
+          aria-expanded={open}
+        >
+          <span className="dept-toggle-label">
+            {label}
+          </span>
+          <span className="dept-toggle-icon">
+            <span className="dept-bar" />
+            <span className="dept-bar" />
+            <span className="dept-bar" />
+          </span>
+        </button>
 
-      {open && (
-        <div className="dept-dropdown">
-          <div className="dept-list">
-            {colleges.map(c => (
-              <label key={c} className="dept-option">
-                <input
-                  type="checkbox"
-                  checked={selectedSet.has(c)}
-                  onChange={() => toggleCollege(c)}
-                />
-                <span>{c}</span>
-              </label>
-            ))}
-          </div>
+        {open && createPortal(
+          <div
+            ref={dropdownRef}
+            className="dept-dropdown"
+            style={{ top: dropdownPos.top, left: dropdownPos.left, width: dropdownPos.width }}
+          >
+            <div className="dept-list">
+              {colleges.map(c => (
+                <label key={c} className="dept-option">
+                  <input
+                    type="checkbox"
+                    checked={selectedSet.has(c)}
+                    onChange={() => toggleCollege(c)}
+                  />
+                  <span>{c}</span>
+                </label>
+              ))}
+            </div>
+          </div>,
+          document.body
+        )}
+      </div>
+
+      {selectedSet.size > 0 && (
+        <div className="filter-tags">
+          {[...selectedSet].map(c => (
+            <button key={c} className="filter-tag" onClick={() => toggleCollege(c)}>
+              {c} <span className="filter-tag-x">×</span>
+            </button>
+          ))}
         </div>
       )}
     </div>
@@ -879,15 +940,28 @@ function DepartmentFilter({
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   const ref = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0, width: 0 });
   const filtered = departments.filter(d =>
     d.toLowerCase().includes(search.toLowerCase())
   );
   const selectedSet = useMemo(() => new Set(selected ? selected.split(',') : []), [selected]);
 
+  useLayoutEffect(() => {
+    if (open && triggerRef.current) {
+      const r = triggerRef.current.getBoundingClientRect();
+      setDropdownPos({ top: r.bottom + 4, left: r.left, width: r.width });
+    }
+  }, [open]);
+
   useEffect(() => {
     if (!open) return;
     const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      if (
+        ref.current && !ref.current.contains(e.target as Node) &&
+        dropdownRef.current && !dropdownRef.current.contains(e.target as Node)
+      ) setOpen(false);
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
@@ -908,46 +982,64 @@ function DepartmentFilter({
 
   return (
     <div className="dept-filter" ref={ref}>
-      <button
-        className={`dept-toggle ${open ? 'open' : ''}`}
-        onClick={() => setOpen(o => !o)}
-        aria-expanded={open}
-      >
-        <span className="dept-toggle-label">
-          {label}
-        </span>
-        <span className="dept-toggle-icon">
-          <span className="dept-bar" />
-          <span className="dept-bar" />
-          <span className="dept-bar" />
-        </span>
-      </button>
+      <div className="dept-filter-trigger">
+        <button
+          ref={triggerRef}
+          className={`dept-toggle ${open ? 'open' : ''}`}
+          onClick={() => setOpen(o => !o)}
+          aria-expanded={open}
+        >
+          <span className="dept-toggle-label">
+            {label}
+          </span>
+          <span className="dept-toggle-icon">
+            <span className="dept-bar" />
+            <span className="dept-bar" />
+            <span className="dept-bar" />
+          </span>
+        </button>
 
-      {open && (
-        <div className="dept-dropdown">
-          <input
-            className="dept-search"
-            type="text"
-            placeholder="Search departments…"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            autoFocus
-          />
-          <div className="dept-list">
-            {filtered.map(d => (
-              <label key={d} className="dept-option">
-                <input
-                  type="checkbox"
-                  checked={selectedSet.has(d)}
-                  onChange={() => toggleDept(d)}
-                />
-                <span>{d}</span>
-              </label>
-            ))}
-            {filtered.length === 0 && (
-              <p className="dept-empty">No departments found</p>
-            )}
-          </div>
+        {open && createPortal(
+          <div
+            ref={dropdownRef}
+            className="dept-dropdown"
+            style={{ top: dropdownPos.top, left: dropdownPos.left, width: dropdownPos.width }}
+          >
+            <input
+              className="dept-search"
+              type="text"
+              placeholder="Search departments…"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              autoFocus
+            />
+            <div className="dept-list">
+              {filtered.map(d => (
+                <label key={d} className="dept-option">
+                  <input
+                    type="checkbox"
+                    checked={selectedSet.has(d)}
+                    onChange={() => toggleDept(d)}
+                  />
+                  <span>{d}</span>
+                </label>
+              ))}
+              {filtered.length === 0 && (
+                <p className="dept-empty">No departments found</p>
+              )}
+            </div>
+          </div>,
+          document.body
+        )}
+      </div>
+
+      {selectedSet.size > 0 && (
+        <div className="filter-tags">
+          {[...selectedSet].map(d => (
+            <button key={d} className="filter-tag" onClick={() => toggleDept(d)}>
+              {d} <span className="filter-tag-x">×</span>
+            </button>
+          ))}
         </div>
       )}
     </div>

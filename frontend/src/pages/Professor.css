@@ -918,8 +918,8 @@
   .prof-dept { font-size: 0.88rem; }
   .prof-avatar { width: 60px; height: 60px; font-size: 1.3rem; }
 
-  .prof-hero-actions-row { flex-direction: column; align-items: stretch; }
-  .prof-compare-btn, .prof-rmp-btn { justify-content: center; }
+  .prof-hero-actions-row { flex-direction: column; align-items: center; }
+  .prof-compare-btn, .prof-rmp-btn { justify-content: center; min-width: 180px; }
 
   .prof-stats { grid-template-columns: repeat(2, 1fr); }
   .prof-stat-value { font-size: 1.5rem; }

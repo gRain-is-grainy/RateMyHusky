@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
 	fetchCourseDepartments,
@@ -92,6 +93,34 @@ export default function Courses() {
 	const searchWrapperRef = useRef<HTMLDivElement>(null);
 	const searchInputRef = useRef<HTMLInputElement>(null);
 	const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+	const [searchFocused, setSearchFocused] = useState(false);
+	const [typingPlaceholder, setTypingPlaceholder] = useState('');
+	const courseExamples = useMemo(() => [
+		'CS 2500', 'CS 3500', 'ECON 1115', 'MATH 1341',
+		'CY 2550', 'PHYS 1161', 'ACCT 1201', 'BIOL 1111',
+	], []);
+	useEffect(() => {
+		if (searchFocused || filters.q) {
+			setTypingPlaceholder('Search course code or title...');
+			return;
+		}
+		let idx = Math.floor(Math.random() * courseExamples.length);
+		let text = '';
+		let deleting = false;
+		let speed = 100;
+		const tick = () => {
+			const full = courseExamples[idx];
+			if (deleting) { text = full.substring(0, text.length - 1); speed = 50; }
+			else          { text = full.substring(0, text.length + 1); speed = 100; }
+			setTypingPlaceholder(`Search for "${text}"`);
+			if (!deleting && text === full)   { deleting = true;  speed = 2000; }
+			else if (deleting && text === '') { deleting = false; idx = (idx + 1) % courseExamples.length; speed = 500; }
+			tid = setTimeout(tick, speed);
+		};
+		let tid = setTimeout(tick, speed);
+		return () => clearTimeout(tid);
+	}, [searchFocused, filters.q, courseExamples]);
 
 	const [viewportWidth, setViewportWidth] = useState(() => window.innerWidth);
 	useEffect(() => {
@@ -237,15 +266,6 @@ export default function Courses() {
 	return (
 		<div className="catalog-page">
 			<ThemeToggle />
-			<button className="catalog-filter-toggle" onClick={() => setSidebarOpen((o) => !o)} aria-label="Toggle filters">
-				<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-					<line x1="4" y1="6" x2="20" y2="6" />
-					<line x1="4" y1="12" x2="20" y2="12" />
-					<line x1="4" y1="18" x2="20" y2="18" />
-				</svg>
-				Filters
-				{hasActiveFilters && <span className="filter-active-dot" />}
-			</button>
 
 			{sidebarOpen && <div className="catalog-overlay" onClick={() => setSidebarOpen(false)} />}
 
@@ -309,12 +329,14 @@ export default function Courses() {
 								ref={searchInputRef}
 								type="text"
 								className="catalog-search"
-								placeholder="Search course code or title..."
+								placeholder={typingPlaceholder}
 								value={filters.q}
 								onChange={(e) => updateFilter('q', e.target.value)}
 								onFocus={() => {
+									setSearchFocused(true);
 									if (searchSuggestions.length > 0) setShowSearchSuggestions(true);
 								}}
+								onBlur={() => setSearchFocused(false)}
 								onKeyDown={(e) => {
 									if (!showSearchSuggestions || searchSuggestions.length === 0) return;
 									if (e.key === 'ArrowDown') {
@@ -352,14 +374,27 @@ export default function Courses() {
 								</ul>
 							)}
 						</div>
-					</div>
+					<button
+						className="catalog-filter-toggle"
+						onClick={() => setSidebarOpen((o) => !o)}
+						aria-label="Toggle filters"
+					>
+						<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+							<line x1="4" y1="6" x2="20" y2="6" />
+							<line x1="4" y1="12" x2="20" y2="12" />
+							<line x1="4" y1="18" x2="20" y2="18" />
+						</svg>
+						Filters
+						{hasActiveFilters && <span className="filter-active-dot" />}
+					</button>
+				</div>
 
-					<p className="catalog-disclaimer">
-						Course cards currently use TRACE aggregate data only.
+				<p className="catalog-disclaimer">
+					Course cards currently use TRACE aggregate data only.
 					</p>
 
 					{loading ? (
-						<div className="catalog-grid">
+						<div className="catalog-grid courses-grid">
 							{Array.from({ length: pageSize }).map((_, i) => (
 								<div key={i} className="prof-card skeleton" />
 							))}
@@ -372,7 +407,7 @@ export default function Courses() {
 							</button>
 						</div>
 					) : (
-						<div className="catalog-grid">
+						<div className="catalog-grid courses-grid">
 							{courses.map((course) => (
 								<div
 									key={course.code}
@@ -481,30 +516,106 @@ function DepartmentFilter({
 	selected: string;
 	onSelect: (dept: string) => void;
 }) {
+	const [open, setOpen] = useState(false);
 	const [search, setSearch] = useState('');
+	const ref = useRef<HTMLDivElement>(null);
+	const triggerRef = useRef<HTMLButtonElement>(null);
+	const dropdownRef = useRef<HTMLDivElement>(null);
+	const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0, width: 0 });
+	const selectedSet = useMemo(() => new Set(selected ? selected.split(',') : []), [selected]);
 	const filtered = departments.filter((d) => d.toLowerCase().includes(search.toLowerCase()));
 
+	useLayoutEffect(() => {
+		if (open && triggerRef.current) {
+			const r = triggerRef.current.getBoundingClientRect();
+			setDropdownPos({ top: r.bottom + 4, left: r.left, width: r.width });
+		}
+	}, [open]);
+
+	useEffect(() => {
+		if (!open) return;
+		const handler = (e: MouseEvent) => {
+			if (
+				ref.current && !ref.current.contains(e.target as Node) &&
+				dropdownRef.current && !dropdownRef.current.contains(e.target as Node)
+			) setOpen(false);
+		};
+		document.addEventListener('mousedown', handler);
+		return () => document.removeEventListener('mousedown', handler);
+	}, [open]);
+
+	const toggleDept = (d: string) => {
+		const next = new Set(selectedSet);
+		if (next.has(d)) next.delete(d);
+		else next.add(d);
+		onSelect([...next].join(','));
+	};
+
+	const label =
+		selectedSet.size === 0
+			? 'All departments'
+			: selectedSet.size === 1
+				? [...selectedSet][0]
+				: `${selectedSet.size} departments`;
+
 	return (
-		<div className="dept-filter">
-			<input
-				className="dept-search"
-				type="text"
-				placeholder="Search departments..."
-				value={search}
-				onChange={(e) => setSearch(e.target.value)}
-			/>
-			<div className="dept-list">
-				<label className="dept-option">
-					<input type="radio" name="dept" checked={!selected} onChange={() => onSelect('')} />
-					<span>All departments</span>
-				</label>
-				{filtered.map((d) => (
-					<label key={d} className="dept-option">
-						<input type="radio" name="dept" checked={selected === d} onChange={() => onSelect(d)} />
-						<span>{d}</span>
-					</label>
-				))}
+		<div className="dept-filter" ref={ref}>
+			<div className="dept-filter-trigger">
+				<button
+					ref={triggerRef}
+					className={`dept-toggle ${open ? 'open' : ''}`}
+					onClick={() => setOpen((o) => !o)}
+					aria-expanded={open}
+				>
+					<span className="dept-toggle-label">{label}</span>
+					<span className="dept-toggle-icon">
+						<span className="dept-bar" />
+						<span className="dept-bar" />
+						<span className="dept-bar" />
+					</span>
+				</button>
+
+				{open && createPortal(
+					<div
+						ref={dropdownRef}
+						className="dept-dropdown"
+						style={{ top: dropdownPos.top, left: dropdownPos.left, width: dropdownPos.width }}
+					>
+						<input
+							className="dept-search"
+							type="text"
+							placeholder="Search departments…"
+							value={search}
+							onChange={(e) => setSearch(e.target.value)}
+							autoFocus
+						/>
+						<div className="dept-list">
+							{filtered.map((d) => (
+								<label key={d} className="dept-option">
+									<input
+										type="checkbox"
+										checked={selectedSet.has(d)}
+										onChange={() => toggleDept(d)}
+									/>
+									<span>{d}</span>
+								</label>
+							))}
+							{filtered.length === 0 && <p className="dept-empty">No departments found</p>}
+						</div>
+					</div>,
+					document.body
+				)}
 			</div>
+
+			{selectedSet.size > 0 && (
+				<div className="filter-tags">
+					{[...selectedSet].map((d) => (
+						<button key={d} className="filter-tag" onClick={() => toggleDept(d)}>
+							{d} <span className="filter-tag-x">×</span>
+						</button>
+					))}
+				</div>
+			)}
 		</div>
 	);
 }

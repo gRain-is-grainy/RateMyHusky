@@ -186,7 +186,7 @@ const Course = () => {
 						<h2>Instructor Breakdown</h2>
 					</div>
 					<div className="course-table-wrap">
-						<table className="course-table">
+						<table className="course-table instructor-table">
 							<thead>
 								<tr>
 									<th>Instructor</th>
@@ -246,7 +246,7 @@ const Course = () => {
 						<h2>Section History</h2>
 					</div>
 					<div className="course-table-wrap">
-						<table className="course-table">
+						<table className="course-table section-table">
 							<thead>
 								<tr>
 									<th>Term</th>

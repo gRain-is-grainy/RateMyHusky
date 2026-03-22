@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import logo from '../assets/logo.jpg';
 import Dropdown from './Dropdown';
 import './FeedbackTab.css';
@@ -18,6 +18,12 @@ const FeedbackTab = () => {
   const [email, setEmail] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    const handler = () => setIsOpen(true);
+    window.addEventListener('open-feedback', handler);
+    return () => window.removeEventListener('open-feedback', handler);
+  }, []);
 
   const handleSubmit = () => {
     if (!feedbackType || !description.trim()) {
@@ -54,6 +60,11 @@ const FeedbackTab = () => {
     <>
       <button className="feedback-tab" onClick={() => setIsOpen(true)}>
         Feedback
+      </button>
+      <button className="feedback-fab" onClick={() => setIsOpen(true)} aria-label="Feedback">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+        </svg>
       </button>
 
       {isOpen && (

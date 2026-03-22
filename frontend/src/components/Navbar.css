@@ -261,6 +261,11 @@
   display: none;
 }
 
+.navbar-util-spacer,
+.navbar-utilities {
+  display: none;
+}
+
 /* ---------- dark theme ---------- */
 .dark .navbar {
   background: rgba(26, 26, 26, 0.85);
@@ -479,5 +484,49 @@
 
   .dark .navbar-right .navbar-user-signout {
     border-top-color: #333;
+  }
+
+  /* utility rows (feedback + dark mode) */
+  .navbar-util-spacer {
+    display: flex;
+    flex: 1;
+  }
+
+  .navbar-utilities {
+    display: block;
+    width: 100%;
+    border-top: 1px solid #f0f0f0;
+  }
+
+  .navbar-utility-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 16px 0;
+    font-family: 'Nunito', sans-serif;
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: #444;
+    background: none;
+    border: none;
+    border-bottom: 1px solid #f0f0f0;
+    cursor: pointer;
+    text-align: left;
+  }
+
+  .navbar-utility-item svg {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+  }
+
+  .dark .navbar-utilities {
+    border-top-color: #333;
+  }
+
+  .dark .navbar-utility-item {
+    color: #ccc;
+    border-bottom-color: #333;
   }
 }

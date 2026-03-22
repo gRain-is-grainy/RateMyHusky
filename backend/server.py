@@ -867,13 +867,38 @@ def courses_catalog():
         LIMIT %s OFFSET %s
     """, count_params + [limit, offset])
 
+    # Bulk-fetch ratings for this page of courses in a single query
+    rating_map = {}
+    if rows:
+        codes = [r["code"] for r in rows]
+        placeholders = ",".join(["%s"] * len(codes))
+        rating_rows = query(f"""
+            SELECT
+                SPLIT_PART(tc.display_name, ':', 1) AS course_code,
+                SUM(CAST(ts.mean AS FLOAT) * CAST(ts.total_responses AS FLOAT)) AS weighted_sum,
+                SUM(CAST(ts.total_responses AS FLOAT)) AS total_responses
+            FROM trace_courses tc
+            JOIN trace_scores ts
+                ON tc.course_id = ts.course_id
+                AND tc.instructor_id = ts.instructor_id
+                AND tc.term_id = ts.term_id
+            WHERE LOWER(ts.question) LIKE '%%overall%%'
+                AND SPLIT_PART(tc.display_name, ':', 1) IN ({placeholders})
+            GROUP BY course_code
+        """, codes)
+        for rr in rating_rows:
+            tr = _safe_float(rr["total_responses"])
+            rating_map[rr["course_code"]] = (
+                _safe_float(rr["weighted_sum"]) / tr if tr > 0 else None
+            )
+
     courses = []
     for r in rows:
         courses.append({
             "code": r["code"],
             "name": r["name"],
             "department": r["department"],
-            "avgRating": None,
+            "avgRating": rating_map.get(r["code"]),
             "totalSections": 0,
             "totalInstructors": 0,
             "totalEnrollment": 0,
