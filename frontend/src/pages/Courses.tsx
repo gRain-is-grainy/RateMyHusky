@@ -515,30 +515,87 @@ function DepartmentFilter({
 	selected: string;
 	onSelect: (dept: string) => void;
 }) {
+	const [open, setOpen] = useState(false);
 	const [search, setSearch] = useState('');
+	const ref = useRef<HTMLDivElement>(null);
+	const selectedSet = useMemo(() => new Set(selected ? selected.split(',') : []), [selected]);
 	const filtered = departments.filter((d) => d.toLowerCase().includes(search.toLowerCase()));
 
+	useEffect(() => {
+		if (!open) return;
+		const handler = (e: MouseEvent) => {
+			if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+		};
+		document.addEventListener('mousedown', handler);
+		return () => document.removeEventListener('mousedown', handler);
+	}, [open]);
+
+	const toggleDept = (d: string) => {
+		const next = new Set(selectedSet);
+		if (next.has(d)) next.delete(d);
+		else next.add(d);
+		onSelect([...next].join(','));
+	};
+
+	const label =
+		selectedSet.size === 0
+			? 'All departments'
+			: selectedSet.size === 1
+				? [...selectedSet][0]
+				: `${selectedSet.size} departments`;
+
 	return (
-		<div className="dept-filter">
-			<input
-				className="dept-search"
-				type="text"
-				placeholder="Search departments..."
-				value={search}
-				onChange={(e) => setSearch(e.target.value)}
-			/>
-			<div className="dept-list">
-				<label className="dept-option">
-					<input type="radio" name="dept" checked={!selected} onChange={() => onSelect('')} />
-					<span>All departments</span>
-				</label>
-				{filtered.map((d) => (
-					<label key={d} className="dept-option">
-						<input type="radio" name="dept" checked={selected === d} onChange={() => onSelect(d)} />
-						<span>{d}</span>
-					</label>
-				))}
+		<div className="dept-filter" ref={ref}>
+			<div className="dept-filter-trigger">
+				<button
+					className={`dept-toggle ${open ? 'open' : ''}`}
+					onClick={() => setOpen((o) => !o)}
+					aria-expanded={open}
+				>
+					<span className="dept-toggle-label">{label}</span>
+					<span className="dept-toggle-icon">
+						<span className="dept-bar" />
+						<span className="dept-bar" />
+						<span className="dept-bar" />
+					</span>
+				</button>
+
+				{open && (
+					<div className="dept-dropdown">
+						<input
+							className="dept-search"
+							type="text"
+							placeholder="Search departments…"
+							value={search}
+							onChange={(e) => setSearch(e.target.value)}
+							autoFocus
+						/>
+						<div className="dept-list">
+							{filtered.map((d) => (
+								<label key={d} className="dept-option">
+									<input
+										type="checkbox"
+										checked={selectedSet.has(d)}
+										onChange={() => toggleDept(d)}
+									/>
+									<span>{d}</span>
+								</label>
+							))}
+							{filtered.length === 0 && <p className="dept-empty">No departments found</p>}
+						</div>
+					</div>
+				)}
 			</div>
+
+			{selectedSet.size > 0 && (
+				<div className="filter-tags">
+					{[...selectedSet].map((d) => (
+						<button key={d} className="filter-tag" onClick={() => toggleDept(d)}>
+							{d} <span className="filter-tag-x">×</span>
+						</button>
+					))}
+				</div>
+			)}
 		</div>
 	);
 }
