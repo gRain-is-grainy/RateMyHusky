@@ -121,6 +121,35 @@ export default function ProfessorCatalog() {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const [searchFocused, setSearchFocused] = useState(false);
+  const [typingPlaceholder, setTypingPlaceholder] = useState('');
+  const profExamples = useMemo(() => [
+    'Alan Mislove', 'Ravi Sundaram', 'Cristina Nita-Rotaru',
+    'Stacy Marsella', 'Kathleen Durant', 'Gene Cooperman',
+    'Dan Felushko', 'Ousmane Hicham',
+  ], []);
+  useEffect(() => {
+    if (searchFocused || filters.q) {
+      setTypingPlaceholder('Search professor name…');
+      return;
+    }
+    let idx = Math.floor(Math.random() * profExamples.length);
+    let text = '';
+    let deleting = false;
+    let speed = 100;
+    const tick = () => {
+      const full = profExamples[idx];
+      if (deleting) { text = full.substring(0, text.length - 1); speed = 50; }
+      else          { text = full.substring(0, text.length + 1); speed = 100; }
+      setTypingPlaceholder(`Search for "${text}"`);
+      if (!deleting && text === full)        { deleting = true;  speed = 2000; }
+      else if (deleting && text === '')      { deleting = false; idx = (idx + 1) % profExamples.length; speed = 500; }
+      tid = setTimeout(tick, speed);
+    };
+    let tid = setTimeout(tick, speed);
+    return () => clearTimeout(tid);
+  }, [searchFocused, filters.q, profExamples]);
+
   // Responsive page size: fewer cards on smaller screens
   const [viewportWidth, setViewportWidth] = useState(() => window.innerWidth);
   useEffect(() => {
@@ -329,20 +358,6 @@ export default function ProfessorCatalog() {
 
   return (
     <div className="catalog-page">
-      {/* Mobile sidebar toggle */}
-      <button
-        className="catalog-filter-toggle"
-        onClick={() => setSidebarOpen(o => !o)}
-        aria-label="Toggle filters"
-      >
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <line x1="4" y1="6" x2="20" y2="6" />
-          <line x1="4" y1="12" x2="20" y2="12" />
-          <line x1="4" y1="18" x2="20" y2="18" />
-        </svg>
-        Filters
-      </button>
-
       {sidebarOpen && (
         <div className="catalog-overlay" onClick={() => setSidebarOpen(false)} />
       )}
@@ -535,12 +550,14 @@ export default function ProfessorCatalog() {
                 ref={searchInputRef}
                 type="text"
                 className="catalog-search"
-                placeholder="Search professor name…"
+                placeholder={typingPlaceholder}
                 value={filters.q}
                 onChange={e => updateFilter('q', e.target.value)}
                 onFocus={() => {
+                  setSearchFocused(true);
                   if (searchSuggestions.length > 0) setShowSearchSuggestions(true);
                 }}
+                onBlur={() => setSearchFocused(false)}
                 onKeyDown={(e) => {
                   if (!showSearchSuggestions || searchSuggestions.length === 0) return;
 
@@ -580,6 +597,18 @@ export default function ProfessorCatalog() {
                 </ul>
               )}
             </div>
+            <button
+              className="catalog-filter-toggle"
+              onClick={() => setSidebarOpen(o => !o)}
+              aria-label="Toggle filters"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="4" y1="6" x2="20" y2="6" />
+                <line x1="4" y1="12" x2="20" y2="12" />
+                <line x1="4" y1="18" x2="20" y2="18" />
+              </svg>
+              Filters
+            </button>
           </div>
           <p className="catalog-disclaimer">
             Professors without any rating data are not shown.{' '}
