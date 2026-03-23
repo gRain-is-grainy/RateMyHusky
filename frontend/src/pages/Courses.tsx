@@ -90,6 +90,14 @@ export default function Courses() {
 	const [searchSuggestions, setSearchSuggestions] = useState<CourseSuggestion[]>([]);
 	const [showSearchSuggestions, setShowSearchSuggestions] = useState(false);
 	const [activeSearchIndex, setActiveSearchIndex] = useState(-1);
+	const [isSearchFocused, setIsSearchFocused] = useState(false);
+	const [searchPlaceholder, setSearchPlaceholder] = useState('');
+
+	const courseExamples = useMemo(() => [
+		"CS 2500", "CS 3500", "CS 4500", "ECON 1115", "MATH 1341",
+		"CY 2550", "PHYS 1161", "ACCT 1201", "MKTG 2101", "BIOL 1111"
+	], []);
+
 	const searchWrapperRef = useRef<HTMLDivElement>(null);
 	const searchInputRef = useRef<HTMLInputElement>(null);
 	const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -233,6 +241,42 @@ export default function Courses() {
 		return () => document.removeEventListener('mousedown', handler);
 	}, []);
 
+	useEffect(() => {
+		if (isSearchFocused || filters.q) {
+			setSearchPlaceholder('Search course code or title...');
+			return;
+		}
+
+		let currentExampleIndex = Math.floor(Math.random() * courseExamples.length);
+		let currentText = '';
+		let isDeleting = false;
+		let typingSpeed = 100;
+
+		const type = () => {
+			const fullText = courseExamples[currentExampleIndex];
+			if (isDeleting) {
+				currentText = fullText.substring(0, currentText.length - 1);
+				typingSpeed = 50;
+			} else {
+				currentText = fullText.substring(0, currentText.length + 1);
+				typingSpeed = 100;
+			}
+			setSearchPlaceholder(`Search for "${currentText}"`);
+			if (!isDeleting && currentText === fullText) {
+				isDeleting = true;
+				typingSpeed = 2000;
+			} else if (isDeleting && currentText === '') {
+				isDeleting = false;
+				currentExampleIndex = (currentExampleIndex + 1) % courseExamples.length;
+				typingSpeed = 500;
+			}
+			timeoutId = setTimeout(type, typingSpeed);
+		};
+
+		let timeoutId = setTimeout(type, typingSpeed);
+		return () => clearTimeout(timeoutId);
+	}, [isSearchFocused, filters.q, courseExamples]);
+
 	const hasActiveFilters = !!filters.q || !!filters.dept || filters.minRating > 0 || filters.maxRating < 5;
 
 	return (
@@ -240,6 +284,11 @@ export default function Courses() {
 			<ThemeToggle />
 
 			{sidebarOpen && <div className="catalog-overlay" onClick={() => setSidebarOpen(false)} />}
+
+			<div className="catalog-header">
+				<h1 className="catalog-title">Courses</h1>
+				<span className="catalog-count">{loading ? '…' : `${total.toLocaleString()} result${total !== 1 ? 's' : ''}`}</span>
+			</div>
 
 			<div className="catalog-layout">
 				<aside className={`catalog-sidebar ${sidebarOpen ? 'open' : ''}`}>
@@ -295,23 +344,20 @@ export default function Courses() {
 				</aside>
 
 				<main className="catalog-main">
-					<div className="catalog-header">
-						<h1 className="catalog-title">Courses</h1>
-						<span className="catalog-count">{loading ? '…' : `${total.toLocaleString()} result${total !== 1 ? 's' : ''}`}</span>
-					</div>
-
 					<div className="catalog-search-row">
 						<div className="catalog-search-wrap" ref={searchWrapperRef}>
 							<input
 								ref={searchInputRef}
 								type="text"
 								className="catalog-search"
-								placeholder="Search course code or title..."
+								placeholder={searchPlaceholder}
 								value={filters.q}
 								onChange={(e) => updateFilter('q', e.target.value)}
 								onFocus={() => {
+									setIsSearchFocused(true);
 									if (searchSuggestions.length > 0) setShowSearchSuggestions(true);
 								}}
+								onBlur={() => setIsSearchFocused(false)}
 								onKeyDown={(e) => {
 									if (!showSearchSuggestions || searchSuggestions.length === 0) return;
 									if (e.key === 'ArrowDown') {

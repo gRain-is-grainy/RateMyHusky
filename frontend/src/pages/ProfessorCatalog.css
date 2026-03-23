@@ -19,7 +19,6 @@
 .catalog-sidebar {
   width: 290px;
   flex-shrink: 0;
-  padding-top: 24px;
   font-family: 'Nunito', sans-serif;
 }
 
@@ -538,7 +537,6 @@
 .catalog-main {
   flex: 1;
   min-width: 0;
-  padding-top: 24px;
 }
 
 .catalog-header {
@@ -546,6 +544,7 @@
   align-items: baseline;
   gap: 12px;
   margin-bottom: 20px;
+  padding: 24px clamp(16px, 3vw, 48px) 0;
 }
 
 .catalog-title {

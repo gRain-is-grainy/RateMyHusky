@@ -118,6 +118,14 @@ export default function ProfessorCatalog() {
   const [searchSuggestions, setSearchSuggestions] = useState<ProfessorSuggestion[]>([]);
   const [showSearchSuggestions, setShowSearchSuggestions] = useState(false);
   const [activeSearchIndex, setActiveSearchIndex] = useState(-1);
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const [searchPlaceholder, setSearchPlaceholder] = useState('');
+
+  const professorExamples = useMemo(() => [
+    "John Doe", "Jane Smith", "Alan Mislove", "Ravi Sundaram",
+    "Dan Felushko", "Ousmane Hicham", "Cristina Nita-Rotaru",
+    "Stacy Marsella", "Kathleen Durant", "Gene Cooperman"
+  ], []);
 
   const searchWrapperRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -326,6 +334,42 @@ export default function ProfessorCatalog() {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
+  useEffect(() => {
+    if (isSearchFocused || filters.q) {
+      setSearchPlaceholder('Search professor name…');
+      return;
+    }
+
+    let currentExampleIndex = Math.floor(Math.random() * professorExamples.length);
+    let currentText = '';
+    let isDeleting = false;
+    let typingSpeed = 100;
+
+    const type = () => {
+      const fullText = professorExamples[currentExampleIndex];
+      if (isDeleting) {
+        currentText = fullText.substring(0, currentText.length - 1);
+        typingSpeed = 50;
+      } else {
+        currentText = fullText.substring(0, currentText.length + 1);
+        typingSpeed = 100;
+      }
+      setSearchPlaceholder(`Search for "${currentText}"`);
+      if (!isDeleting && currentText === fullText) {
+        isDeleting = true;
+        typingSpeed = 2000;
+      } else if (isDeleting && currentText === '') {
+        isDeleting = false;
+        currentExampleIndex = (currentExampleIndex + 1) % professorExamples.length;
+        typingSpeed = 500;
+      }
+      timeoutId = setTimeout(type, typingSpeed);
+    };
+
+    let timeoutId = setTimeout(type, typingSpeed);
+    return () => clearTimeout(timeoutId);
+  }, [isSearchFocused, filters.q, professorExamples]);
+
   const hasActiveFilters =
     !!filters.q || !!filters.college || !!filters.dept || filters.minRating > 0 || filters.maxRating < 5 || filters.minReviews > 1 || filters.maxReviews !== null;
 
@@ -342,6 +386,35 @@ export default function ProfessorCatalog() {
       {sidebarOpen && (
         <div className="catalog-overlay" onClick={() => setSidebarOpen(false)} />
       )}
+
+      <div className="catalog-header">
+        <h1 className="catalog-title">Professors</h1>
+        <span className="catalog-count">
+          {loading ? '…' : `${total.toLocaleString()} result${total !== 1 ? 's' : ''}`}
+        </span>
+        <div className="catalog-view-toggle">
+          <button
+            className={`catalog-view-btn ${viewMode === 'grid' ? 'active' : ''}`}
+            onClick={() => { setViewMode('grid'); localStorage.setItem('catalog-view', 'grid'); }}
+            aria-label="Grid view"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" />
+              <rect x="3" y="14" width="7" height="7" /><rect x="14" y="14" width="7" height="7" />
+            </svg>
+          </button>
+          <button
+            className={`catalog-view-btn ${viewMode === 'list' ? 'active' : ''}`}
+            onClick={() => { setViewMode('list'); localStorage.setItem('catalog-view', 'list'); }}
+            aria-label="List view"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" />
+              <line x1="3" y1="6" x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" />
+            </svg>
+          </button>
+        </div>
+      </div>
 
       <div className="catalog-layout">
         {/* ── Sidebar ── */}
@@ -499,46 +572,20 @@ export default function ProfessorCatalog() {
 
         {/* ── Main ── */}
         <main className="catalog-main">
-          <div className="catalog-header">
-            <h1 className="catalog-title">Professors</h1>
-            <span className="catalog-count">
-              {loading ? '…' : `${total.toLocaleString()} result${total !== 1 ? 's' : ''}`}
-            </span>
-            <div className="catalog-view-toggle">
-              <button
-                className={`catalog-view-btn ${viewMode === 'grid' ? 'active' : ''}`}
-                onClick={() => { setViewMode('grid'); localStorage.setItem('catalog-view', 'grid'); }}
-                aria-label="Grid view"
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" />
-                  <rect x="3" y="14" width="7" height="7" /><rect x="14" y="14" width="7" height="7" />
-                </svg>
-              </button>
-              <button
-                className={`catalog-view-btn ${viewMode === 'list' ? 'active' : ''}`}
-                onClick={() => { setViewMode('list'); localStorage.setItem('catalog-view', 'list'); }}
-                aria-label="List view"
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" />
-                  <line x1="3" y1="6" x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" />
-                </svg>
-              </button>
-            </div>
-          </div>
           <div className="catalog-search-row">
             <div className="catalog-search-wrap" ref={searchWrapperRef}>
               <input
                 ref={searchInputRef}
                 type="text"
                 className="catalog-search"
-                placeholder="Search professor name…"
+                placeholder={searchPlaceholder}
                 value={filters.q}
                 onChange={e => updateFilter('q', e.target.value)}
                 onFocus={() => {
+                  setIsSearchFocused(true);
                   if (searchSuggestions.length > 0) setShowSearchSuggestions(true);
                 }}
+                onBlur={() => setIsSearchFocused(false)}
                 onKeyDown={(e) => {
                   if (!showSearchSuggestions || searchSuggestions.length === 0) return;
 
