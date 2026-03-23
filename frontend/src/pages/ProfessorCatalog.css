@@ -561,12 +561,16 @@
 }
 
 .catalog-search-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   margin-bottom: 12px;
 }
 
 .catalog-search-wrap {
   position: relative;
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   max-width: 560px;
 }
 
@@ -1149,14 +1153,7 @@
 /* ─── RESPONSIVE ───────────────────────────────────────────── */
 
 @media (max-width: 900px) {
-  .catalog-search-row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-  }
-
   .catalog-search-wrap {
-    flex: 1;
     max-width: none;
   }
 

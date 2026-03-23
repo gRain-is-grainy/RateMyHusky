@@ -131,7 +131,7 @@ export default function ProfessorCatalog() {
     return () => window.removeEventListener('resize', onResize);
   }, []);
   const pageSize = useMemo(() => {
-    if (viewportWidth <= 480) return 6;
+    if (viewportWidth <= 480) return 8;
     if (viewportWidth <= 768) return 9;
     return 20;
   }, [viewportWidth]);
@@ -331,19 +331,6 @@ export default function ProfessorCatalog() {
 
   return (
     <div className="catalog-page">
-      {/* Mobile sidebar toggle */}
-      <button
-        className="catalog-filter-toggle"
-        onClick={() => setSidebarOpen(o => !o)}
-        aria-label="Toggle filters"
-      >
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <line x1="4" y1="6" x2="20" y2="6" />
-          <line x1="4" y1="12" x2="20" y2="12" />
-          <line x1="4" y1="18" x2="20" y2="18" />
-        </svg>
-        Filters
-      </button>
 
       {sidebarOpen && (
         <div className="catalog-overlay" onClick={() => setSidebarOpen(false)} />
@@ -584,6 +571,19 @@ export default function ProfessorCatalog() {
                 </ul>
               )}
             </div>
+          <button
+            className="catalog-filter-toggle"
+            onClick={() => setSidebarOpen(o => !o)}
+            aria-label="Toggle filters"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="4" y1="6" x2="20" y2="6" />
+              <line x1="4" y1="12" x2="20" y2="12" />
+              <line x1="4" y1="18" x2="20" y2="18" />
+            </svg>
+            Filters
+            {hasActiveFilters && <span className="filter-active-dot" />}
+          </button>
           </div>
           <p className="catalog-disclaimer">
             Professors without any rating data are not shown.{' '}
