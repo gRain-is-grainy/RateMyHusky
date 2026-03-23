@@ -329,6 +329,13 @@ export default function ProfessorCatalog() {
   const hasActiveFilters =
     !!filters.q || !!filters.college || !!filters.dept || filters.minRating > 0 || filters.maxRating < 5 || filters.minReviews > 1 || filters.maxReviews !== null;
 
+  const activeFilterCount =
+    (filters.q ? 1 : 0) +
+    (filters.college ? filters.college.split(',').filter(Boolean).length : 0) +
+    (filters.dept ? filters.dept.split(',').filter(Boolean).length : 0) +
+    (filters.minRating > 0 || filters.maxRating < 5 ? 1 : 0) +
+    (filters.minReviews > 1 || filters.maxReviews !== null ? 1 : 0);
+
   return (
     <div className="catalog-page">
 
@@ -582,7 +589,9 @@ export default function ProfessorCatalog() {
               <line x1="4" y1="18" x2="20" y2="18" />
             </svg>
             Filters
-            {hasActiveFilters && <span className="filter-active-dot" />}
+            {activeFilterCount > 0 && (
+              <span className="filter-active-badge">{activeFilterCount}</span>
+            )}
           </button>
           </div>
           <p className="catalog-disclaimer">
