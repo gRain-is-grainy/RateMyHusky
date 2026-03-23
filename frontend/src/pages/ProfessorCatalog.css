@@ -880,10 +880,12 @@
 /* ─── PROFESSOR CARD ───────────────────────────────────────── */
 
 .prof-card {
+  position: relative;
   background: #fff;
   border: 1px solid #e8e8e8;
   border-radius: 14px;
   padding: 18px;
+  padding-right: 92px;
   cursor: pointer;
   display: flex;
   gap: 14px;
@@ -978,11 +980,14 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-bottom: 8px;
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  margin-bottom: 0;
 }
 
 .prof-avg {
-  font-size: 0.84rem;
+  font-size: 0.94rem;
   font-weight: 700;
   color: #333;
 }
@@ -1216,8 +1221,15 @@
 
   .prof-card {
     padding: 10px;
+    padding-right: 74px;
     gap: 8px;
     min-width: 0;
+  }
+
+  .prof-rating-row {
+    top: 10px;
+    right: 10px;
+    gap: 4px;
   }
 
   .catalog-page .prof-avatar {

@@ -9,7 +9,6 @@ import {
   type ProfessorSuggestion,
 } from '../api/api';
 import Footer from '../components/Footer';
-import StarRating from '../components/StarRating';
 import RatingBadge from '../components/RatingBadge';
 import Dropdown from '../components/Dropdown';
 
@@ -744,10 +743,7 @@ export default function ProfessorCatalog() {
 
                     <div className="prof-rating-row">
                       {prof.avgRating != null ? (
-                        <>
-                          <StarRating rating={prof.avgRating} size="sm" />
-                          <span className="prof-avg">{prof.avgRating.toFixed(2)}</span>
-                        </>
+                        <span className="prof-avg">{prof.avgRating.toFixed(2)}</span>
                       ) : (
                         <span className="prof-avg na">N/A</span>
                       )}
