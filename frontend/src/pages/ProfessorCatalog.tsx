@@ -122,9 +122,9 @@ export default function ProfessorCatalog() {
   const [searchPlaceholder, setSearchPlaceholder] = useState('');
 
   const professorExamples = useMemo(() => [
-    "John Doe", "Jane Smith", "Alan Mislove", "Ravi Sundaram",
-    "Dan Felushko", "Ousmane Hicham", "Cristina Nita-Rotaru",
-    "Stacy Marsella", "Kathleen Durant", "Gene Cooperman"
+    "Alan Mislove", "Ravi Sundaram", "Dan Felushko",
+    "Cristina Nita-Rotaru", "Stacy Marsella", "Kathleen Durant",
+    "Gene Cooperman", "Benjamin Yelle", "Peter Topalov"
   ], []);
 
   const searchWrapperRef = useRef<HTMLDivElement>(null);

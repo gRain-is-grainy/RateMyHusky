@@ -113,8 +113,8 @@ const RatingCell = ({ prof, isOpen, onToggle }: {
       className="goat-col-rating goat-rating-wrapper"
       onClick={(e) => { e.stopPropagation(); onToggle(); }}
     >
-      <Stars rating={prof.avgRating} />
-      <span className="goat-score">{prof.avgRating.toFixed(2)}</span>
+      <Stars rating={prof.avgRating ?? 0} />
+      <span className="goat-score">{prof.avgRating?.toFixed(2) ?? '—'}</span>
       <span className="goat-rating-hint">ⓘ</span>
 
       {isOpen && (
@@ -134,7 +134,7 @@ const RatingCell = ({ prof, isOpen, onToggle }: {
           <div className="tooltip-divider" />
           <div className="tooltip-row">
             <span className="tooltip-label">Avg Rating</span>
-            <span className="tooltip-value tooltip-blended">{prof.avgRating.toFixed(2)}</span>
+            <span className="tooltip-value tooltip-blended">{prof.avgRating?.toFixed(2) ?? '—'}</span>
           </div>
         </div>
       )}
