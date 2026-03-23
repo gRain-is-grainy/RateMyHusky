@@ -131,7 +131,7 @@ export default function ProfessorCatalog() {
     return () => window.removeEventListener('resize', onResize);
   }, []);
   const pageSize = useMemo(() => {
-    if (viewportWidth <= 480) return 8;
+    if (viewportWidth <= 480) return 6;
     if (viewportWidth <= 768) return 9;
     return 20;
   }, [viewportWidth]);
