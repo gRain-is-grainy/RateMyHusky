@@ -7,30 +7,108 @@
 	position: static;
 }
 
+/* ── Course card header banner (mirrors prof-card-photo) ── */
+.course-card-header {
+	width: 100%;
+	height: 80px;
+	flex-shrink: 0;
+	background: linear-gradient(135deg, #1b6d5e, #0f4a3e);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	overflow: hidden;
+}
+
+.course-card-code {
+	font-size: 1.3rem;
+	font-weight: 900;
+	color: #fff;
+	letter-spacing: 0.04em;
+	opacity: 0.95;
+}
+
+.dark .course-card-header {
+	background: linear-gradient(135deg, #0f3530, #0a2520);
+}
+
+/* ── Course card info (mirrors prof-card-info) ── */
+.course-card {
+	height: 100%;
+}
+
 .course-card .prof-body {
-	gap: 2px;
+	display: flex;
+	flex-direction: column;
+	flex: 1;
+	padding: 14px;
+	gap: 3px;
+	height: 100%;
 }
 
 .course-card .prof-name {
-	font-size: 1.08rem;
-	font-weight: 800;
-	margin-bottom: 4px;
+	font-size: 0.97rem;
+	font-weight: 700;
+	color: #1a1a1a;
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
+	line-clamp: 2;
+	overflow: hidden;
+	margin: 4px 0 2px;
+	line-height: 1.3;
 }
 
-.course-code {
-	display: inline-block;
-	width: fit-content;
-	font-size: 0.67rem;
-	font-weight: 800;
+.dark .course-card .prof-name {
+	color: #e0e0e0;
+}
+
+.course-card .prof-dept {
+	font-size: 0.62rem;
+	font-weight: 600;
+	color: #bbb;
 	text-transform: uppercase;
-	letter-spacing: 0.05em;
-	background: #e9f5f2;
-	color: #1b6d5e;
-	border-radius: 5px;
-	padding: 2px 7px;
-	margin-bottom: 6px;
+	letter-spacing: 0.06em;
 }
 
+.dark .course-card .prof-dept {
+	color: #555;
+}
+
+/* ── Rating row ── */
+.course-card .prof-rating-row {
+	position: static;
+	margin-top: auto;
+	padding-top: 10px;
+	border-top: 1px solid #f0f0f0;
+	gap: 6px;
+}
+
+.dark .course-card .prof-rating-row {
+	border-top-color: #2e2e2e;
+}
+
+.course-card .prof-avg {
+	font-size: 1.1rem;
+	font-weight: 800;
+	color: #1a1a1a;
+	line-height: 1;
+}
+
+.dark .course-card .prof-avg {
+	color: #e0e0e0;
+}
+
+.course-card .prof-avg.na {
+	color: #bbb;
+	font-weight: 600;
+	font-size: 0.94rem;
+}
+
+.dark .course-card .prof-avg.na {
+	color: #555;
+}
+
+/* ── Search suggestion badge (unchanged) ── */
 .course-suggestion-code {
 	display: inline-block;
 	font-size: 0.72rem;
@@ -41,38 +119,27 @@
 	margin-right: 6px;
 }
 
-.dark .course-code,
 .dark .course-suggestion-code {
 	background: #1c3d38;
 	color: #84d4c3;
 }
 
-/* ── Mobile: single-column list layout ── */
+/* ── Mobile ── */
 @media (max-width: 540px) {
 	.courses-grid {
 		grid-template-columns: 1fr;
 		gap: 8px;
 	}
 
-	.course-card {
-		padding: 14px 16px;
+	.course-card-header {
+		height: 60px;
 	}
 
-	.course-card .prof-name {
-		font-size: 0.96rem;
-		white-space: normal;
-		overflow: visible;
-		text-overflow: unset;
-		line-height: 1.3;
-		margin-bottom: 3px;
+	.course-card-code {
+		font-size: 1.3rem;
 	}
 
-	.course-card .prof-dept {
-		font-size: 0.74rem;
-		margin-bottom: 6px;
-	}
-
-	.course-card .prof-rating-row {
-		margin-bottom: 0;
+	.course-card .prof-body {
+		padding: 12px;
 	}
 }

@@ -431,8 +431,10 @@ export default function Courses() {
 									onClick={() => navigate(`/courses/${course.code.toLowerCase()}`)}
 									onKeyDown={(e) => e.key === 'Enter' && navigate(`/courses/${course.code.toLowerCase()}`)}
 								>
+									<div className="course-card-header">
+										<span className="course-card-code">{course.code}</span>
+									</div>
 									<div className="prof-body">
-										<div className="course-code">{course.code}</div>
 										<h3 className="prof-name">{course.name}</h3>
 										<p className="prof-dept">{course.department}</p>
 
