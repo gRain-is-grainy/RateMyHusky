@@ -4,6 +4,7 @@
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+  font-family: inherit;
 }
 
 html, body, #root {
@@ -13,6 +14,7 @@ html, body, #root {
 }
 
 body {
+  font-family: 'Nunito', sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;

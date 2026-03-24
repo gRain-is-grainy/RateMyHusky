@@ -625,15 +625,15 @@ export default function ProfessorCatalog() {
               )}
             </div>
           <button
-            className="catalog-filter-toggle"
+            className={`catalog-filter-toggle${sidebarOpen ? ' open' : ''}`}
             onClick={() => setSidebarOpen(o => !o)}
             aria-label="Toggle filters"
           >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <line x1="4" y1="6" x2="20" y2="6" />
-              <line x1="4" y1="12" x2="20" y2="12" />
-              <line x1="4" y1="18" x2="20" y2="18" />
-            </svg>
+            <span className="filter-toggle-icon">
+              <span className="filter-toggle-bar" />
+              <span className="filter-toggle-bar" />
+              <span className="filter-toggle-bar" />
+            </span>
             Filters
             {activeFilterCount > 0 && (
               <span className="filter-active-badge">{activeFilterCount}</span>

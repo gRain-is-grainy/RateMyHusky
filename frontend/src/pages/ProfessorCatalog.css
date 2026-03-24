@@ -1131,9 +1131,34 @@
   position: relative;
 }
 
-.catalog-filter-toggle svg {
+.filter-toggle-icon {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
   width: 18px;
-  height: 18px;
+  flex-shrink: 0;
+}
+
+.filter-toggle-bar {
+  display: block;
+  width: 100%;
+  height: 2px;
+  background: currentColor;
+  border-radius: 2px;
+  transition: all 0.3s ease;
+}
+
+.catalog-filter-toggle.open .filter-toggle-bar:nth-child(1) {
+  transform: rotate(45deg) translate(4px, 4px);
+}
+
+.catalog-filter-toggle.open .filter-toggle-bar:nth-child(2) {
+  opacity: 0;
+}
+
+.catalog-filter-toggle.open .filter-toggle-bar:nth-child(3) {
+  transform: rotate(-45deg) translate(4px, -4px);
 }
 
 .filter-active-badge {
