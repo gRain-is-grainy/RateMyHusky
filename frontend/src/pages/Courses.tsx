@@ -441,8 +441,8 @@ export default function Courses() {
 										<div className="prof-rating-row">
 											{course.avgRating != null ? (
 												<>
-													<StarRating rating={course.avgRating} size="sm" />
 													<span className="prof-avg">{course.avgRating.toFixed(2)}</span>
+													<StarRating rating={course.avgRating} size="sm" />
 												</>
 											) : (
 												<span className="prof-avg na">N/A</span>
