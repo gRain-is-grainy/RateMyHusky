@@ -53,6 +53,7 @@ const Course = () => {
 	useEffect(() => {
 		const handler = () => setShowBackToTop(window.scrollY > 300);
 		window.addEventListener('scroll', handler, { passive: true });
+		handler();
 		return () => window.removeEventListener('scroll', handler);
 	}, []);
 

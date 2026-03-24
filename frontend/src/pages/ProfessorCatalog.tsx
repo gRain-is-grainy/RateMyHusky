@@ -744,7 +744,7 @@ export default function ProfessorCatalog() {
                         className="prof-avatar-initials"
                         style={prof.imageUrl ? { display: 'none' } : undefined}
                       >
-                        {initials(prof.name)}
+                        {initials(stripPrefix(prof.name))}
                       </span>
                     </div>
                     <p className="prof-dept">{prof.department}</p>
