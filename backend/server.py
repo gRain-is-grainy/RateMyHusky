@@ -81,6 +81,9 @@ ALIAS_MAP = {
     "john alexis gomez": "john alexis guerra gomez",
     "ji yong shin": "ji-yong shin",
     "ghita amor tijani": "ghita amor-tijani",
+    "bob lupi": "robert lupi",
+    "hany sadaka": "hanai sadaka",
+    "mary- susan potts": "mary-susan potts-santone",
 }
 
 # Build a word-level mapping so partial/typeahead queries also resolve.

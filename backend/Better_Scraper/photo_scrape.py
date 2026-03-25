@@ -145,6 +145,10 @@ def slug_variations(name):
     if len(parts) >= 3:
         # first-middle-last
         slugs.add(re.sub(r'[^a-z0-9]+', '-', f"{parts[0]} {parts[1]} {parts[-1]}").strip('-'))
+        # all-after-first-then-first (COE multi-word last name)
+        # e.g. "Hande Musdal Ondemir" → "musdal-ondemir-hande"
+        rest = ' '.join(parts[1:])
+        slugs.add(re.sub(r'[^a-z0-9]+', '-', f"{rest} {parts[0]}").strip('-'))
 
     return list(slugs)
 
@@ -562,11 +566,12 @@ def match_prof_to_directory(prof, directory_map, slug_index, lastname_index):
 
     # Strategy 4: Last name match with first-name prefix (at least 3 chars)
     # Catches: "Dan Metzger" → "Daniel Metzger", "Chris Lee" → "Christopher Lee"
-    # Requires first 3+ chars to match bidirectionally — NOT just same initial
+    # Also: nickname matches when the directory name is short (≤4 chars) and
+    # shares the first letter — e.g., "Denise Spencer" → "Dee Spencer"
     if len(parts) >= 2:
         first = re.sub(r'[^a-z]', '', parts[0])
         last = re.sub(r'[^a-z]', '', parts[-1])
-        if len(first) >= 3:
+        if len(first) >= 2:
             candidates = lastname_index.get(last, [])
             for entry in candidates:
                 entry_parts = name_to_key(entry['name']).split()
@@ -576,8 +581,13 @@ def match_prof_to_directory(prof, directory_map, slug_index, lastname_index):
                 entry_last = entry_parts[-1]
                 if entry_last != last:
                     continue
-                # Require first 3 chars to match in at least one direction
-                if first[:3] == entry_first[:3]:
+                # Strong match: first 3 chars match
+                if len(first) >= 3 and first[:3] == entry_first[:3]:
+                    return entry
+                # Nickname match: same first letter AND one name is short (≤4 chars)
+                # e.g., Dee/Denise, Bob/Robert won't match (B≠R), but Dee/Denise will
+                if (first[0] == entry_first[0]
+                        and (len(entry_first) <= 4 or len(first) <= 4)):
                     return entry
 
     # Strategy 5: Check if directory has entry with extra/fewer name parts

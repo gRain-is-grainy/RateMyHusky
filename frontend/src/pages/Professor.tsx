@@ -813,7 +813,29 @@ const Professor = () => {
           const code = getFormattedCourseCode(r.course).toUpperCase();
           if (code && !grouped.has(code)) grouped.set(code, []);
         });
-        const sorted = Array.from(grouped.entries()).sort(([a], [b]) => a.localeCompare(b));
+        // Build a map of course code -> most recent review date
+        const recentReviewDate = new Map<string, number>();
+        reviews.forEach(r => {
+          const code = getFormattedCourseCode(r.course).toUpperCase();
+          if (code && r.date) {
+            const ts = new Date(r.date).getTime();
+            if (!recentReviewDate.has(code) || ts > recentReviewDate.get(code)!) {
+              recentReviewDate.set(code, ts);
+            }
+          }
+        });
+        const sorted = Array.from(grouped.entries()).sort(([a, secA], [b, secB]) => {
+          // Primary: most recent review date (descending)
+          const reviewA = recentReviewDate.get(a) || 0;
+          const reviewB = recentReviewDate.get(b) || 0;
+          if (reviewA !== reviewB) return reviewB - reviewA;
+          // Secondary: most recent termId from trace data (descending)
+          const termA = secA.length > 0 ? Math.max(...secA.map(s => s.termId)) : 0;
+          const termB = secB.length > 0 ? Math.max(...secB.map(s => s.termId)) : 0;
+          if (termA !== termB) return termB - termA;
+          // Tertiary: alphabetical
+          return a.localeCompare(b);
+        });
         return (
           <section className="prof-section">
             <div className="prof-section-header">
