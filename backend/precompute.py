@@ -255,7 +255,7 @@ def main():
 
     # ── TRACE proper name lookup ──
     name_sorted = tc.sort_values("term_id", ascending=False).drop_duplicates(subset=["name_key"])
-    name_sorted["_full"] = name_sorted["instructor_first_name"].astype(str).str.strip() + " " + name_sorted["instructor_last_name"].astype(str).str.strip()
+    name_sorted["_full"] = (name_sorted["instructor_first_name"].astype(str).str.strip() + " " + name_sorted["instructor_last_name"].astype(str).str.strip()).str.title()
     valid = name_sorted["instructor_first_name"].astype(str).str.strip().ne("") & name_sorted["instructor_last_name"].astype(str).str.strip().ne("")
     trace_name_lookup = dict(zip(name_sorted.loc[valid, "name_key"], name_sorted.loc[valid, "_full"]))
 
