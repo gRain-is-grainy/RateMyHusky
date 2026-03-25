@@ -41,6 +41,18 @@ ALIAS_MAP = {
     "justin wang": "hsiao-an wang",
     "sakib miazi": "md nazmus sakib miazi",
     "nazmus miazi": "md nazmus sakib miazi",
+    "alex depaoli": "alexander depaoli",
+    "denisee spencer": "denise spencer",
+    "chris bruell": "christopher bruell",
+    "hande ondemir": "hande musdal ondemir",
+    "francis frank georges": "francis georges",
+    "isabel campos": "isabel sobral campos",
+    "mary sue potts-santone": "mary-susan potts-santone",
+    "ronald c. zullo": "ronald zullo",
+    "steve granelli": "steven granelli",
+    "william (bill) goldman": "william goldman",
+    "virgiliu pavlu": "virgil pavlu",
+    "zhiyuan (katherine) zhang": "zhiyuan zhang",
 }
 
 COLLEGE_MAP = {

@@ -38,7 +38,7 @@ def normalize_name(name):
 
 
 def sanitize(text: str) -> str:
-    return _html.escape(str(text), quote=False)
+    return _html.escape(_html.unescape(str(text)), quote=False)
 
 
 def friendly_count(n: int) -> str:
