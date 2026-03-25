@@ -377,7 +377,7 @@ def main():
     tc["_cname"] = tc["_parsed"].apply(lambda x: x[1])
     course_df = tc[tc["_code"].notna()][["_code", "_cname", "department_name"]].drop_duplicates(subset=["_code"])
     course_rows = [
-        (r["_code"], r["_cname"], r["department_name"], r["_code"].lower() + " " + str(r["_cname"]).lower())
+        (r["_code"], r["_cname"], str(r["department_name"]) if pd.notna(r["department_name"]) else "", r["_code"].lower() + " " + str(r["_cname"]).lower())
         for _, r in course_df.iterrows()
     ]
 
@@ -623,20 +623,29 @@ def main():
     chunk_insert(cur, "INSERT INTO _url_ids (course_url, cid, iid, tid) VALUES %s", mapping_rows)
     print(f"  Parsed {len(mapping_rows)} unique URLs")
 
-    # Batch join-update
+    # Batch join-update (smaller batches to avoid CockroachDB serialization failures)
+    COMMENT_BATCH = 5000
     while True:
-        cur.execute("""
-            UPDATE trace_comments tc SET
-                tc_course_id = m.cid,
-                tc_instructor_id = m.iid,
-                tc_term_id = m.tid
-            FROM _url_ids m
-            WHERE tc.course_url = m.course_url
-              AND tc.tc_course_id IS NULL
-            LIMIT %s
-        """, (BATCH_SIZE,))
-        updated = cur.rowcount
-        conn.commit()
+        try:
+            cur.execute("""
+                UPDATE trace_comments tc SET
+                    tc_course_id = m.cid,
+                    tc_instructor_id = m.iid,
+                    tc_term_id = m.tid
+                FROM _url_ids m
+                WHERE tc.course_url = m.course_url
+                  AND tc.tc_course_id IS NULL
+                LIMIT %s
+            """, (COMMENT_BATCH,))
+            updated = cur.rowcount
+            conn.commit()
+        except Exception as e:
+            conn.rollback()
+            cur = conn.cursor()
+            if "restart transaction" in str(e).lower() or "serialization" in str(e).lower():
+                print(f"    retry (serialization conflict)...")
+                continue
+            raise
         if updated == 0:
             break
         print(f"    updated {updated} rows...")

@@ -1,5 +1,8 @@
 """
 Migrate CSV data into CockroachDB.
+Idempotent — safe to re-run. Pre-filters rows client-side to avoid sending
+data the DB already has, minimizing Request Units.
+
 Run:  python backend/migrate_to_crdb.py all
 """
 
@@ -17,7 +20,7 @@ import psycopg2
 from psycopg2.extras import execute_values
 
 DATA_DIR = os.path.join(os.path.dirname(__file__), "Better_Scraper", "output_data")
-BATCH_SIZE = 10000
+BATCH_SIZE = 50000  # larger batches = fewer round trips = fewer RUs
 
 
 def get_connection():
@@ -30,7 +33,29 @@ def create_table(conn, sql: str):
     conn.commit()
 
 
-def upload_csv(conn, table: str, columns: list[str], csv_path: str, transform=None):
+def fetch_existing_keys(conn, table: str, key_columns: list[str], key_query: str = None) -> set:
+    """
+    Fetch existing keys from the DB so we can skip them client-side.
+    Uses key_query if provided (for lightweight proxy keys like DISTINCT course_url),
+    otherwise builds a SELECT from key_columns.
+    """
+    try:
+        sql = key_query or f"SELECT DISTINCT {', '.join(key_columns)} FROM {table}"
+        with conn.cursor() as cur:
+            cur.execute(sql)
+            rows = cur.fetchall()
+        # Unwrap single-column tuples for simpler lookup
+        if len(key_columns) == 1:
+            return {row[0] for row in rows}
+        return {row for row in rows}
+    except Exception:
+        conn.rollback()
+        return set()
+
+
+def upload_csv(conn, table: str, columns: list[str], csv_path: str,
+               transform=None, on_conflict: str = "",
+               key_columns: list[str] = None, existing_keys: set = None):
     if not os.path.exists(csv_path):
         print(f"  File not found: {csv_path}")
         return
@@ -39,32 +64,52 @@ def upload_csv(conn, table: str, columns: list[str], csv_path: str, transform=No
         reader = csv.DictReader(f)
         batch = []
         total = 0
+        skipped = 0
 
         col_names = ", ".join(columns)
-        insert_sql = f"INSERT INTO {table} ({col_names}) VALUES %s"
+        insert_sql = f"INSERT INTO {table} ({col_names}) VALUES %s{' ' + on_conflict if on_conflict else ''}"
+
+        # Find key column indices for client-side filtering
+        key_indices = None
+        single_key = False
+        if key_columns and existing_keys:
+            key_indices = [columns.index(k) for k in key_columns]
+            single_key = len(key_columns) == 1
 
         for row in reader:
             if transform:
                 row = transform(row)
             if row is None:
                 continue
-            batch.append(tuple(row[col] for col in columns))
+            values = tuple(row[col] for col in columns)
+
+            # Skip rows that already exist in DB (saves RUs on conflict checks)
+            if key_indices is not None and existing_keys:
+                if single_key:
+                    key = values[key_indices[0]]
+                else:
+                    key = tuple(values[i] for i in key_indices)
+                if key in existing_keys:
+                    skipped += 1
+                    continue
+
+            batch.append(values)
 
             if len(batch) >= BATCH_SIZE:
                 with conn.cursor() as cur:
                     execute_values(cur, insert_sql, batch, page_size=BATCH_SIZE)
-                conn.commit()
                 total += len(batch)
-                print(f"  Uploaded {total:,} rows...", end="\r")
+                print(f"  Uploaded {total:,} new rows (skipped {skipped:,} existing)...", end="\r")
                 batch = []
 
         if batch:
             with conn.cursor() as cur:
                 execute_values(cur, insert_sql, batch, page_size=BATCH_SIZE)
-            conn.commit()
             total += len(batch)
 
-    print(f"  Done: {total:,} rows inserted.")
+    # Single commit per table instead of per batch
+    conn.commit()
+    print(f"  Done: {total:,} rows inserted, {skipped:,} skipped (already in DB).")
 
 
 # ──────────────────────────────────────────────
@@ -78,11 +123,16 @@ TABLES = {
                 id INT8 DEFAULT unique_rowid() PRIMARY KEY,
                 course_url TEXT NOT NULL,
                 question TEXT,
-                comment TEXT
+                comment TEXT,
+                UNIQUE (course_url, question, comment)
             );
         """,
         "columns": ["course_url", "question", "comment"],
+        # Use just course_url as lightweight filter — skips entire sections cheaply
+        "key_columns": ["course_url"],
+        "key_query": "SELECT DISTINCT course_url FROM trace_comments",
         "csv": "trace_comments.csv",
+        "on_conflict": "ON CONFLICT (course_url, question, comment) DO NOTHING",
         "transform": lambda row: {
             "course_url": row.get("course_url", ""),
             "question": row.get("question", ""),
@@ -99,11 +149,14 @@ TABLES = {
                 num_ratings INT,
                 would_take_again_pct TEXT,
                 level_of_difficulty REAL,
-                professor_url TEXT
+                professor_url TEXT,
+                UNIQUE (name, department)
             );
         """,
         "columns": ["name", "department", "rating", "num_ratings", "would_take_again_pct", "level_of_difficulty", "professor_url"],
+        "key_columns": ["name", "department"],
         "csv": "rmp_professors.csv",
+        "on_conflict": "ON CONFLICT (name, department) DO NOTHING",
         "transform": lambda row: {
             "name": row.get("name", ""),
             "department": row.get("department", ""),
@@ -130,11 +183,16 @@ TABLES = {
                 grade TEXT,
                 textbook TEXT,
                 online_class TEXT,
-                comment TEXT
+                comment TEXT,
+                UNIQUE (professor_name, course, date, comment)
             );
         """,
         "columns": ["professor_name", "department", "overall_rating", "course", "quality", "difficulty", "date", "tags", "attendance", "grade", "textbook", "online_class", "comment"],
+        # Lightweight proxy: skip by (professor, course, date) — avoids fetching full comment text
+        "key_columns": ["professor_name", "course", "date"],
+        "key_query": "SELECT DISTINCT professor_name, course, date FROM rmp_reviews",
         "csv": "rmp_reviews.csv",
+        "on_conflict": "ON CONFLICT (professor_name, course, date, comment) DO NOTHING",
         "transform": lambda row: {
             "professor_name": row.get("professor_name", ""),
             "department": row.get("department", ""),
@@ -166,11 +224,14 @@ TABLES = {
                 department_name TEXT,
                 enrollment INT,
                 display_name TEXT,
-                section TEXT
+                section TEXT,
+                UNIQUE (course_id, instructor_id, term_id)
             );
         """,
         "columns": ["course_id", "school_code", "term_id", "term_title", "instructor_id", "term_end_date", "instructor_first_name", "instructor_last_name", "department_name", "enrollment", "display_name", "section"],
+        "key_columns": ["course_id", "instructor_id", "term_id"],
         "csv": "trace_courses.csv",
+        "on_conflict": "ON CONFLICT (course_id, instructor_id, term_id) DO NOTHING",
         "transform": lambda row: {
             "course_id": int(row["courseId"]) if row.get("courseId") else None,
             "school_code": row.get("schoolCode", ""),
@@ -203,11 +264,16 @@ TABLES = {
                 count_1 INT,
                 mean REAL,
                 median REAL,
-                std_dev REAL
+                std_dev REAL,
+                UNIQUE (course_id, instructor_id, term_id, question)
             );
         """,
         "columns": ["course_id", "instructor_id", "term_id", "enrollment", "completed", "question", "count_5", "count_4", "count_3", "count_2", "count_1", "mean", "median", "std_dev"],
+        # Lightweight proxy: skip by section-level key, avoids fetching question text
+        "key_columns": ["course_id", "instructor_id", "term_id"],
+        "key_query": "SELECT DISTINCT course_id, instructor_id, term_id FROM trace_scores",
         "csv": "trace_scores.csv",
+        "on_conflict": "ON CONFLICT (course_id, instructor_id, term_id, question) DO NOTHING",
         "transform": lambda row: {
             "course_id": int(row["courseId"]) if row.get("courseId") else None,
             "instructor_id": int(row["instructorId"]) if row.get("instructorId") else None,
@@ -231,11 +297,14 @@ TABLES = {
                 id INT8 DEFAULT unique_rowid() PRIMARY KEY,
                 name TEXT NOT NULL,
                 image_url TEXT,
-                source_page TEXT
+                source_page TEXT,
+                UNIQUE (name, source_page)
             );
         """,
         "columns": ["name", "image_url", "source_page"],
+        "key_columns": ["name", "source_page"],
         "csv": "professor_photos.csv",
+        "on_conflict": "ON CONFLICT (name, source_page) DO NOTHING",
         "transform": lambda row: {
             "name": row.get("name", ""),
             "image_url": row.get("image_url", ""),
@@ -245,8 +314,45 @@ TABLES = {
 }
 
 
+UNIQUE_CONSTRAINTS = {
+    "trace_courses": ("uq_trace_courses", "(course_id, instructor_id, term_id)"),
+    "trace_scores": ("uq_trace_scores", "(course_id, instructor_id, term_id, question)"),
+    "trace_comments": ("uq_trace_comments", "(course_url, question, comment)"),
+    "rmp_professors": ("uq_rmp_professors", "(name, department)"),
+    "rmp_reviews": ("uq_rmp_reviews", "(professor_name, course, date, comment)"),
+    "professor_photos": ("uq_professor_photos", "(name, source_page)"),
+}
+
+
+def add_constraints(conn):
+    """Add unique constraints to existing tables (idempotent — skips if already present)."""
+    cur = conn.cursor()
+    for table, (name, cols) in UNIQUE_CONSTRAINTS.items():
+        try:
+            cur.execute(f"ALTER TABLE {table} ADD CONSTRAINT {name} UNIQUE {cols}")
+            conn.commit()
+            print(f"  Added {name} to {table}")
+        except Exception as e:
+            conn.rollback()
+            cur = conn.cursor()
+            if "already exists" in str(e).lower() or "duplicate" in str(e).lower():
+                print(f"  {name} already exists on {table}, skipping")
+            else:
+                print(f"  Warning: could not add {name} to {table}: {e}")
+    cur.close()
+
+
 def main():
     targets = sys.argv[1:] if len(sys.argv) > 1 else ["trace_comments"]
+
+    if targets == ["add-constraints"]:
+        conn = get_connection()
+        print("Connected to CockroachDB!")
+        print("\nAdding unique constraints...")
+        add_constraints(conn)
+        conn.close()
+        print("Done!")
+        return
 
     if targets == ["all"]:
         targets = list(TABLES.keys())
@@ -269,9 +375,23 @@ def main():
         print(f"  Creating table if not exists...")
         create_table(conn, conf["create_sql"])
 
+        # Pre-fetch existing keys to filter client-side (saves RUs)
+        key_columns = conf.get("key_columns")
+        existing_keys = set()
+        if key_columns:
+            print(f"  Fetching existing keys for client-side filtering...")
+            existing_keys = fetch_existing_keys(
+                conn, table_name, key_columns, conf.get("key_query")
+            )
+            print(f"  Found {len(existing_keys):,} existing keys")
+
         print(f"  Reading {conf['csv']}...")
         start = time.time()
-        upload_csv(conn, table_name, conf["columns"], csv_path, conf.get("transform"))
+        upload_csv(
+            conn, table_name, conf["columns"], csv_path,
+            conf.get("transform"), conf.get("on_conflict", ""),
+            key_columns, existing_keys
+        )
         elapsed = time.time() - start
         print(f"  Time: {elapsed:.1f}s")
 
