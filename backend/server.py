@@ -115,7 +115,7 @@ CRDB_DATABASE_URL = os.getenv("CRDB_DATABASE_URL")
 if not CRDB_DATABASE_URL:
     raise RuntimeError("CRDB_DATABASE_URL environment variable is required")
 
-pool = SimpleConnectionPool(1, 5, CRDB_DATABASE_URL, sslmode="require")
+pool = SimpleConnectionPool(5, 20, CRDB_DATABASE_URL, sslmode="require")
 
 # ──────────────────────────────────────────────
 #  Simple in-memory cache (TTL-based)
@@ -769,28 +769,25 @@ def professors_catalog():
         name_keys = [row["name_key"] for row in page_rows]
         placeholders = ",".join(["%s"] * len(name_keys))
 
-        rmp_counts = query(
-            f"SELECT name_key, COUNT(*) as cnt FROM rmp_reviews "
-            f"WHERE name_key IN ({placeholders}) AND comment IS NOT NULL AND comment != '' "
-            f"GROUP BY name_key",
-            name_keys
+        combined_counts = query(
+            f"SELECT name_key, SUM(cnt) as cnt FROM ("
+            f"  SELECT name_key, COUNT(*) as cnt FROM rmp_reviews "
+            f"  WHERE name_key IN ({placeholders}) AND comment IS NOT NULL AND comment != '' "
+            f"  GROUP BY name_key"
+            f"  UNION ALL "
+            f"  SELECT tc2.name_key, COUNT(*) as cnt "
+            f"  FROM trace_comments tc "
+            f"  JOIN trace_courses tc2 ON tc.tc_course_id = tc2.course_id "
+            f"    AND tc.tc_instructor_id = tc2.instructor_id "
+            f"    AND tc.tc_term_id = tc2.term_id "
+            f"  WHERE tc2.name_key IN ({placeholders}) "
+            f"  AND tc.comment IS NOT NULL AND tc.comment != '' "
+            f"  GROUP BY tc2.name_key"
+            f") sub GROUP BY name_key",
+            name_keys + name_keys
         )
-        for r in rmp_counts:
-            comment_counts[r["name_key"]] = comment_counts.get(r["name_key"], 0) + int(r["cnt"])
-
-        trace_counts = query(
-            f"SELECT tc2.name_key, COUNT(*) as cnt "
-            f"FROM trace_comments tc "
-            f"JOIN trace_courses tc2 ON tc.tc_course_id = tc2.course_id "
-            f"  AND tc.tc_instructor_id = tc2.instructor_id "
-            f"  AND tc.tc_term_id = tc2.term_id "
-            f"WHERE tc2.name_key IN ({placeholders}) "
-            f"AND tc.comment IS NOT NULL AND tc.comment != '' "
-            f"GROUP BY tc2.name_key",
-            name_keys
-        )
-        for r in trace_counts:
-            comment_counts[r["name_key"]] = comment_counts.get(r["name_key"], 0) + int(r["cnt"])
+        for r in combined_counts:
+            comment_counts[r["name_key"]] = int(r["cnt"])
 
     professors = []
     for row in page_rows:
