@@ -654,22 +654,6 @@
   gap: 8px;
 }
 
-.trace-comment-bubble.clickable {
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.trace-comment-bubble.clickable:hover {
-  background: #fef8f8;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-  border-color: #fcdada;
-}
-
-.dark .trace-comment-bubble.clickable:hover {
-  background: #2d2424;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-}
 
 .trace-comment-term {
   font-size: 0.72rem;

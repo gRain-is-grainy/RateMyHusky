@@ -1070,9 +1070,7 @@ const Professor = () => {
                           return (
                           <div
                             key={ci}
-                            className={`trace-comment-bubble ${c.courseUrl ? 'clickable' : ''}`}
-                            onClick={() => c.courseUrl && window.open(c.courseUrl, '_blank')}
-                            title={c.courseUrl ? "Click to view original TRACE report" : ""}
+                            className="trace-comment-bubble"
                           >
                             <div className="trace-comment-meta">
                               {hasYear && <span className="trace-comment-term">{term}</span>}
