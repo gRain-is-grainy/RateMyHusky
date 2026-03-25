@@ -882,6 +882,11 @@ def courses_catalog():
     except (ValueError, TypeError):
         max_rating = 5.0
 
+    cache_key = f"coursecat:{q}:{dept}:{sort}:{page}:{limit}:{min_rating}:{max_rating}"
+    cached = cache_get(cache_key)
+    if cached:
+        return jsonify(cached)
+
     # Query course_catalog for listing, then bulk-fetch ratings per page
     count_where = []
     count_params = []
@@ -962,12 +967,14 @@ def courses_catalog():
             "latestTermId": 0,
         })
 
-    return jsonify({
+    result = {
         "courses": courses,
         "total": total,
         "page": page,
         "totalPages": total_pages,
-    })
+    }
+    cache_set(cache_key, result)
+    return jsonify(result)
 
 
 @app.route("/api/courses/<code>")
