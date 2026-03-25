@@ -25,14 +25,27 @@ const SearchBar = () => {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const professorExamples = useMemo(() => [
-    "John Doe", "Jane Smith", "Alan Mislove", "Ravi Sundaram", 
-    "Dan Felushko", "Ousmane Hicham", "Cristina Nita-Rotaru",
-    "Stacy Marsella", "Kathleen Durant", "Gene Cooperman"
+    "Alan Mislove", "Ravi Sundaram", "Dan Felushko", "Cristina Nita-Rotaru",
+    "Stacy Marsella", "Kathleen Durant", "Gene Cooperman", "Amit Shesh",
+    "Mark Sheldon", "Nat Tuck", "Abhi Shelat", "Bryan Lackaye",
+    "Predrag Radivojac", "Martin Schedlbauer", "Laney Strange",
+    "Ben Hescott", "Rajmohan Rajaraman", "Keith Bagley",
+    "Jonathan Meil", "Robert Platt", "Amal Ahmed", "Karl Lieberherr",
+    "Frank Tip", "Jay McCarthy", "Christo Wilson",
+    "Sami Rollins", "David Choffnes", "John Rachlin",
+    "Alina Ene", "Pete Hartman", "Rose Yu", "Ji-Yong Shin",
+    "Jonathan Ullman", "Stavros Tripakis", "Byron Wallace"
   ], []);
 
   const courseExamples = useMemo(() => [
     "CS 2500", "CS 3500", "CS 4500", "ECON 1115", "MATH 1341",
-    "CY 2550", "PHYS 1161", "ACCT 1201", "MKTG 2101", "BIOL 1111"
+    "CY 2550", "PHYS 1161", "ACCT 1201", "MKTG 2101", "BIOL 1111",
+    "CS 1800", "CS 2510", "CS 3000", "CS 3200", "CS 3650",
+    "CS 3700", "CS 3800", "CS 4400", "CS 4530", "CS 4550",
+    "ENGW 1111", "ENGW 3302", "MATH 1342", "MATH 2331", "MATH 3081",
+    "PHYS 1151", "PHYS 1155", "CHEM 1161", "PSYC 1101", "HIST 1130",
+    "EECE 2160", "EECE 2322", "DS 2000", "DS 2001", "DS 3000",
+    "ARTF 1122", "MUSC 1201", "PHIL 1101", "ENVR 1101", "FINA 2201"
   ], []);
 
   // Typing animation logic
