@@ -844,78 +844,7 @@ def courses_catalog():
     except (ValueError, TypeError):
         max_rating = 5.0
 
-    # Build the base query using course_catalog + trace aggregation
-    # course_catalog has: code, name, department, search_text
-    # We need to join with trace data for ratings/sections/enrollment
-    where_clauses = []
-    params = []
-
-    if dept and dept != "All":
-        dept_list = [d.strip() for d in dept.split(",") if d.strip()]
-        if len(dept_list) == 1:
-            where_clauses.append("cc.department = %s")
-            params.append(dept_list[0])
-        elif dept_list:
-            where_clauses.append("cc.department IN (" + ",".join(["%s"] * len(dept_list)) + ")")
-            params.extend(dept_list)
-    if q:
-        where_clauses.append("cc.search_text LIKE %s")
-        params.append(f"%{q}%")
-
-    where_sql = (" AND " + " AND ".join(where_clauses)) if where_clauses else ""
-
-    # Aggregate course stats from trace_courses + trace_scores
-    catalog_sql = f"""
-        WITH course_sections AS (
-            SELECT DISTINCT ON (tc.course_id, tc.instructor_id, tc.term_id)
-                tc.course_id, tc.instructor_id, tc.term_id, tc.term_title,
-                tc.department_name, tc.display_name, tc.enrollment
-            FROM trace_courses tc
-            WHERE tc.display_name IS NOT NULL
-        ),
-        overall_scores AS (
-            SELECT ts.course_id, ts.instructor_id, ts.term_id,
-                   SUM(ts.mean * ts.total_responses) as weighted_sum,
-                   SUM(ts.total_responses) as total_responses
-            FROM trace_scores ts
-            WHERE lower(ts.question) LIKE '%%overall%%'
-            GROUP BY ts.course_id, ts.instructor_id, ts.term_id
-        ),
-        course_agg AS (
-            SELECT cc.code, cc.name, cc.department,
-                   COUNT(cs.course_id) as total_sections,
-                   COUNT(DISTINCT cs.instructor_id) as total_instructors,
-                   COALESCE(SUM(cs.enrollment), 0) as total_enrollment,
-                   COALESCE(SUM(os.total_responses), 0) as total_responses,
-                   CASE WHEN SUM(os.total_responses) > 0
-                        THEN SUM(os.weighted_sum) / SUM(os.total_responses)
-                        ELSE NULL END as avg_rating,
-                   MAX(cs.term_id) as latest_term_id,
-                   MAX(cs.term_title) as latest_term_title
-            FROM course_catalog cc
-            JOIN trace_courses tc ON upper(regexp_replace(
-                split_part(tc.display_name, ':', 1), '[^A-Za-z0-9]', '', 'g'
-            )) = cc.code
-            JOIN course_sections cs ON cs.course_id = tc.course_id
-                AND cs.instructor_id = tc.instructor_id AND cs.term_id = tc.term_id
-            LEFT JOIN overall_scores os ON os.course_id = cs.course_id
-                AND os.instructor_id = cs.instructor_id AND os.term_id = cs.term_id
-            WHERE 1=1 {where_sql}
-            GROUP BY cc.code, cc.name, cc.department
-            HAVING CASE WHEN SUM(os.total_responses) > 0
-                        THEN SUM(os.weighted_sum) / SUM(os.total_responses)
-                        ELSE NULL END IS NOT NULL
-        )
-        SELECT * FROM course_agg
-        {"WHERE avg_rating >= %s AND avg_rating <= %s" if min_rating > 0 or max_rating < 5 else ""}
-    """
-
-    if min_rating > 0 or max_rating < 5:
-        params.extend([min_rating, max_rating])
-
-    # This is complex — use a simpler approach: query course_catalog directly
-    # and do a second query for aggregates
-    # Simplified approach: use course_catalog for listing, compute stats per-request
+    # Query course_catalog for listing, then bulk-fetch ratings per page
     count_where = []
     count_params = []
 
@@ -962,7 +891,7 @@ def courses_catalog():
         placeholders = ",".join(["%s"] * len(codes))
         rating_rows = query(f"""
             SELECT
-                SPLIT_PART(tc.display_name, ':', 1) AS course_code,
+                tc.course_code,
                 SUM(CAST(ts.mean AS FLOAT) * CAST(ts.total_responses AS FLOAT)) AS weighted_sum,
                 SUM(CAST(ts.total_responses AS FLOAT)) AS total_responses
             FROM trace_courses tc
@@ -971,8 +900,8 @@ def courses_catalog():
                 AND tc.instructor_id = ts.instructor_id
                 AND tc.term_id = ts.term_id
             WHERE LOWER(ts.question) LIKE '%%overall%%'
-                AND SPLIT_PART(tc.display_name, ':', 1) IN ({placeholders})
-            GROUP BY course_code
+                AND tc.course_code IN ({placeholders})
+            GROUP BY tc.course_code
         """, codes)
         for rr in rating_rows:
             tr = _safe_float(rr["total_responses"])

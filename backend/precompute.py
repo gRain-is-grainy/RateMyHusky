@@ -509,6 +509,31 @@ def main():
         cur = conn.cursor()
     print(f"  Updated {len(unique_instructors)} unique instructors")
 
+    # 4b. Add precomputed course_code to trace_courses
+    print("Adding course_code to trace_courses...")
+    try:
+        cur.execute("ALTER TABLE trace_courses ADD COLUMN course_code TEXT")
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        cur = conn.cursor()
+
+    cur.execute("""
+        UPDATE trace_courses SET course_code = UPPER(REGEXP_REPLACE(
+            SPLIT_PART(display_name, ':', 1), '[^A-Za-z0-9]', '', 'g'
+        ))
+        WHERE course_code IS NULL AND display_name IS NOT NULL
+    """)
+    conn.commit()
+
+    try:
+        cur.execute("CREATE INDEX idx_tc_course_code ON trace_courses (course_code)")
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        cur = conn.cursor()
+    print("  Done")
+
     # 5. Add name_key to rmp_reviews (batch via temp table)
     print("Adding name_key to rmp_reviews...")
     conn.close()
