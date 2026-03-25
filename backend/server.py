@@ -6,7 +6,7 @@ Install deps:  pip install flask flask-cors flask-limiter psycopg2-binary pyjwt 
 Run:           python server.py
 """
 
-import os, re, unicodedata, json, hashlib
+import os, re, unicodedata, json, hashlib, random
 import html as _html
 import psycopg2
 from psycopg2.pool import SimpleConnectionPool
@@ -15,6 +15,7 @@ from functools import lru_cache
 from dotenv import load_dotenv
 from flask import Flask, g, jsonify, request, redirect, make_response
 from flask_cors import CORS
+from flask_compress import Compress
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 import jwt as pyjwt
@@ -95,6 +96,9 @@ def _name_to_slug(name: str) -> str:
 #  App setup
 # ──────────────────────────────────────────────
 app = Flask(__name__)
+app.config["COMPRESS_MIMETYPES"] = ["application/json", "text/html"]
+app.config["COMPRESS_MIN_SIZE"] = 256
+Compress(app)
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
 CORS(app, supports_credentials=True, origins=[FRONTEND_URL])
 limiter = Limiter(get_remote_address, app=app, default_limits=["120 per minute"])
@@ -115,7 +119,11 @@ CRDB_DATABASE_URL = os.getenv("CRDB_DATABASE_URL")
 if not CRDB_DATABASE_URL:
     raise RuntimeError("CRDB_DATABASE_URL environment variable is required")
 
-pool = SimpleConnectionPool(5, 20, CRDB_DATABASE_URL, sslmode="require")
+pool = SimpleConnectionPool(5, 20, CRDB_DATABASE_URL, sslmode="require",
+                            connect_timeout=5,
+                            options="-c statement_timeout=10000",
+                            keepalives=1, keepalives_idle=30,
+                            keepalives_interval=10, keepalives_count=3)
 
 # ──────────────────────────────────────────────
 #  Simple in-memory cache (TTL-based)
@@ -339,11 +347,16 @@ def goat_professors():
 
 @app.route("/api/random-professor")
 def random_professor():
+    count_row = query_one("SELECT COUNT(*) as cnt FROM professors_catalog WHERE num_ratings >= 3")
+    total = count_row["cnt"] if count_row else 0
+    if total == 0:
+        return jsonify({"error": "No professors found"}), 404
+    offset = random.randint(0, total - 1)
     row = query_one("""
         SELECT * FROM professors_catalog
         WHERE num_ratings >= 3
-        ORDER BY random() LIMIT 1
-    """)
+        LIMIT 1 OFFSET %s
+    """, (offset,))
     if not row:
         return jsonify({"error": "No professors found"}), 404
     return jsonify({

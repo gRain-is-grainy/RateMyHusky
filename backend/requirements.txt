@@ -1,8 +1,10 @@
 flask
 flask-cors
+flask-compress
 flask-limiter
 pyjwt
 requests
 python-dotenv
 gunicorn
+gevent
 psycopg2-binary
