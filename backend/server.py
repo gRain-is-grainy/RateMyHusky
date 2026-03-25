@@ -59,6 +59,28 @@ ALIAS_MAP = {
     "william (bill) goldman": "william goldman",
     "virgiliu pavlu": "virgil pavlu",
     "zhiyuan (katherine) zhang": "zhiyuan zhang",
+    "katherine zhang": "zhiyuan zhang",
+    "bill goldman": "william goldman",
+    "aarti sathyanaran": "aarti sathyanarayana",
+    "akash murty": "akash murthy",
+    "ali chaleshtari": "ali shirzadeh chaleshtari",
+    "sriram rajagopalan": "sriramasundarar rajagopalan",
+    "mauricio codesso": "mauricio mello codesso",
+    "magda cooney": "magdalena cooney",
+    "john lowery": "john lowrey",
+    "iesha karasik": "ieshia karasik",
+    "ifa khan": "iffat khan",
+    "h. david sherman": "h sherman",
+    "ganish krisnamoorthy": "ganesh krishnamoorthy",
+    "farena sultan": "fareena sultan",
+    "cathy merlo": "catherine merlo",
+    "ye yin": "yi yin",
+    "silvio amir": "silvio amir alves moreira",
+    "olin shivers": "olin shivers iii",
+    "rush sanghrajka": "rushit sanghrajka",
+    "john alexis gomez": "john alexis guerra gomez",
+    "ji yong shin": "ji-yong shin",
+    "ghita amor tijani": "ghita amor-tijani",
 }
 
 # Build a word-level mapping so partial/typeahead queries also resolve.
@@ -68,8 +90,11 @@ for _from, _to in ALIAS_MAP.items():
     _from_words = set(_from.split())
     _to_words = set(_to.split())
     for w in _from_words - _to_words:
-        # map each RMP-only word to all target words that aren't in the source
-        _WORD_ALIAS[w] = _to_words - _from_words
+        # Strip parens/punctuation so "(katherine)" becomes "katherine",
+        # "c." becomes "c", matching what normalize_name produces.
+        clean = re.sub(r'[^a-z0-9\-]', '', w)
+        if clean:
+            _WORD_ALIAS[clean] = _to_words - _from_words
 
 
 def resolve_alias(q):
@@ -78,7 +103,7 @@ def resolve_alias(q):
 
 
 def sanitize(text: str) -> str:
-    return _html.escape(_html.unescape(str(text)), quote=False)
+    return _html.unescape(str(text))
 
 
 def friendly_count(n: int) -> str:
