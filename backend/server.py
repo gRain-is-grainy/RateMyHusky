@@ -1111,14 +1111,21 @@ def course_profile(code):
             instructor_data[name]["weighted"] += _safe_float(score_map[key]["weighted_sum"])
             instructor_data[name]["responses"] += _safe_int(score_map[key]["total_responses"])
 
-    # Look up instructor metadata from professors_catalog
+    # Look up instructor metadata from professors_catalog (batched)
+    name_key_map = {normalize_name(name): name for name in instructor_data}
+    name_keys = list(name_key_map.keys())
+    prof_map = {}
+    if name_keys:
+        placeholders = ",".join(["%s"] * len(name_keys))
+        prof_rows = query(
+            f"SELECT name_key, slug, image_url, total_reviews, would_take_again_pct, difficulty "
+            f"FROM professors_catalog WHERE name_key IN ({placeholders})", name_keys
+        )
+        prof_map = {r["name_key"]: r for r in prof_rows}
+
     instructor_rows = []
     for name, data in instructor_data.items():
-        name_key = normalize_name(name)
-        prof = query_one(
-            "SELECT slug, image_url, total_reviews, would_take_again_pct, difficulty "
-            "FROM professors_catalog WHERE name_key = %s", (name_key,)
-        )
+        prof = prof_map.get(normalize_name(name))
         meta_slug = prof["slug"] if prof else ""
         meta_image = prof["image_url"] if prof else None
         meta_reviews = prof["total_reviews"] if prof else 0
