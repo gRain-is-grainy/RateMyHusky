@@ -4,7 +4,7 @@ import { fetchProfessorData, fetchProfessorsCatalog, fetchSearchSuggestions } fr
 import type { CatalogProfessor, ProfessorProfile, ProfessorSuggestion } from '../api/api';
 import StarRating from '../components/StarRating';
 import Footer from '../components/Footer';
-import ThemeToggle from '../components/ThemeToggle';
+
 import './Compare.css';
 
 type Side = 'a' | 'b';
@@ -98,7 +98,7 @@ function Compare() {
 	const [searchParams, setSearchParams] = useSearchParams();
 
 	const [catalog, setCatalog] = useState<CatalogProfessor[]>([]);
-	const [catalogLoading, setCatalogLoading] = useState(true);
+	const [, setCatalogLoading] = useState(true);
 	const [catalogError, setCatalogError] = useState<string | null>(null);
 
 	const [leftQuery, setLeftQuery] = useState('');
@@ -285,10 +285,6 @@ function Compare() {
 	const handleClear = (side: Side) => {
 		if (side === 'a') updateSlugs({ a: '' });
 		else updateSlugs({ b: '' });
-	};
-
-	const handleSwap = () => {
-		updateSlugs({ a: rightSlug, b: leftSlug });
 	};
 
 	const getSlugForSuggestion = (name: string) => {
@@ -541,7 +537,11 @@ function Compare() {
 					<strong>{formatMetric(rating)}</strong>
 					<StarRating rating={rating ?? 0} size="sm" />
 				</div>
-				<Link className="compare-profile-link" to={`/professors/${profSlug}`}>
+				<Link
+					className="compare-profile-link"
+					to={`/professors/${profSlug}`}
+					state={{ fromPage: { label: 'Compare', url: `/compare?${searchParams.toString()}` } }}
+				>
 					View profile
 				</Link>
 			</>
@@ -704,38 +704,40 @@ function Compare() {
 			<section className="compare-metrics">
 				<header className="compare-metrics-header">
 					<h2>Key Comparison Metrics</h2>
-					{!bothSelected && <p>Select both professors to unlock full comparison.</p>}
 					{bothSelected && !bothReady && <p>Loading comparison...</p>}
 				</header>
 
-				{bothReady && <div className="compare-table" role="table" aria-label="Professor metrics comparison table">
-					{compareRows.map((row) => (
-						<div className="compare-row" role="row" key={row.label}>
-							<div
-								className={`compare-cell compare-cell-left ${row.leftClass ?? ''} ${row.winner === 'left' ? 'compare-cell-winner' : ''}`}
-								role="cell"
-							>
-								<span>{row.left}</span>
-								{row.footnoteLeft && <small>{row.footnoteLeft}</small>}
+				<div className="compare-table" role="table" aria-label="Professor metrics comparison table">
+					{compareRows.map((row) => {
+						const showLeft = Boolean(leftSlug) && !leftLoading;
+						const showRight = Boolean(rightSlug) && !rightLoading;
+						return (
+							<div className="compare-row" role="row" key={row.label}>
+								<div
+									className={`compare-cell compare-cell-left ${showLeft ? (row.leftClass ?? '') : ''} ${showLeft && row.winner === 'left' ? 'compare-cell-winner' : ''}`}
+									role="cell"
+								>
+									<span>{showLeft ? row.left : '—'}</span>
+									{showLeft && row.footnoteLeft && <small>{row.footnoteLeft}</small>}
+								</div>
+								<div className="compare-cell compare-cell-label" role="columnheader">
+									{row.label}
+								</div>
+								<div
+									className={`compare-cell compare-cell-right ${showRight ? (row.rightClass ?? '') : ''} ${showRight && row.winner === 'right' ? 'compare-cell-winner' : ''}`}
+									role="cell"
+								>
+									<span>{showRight ? row.right : '—'}</span>
+									{showRight && row.footnoteRight && <small>{row.footnoteRight}</small>}
+								</div>
 							</div>
-							<div className="compare-cell compare-cell-label" role="columnheader">
-								{row.label}
-							</div>
-							<div
-								className={`compare-cell compare-cell-right ${row.rightClass ?? ''} ${row.winner === 'right' ? 'compare-cell-winner' : ''}`}
-								role="cell"
-							>
-								<span>{row.right}</span>
-								{row.footnoteRight && <small>{row.footnoteRight}</small>}
-							</div>
-						</div>
-					))}
-				</div>}
+						);
+					})}
+				</div>
 			</section>
 
 			</main>
 			<Footer />
-			<ThemeToggle />
 		</>
 	);
 }

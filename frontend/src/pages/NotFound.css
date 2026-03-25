@@ -31,8 +31,7 @@
   position: relative;
   z-index: 1;
   width: 100%;
-  max-width: 1240px;
-  margin: 0 auto;
+  padding: 0 clamp(16px, 3vw, 48px);
 }
 
 .not-found-hero {

@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import Footer from '../components/Footer';
-import ThemeToggle from '../components/ThemeToggle';
+
 import huskyIcon from '../assets/neu-husky-icon.png';
 import './NotFound.css';
 
@@ -38,7 +38,6 @@ const NotFound = () => {
         </div>
       </main>
       <Footer />
-      <ThemeToggle />
     </div>
   );
 };

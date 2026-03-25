@@ -2,10 +2,9 @@
 Primary Homepage Codespace
 */
 import { useState, useEffect, useRef, useCallback, useLayoutEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import SearchBar from '../components/SearchBar';
 import Footer from '../components/Footer';
-import ThemeToggle from '../components/ThemeToggle';
 import { fetchStats, fetchColleges, fetchGoatProfessors, fetchRandomProfessor, fetchProfessorsCatalog } from '../api/api';
 import type { Stat, Professor } from '../api/api';
 import neuIcon from '../assets/neu-circle-icon.png';
@@ -114,8 +113,8 @@ const RatingCell = ({ prof, isOpen, onToggle }: {
       className="goat-col-rating goat-rating-wrapper"
       onClick={(e) => { e.stopPropagation(); onToggle(); }}
     >
-      <Stars rating={prof.avgRating} />
-      <span className="goat-score">{prof.avgRating.toFixed(2)}</span>
+      <Stars rating={prof.avgRating ?? 0} />
+      <span className="goat-score">{prof.avgRating?.toFixed(2) ?? '—'}</span>
       <span className="goat-rating-hint">ⓘ</span>
 
       {isOpen && (
@@ -135,7 +134,7 @@ const RatingCell = ({ prof, isOpen, onToggle }: {
           <div className="tooltip-divider" />
           <div className="tooltip-row">
             <span className="tooltip-label">Avg Rating</span>
-            <span className="tooltip-value tooltip-blended">{prof.avgRating.toFixed(2)}</span>
+            <span className="tooltip-value tooltip-blended">{prof.avgRating?.toFixed(2) ?? '—'}</span>
           </div>
         </div>
       )}
@@ -267,6 +266,7 @@ const Homepage = () => {
 
     return () => { cancelled = true; };
   }, [selectedCollege]);
+
 
   const [slotResult, setSlotResult] = useState<{ name: string; dept: string; college: string; slug: string } | null>(null);
   const [wheelState, setWheelState] = useState<'idle' | 'spinning' | 'result'>('idle');
@@ -470,6 +470,15 @@ const Homepage = () => {
             ))
           )}
         </div>
+
+        {selectedCollege && (
+          <Link
+            to={`/professors?college=${encodeURIComponent(selectedCollege)}&sort=rating`}
+            className="goat-view-all"
+          >
+            View all {selectedCollege} professors →
+          </Link>
+        )}
       </section>
 
       {/* ======== Professor Randomizer ======== */}
@@ -480,20 +489,6 @@ const Homepage = () => {
             <p className="randomizer-desc">
               Discover a random professor and check out their ratings. You might find your next favorite class.
             </p>
-            <button
-              className="randomizer-btn"
-              onClick={handleShuffle}
-              disabled={shuffling}
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="16 3 21 3 21 8" />
-                <line x1="4" y1="20" x2="21" y2="3" />
-                <polyline points="21 16 21 21 16 21" />
-                <line x1="15" y1="15" x2="21" y2="21" />
-                <line x1="4" y1="4" x2="9" y2="9" />
-              </svg>
-              {shuffling ? 'Shuffling…' : 'Shuffle Professor'}
-            </button>
           </div>
 
           <div className={`wheel-spinner ${wheelState} ${slotResult ? 'has-result' : ''}`}>
@@ -502,12 +497,15 @@ const Homepage = () => {
             <div className="wheel-shell">
               <div
                 className="wheel-disc"
-                style={{
-                  transform: `rotate(${wheelRotation}deg)`,
-                  transition: wheelDurationMs > 0
-                    ? `transform ${wheelDurationMs}ms cubic-bezier(0.14, 0.78, 0.18, 1)`
-                    : 'none',
-                }}
+                style={wheelState === 'idle'
+                  ? undefined
+                  : {
+                      transform: `rotate(${wheelRotation}deg)`,
+                      transition: wheelDurationMs > 0
+                        ? `transform ${wheelDurationMs}ms cubic-bezier(0.14, 0.78, 0.18, 1)`
+                        : 'none',
+                    }
+                }
               >
                 <div className="wheel-face" />
                 {wheelNames.map((name, i) => (
@@ -525,15 +523,11 @@ const Homepage = () => {
                 className={`wheel-center-btn ${slotResult ? 'winner' : ''}`}
                 onClick={(e) => {
                   e.stopPropagation();
-                  if (slotResult && !shuffling) {
-                    navigate(`/professors/${slotResult.slug}`);
-                    return;
-                  }
                   handleShuffle();
                 }}
                 disabled={shuffling}
               >
-                {shuffling ? 'Spinning...' : slotResult ? 'View Winner' : 'Spin'}
+                {shuffling ? 'Spinning...' : slotResult ? 'Spin Again' : 'Spin'}
               </button>
             </div>
 
@@ -548,7 +542,6 @@ const Homepage = () => {
       </section>
 
       <Footer />
-      <ThemeToggle />
     </div>
   );
 };

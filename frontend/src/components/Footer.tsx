@@ -4,6 +4,7 @@
   - Responsive design for desktop and mobile
 */
 
+import { Link } from 'react-router-dom';
 import logo from '../assets/logo.jpg';
 import './Footer.css';
 
@@ -22,8 +23,8 @@ const Footer = () => {
           <div className="footer-col">
             <h4>Resources</h4>
             <ul>
-              <li><a href="/changelog">Changelog</a></li>
-              <li><a href="/faq">FAQs</a></li>
+              <li><Link to="/changelog">Changelog</Link></li>
+              <li><Link to="/faq">FAQs</Link></li>
             </ul>
           </div>
 
@@ -50,8 +51,8 @@ const Footer = () => {
         </span>
 
         <div className="footer-bottom-links">
-          <a href="/terms">Terms &amp; Conditions</a>
-          <a href="/privacy">Privacy Policy</a>
+          <Link to="/terms">Terms &amp; Conditions</Link>
+          <Link to="/privacy">Privacy Policy</Link>
         </div>
       </div>
     </footer>

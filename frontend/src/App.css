@@ -1,1 +1,15 @@
-/* App-level styles — add as needed */
+/* App-level styles */
+
+/* Page transition animation */
+.page-transition-wrapper {
+  opacity: 1;
+}
+
+.page-fade-in {
+  animation: pageFadeIn 0.2s ease-out;
+}
+
+@keyframes pageFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}

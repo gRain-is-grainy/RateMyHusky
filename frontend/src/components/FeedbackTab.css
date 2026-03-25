@@ -293,8 +293,48 @@
   background: #b82e3f;
 }
 
+/* ---------- FAB (mobile only) ---------- */
+.feedback-fab {
+  display: none;
+  position: fixed;
+  bottom: 80px;
+  right: 16px;
+  z-index: 200;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: #d6394c;
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  transition: background 0.2s;
+}
+
+.feedback-fab svg {
+  width: 20px;
+  height: 20px;
+}
+
+.feedback-fab:hover {
+  background: #b82e3f;
+}
+
 /* ---------- responsive ---------- */
 @media (max-width: 480px) {
+  .feedback-tab {
+    display: none;
+  }
+  .feedback-fab {
+    display: none;
+  }
+
+  .feedback-fab svg {
+    width: 16px;
+    height: 16px;
+  }
   .feedback-overlay {
     justify-content: center;
     align-items: flex-end;
@@ -315,11 +355,6 @@
   }
   .feedback-subtitle {
     font-size: 0.8rem;
-  }
-  .feedback-tab {
-    bottom: 60px;
-    padding: 10px 6px;
-    font-size: 0.7rem;
   }
 }
 
@@ -372,4 +407,12 @@
 .dark .feedback-error {
   background: #3a2020;
   color: #e06070;
+}
+
+.dark .feedback-fab {
+  background: #b82e3f;
+}
+
+.dark .feedback-fab:hover {
+  background: #9e2535;
 }

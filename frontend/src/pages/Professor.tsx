@@ -2,10 +2,11 @@ import { useState, useEffect, useRef, useCallback, useMemo, useLayoutEffect } fr
 import { useParams, Link } from 'react-router-dom';
 import Footer from '../components/Footer';
 import NotFound from './NotFound';
-import ThemeToggle from '../components/ThemeToggle';
+
 import Dropdown from '../components/Dropdown';
 import StarRating from '../components/StarRating';
 import RatingBar from '../components/RatingBar';
+import Breadcrumbs from '../components/Breadcrumbs';
 import { fetchProfessorData } from '../api/api';
 import type { ProfessorProfile, ProfessorReview, TraceComment } from '../api/api';
 import { useAuth } from '../context/AuthContext';
@@ -164,7 +165,15 @@ const Professor = () => {
   const [traceComments, setTraceComments] = useState<TraceComment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [reviewTab, setReviewTab] = useState<'rmp' | 'trace'>('rmp');
+  const [reviewTabRestored] = useState(() => sessionStorage.getItem('prof_review_tab') === 'trace');
+  const [reviewTab, setReviewTab] = useState<'rmp' | 'trace'>(() => {
+    const saved = sessionStorage.getItem('prof_review_tab');
+    if (saved === 'trace') {
+      sessionStorage.removeItem('prof_review_tab');
+      return 'trace';
+    }
+    return 'rmp';
+  });
   const [sortBy, setSortBy] = useState('newest');
   const [visibleReviews, setVisibleReviews] = useState(10);
   const [selectedCourses, setSelectedCourses] = useState<Set<string>>(new Set());
@@ -176,6 +185,11 @@ const Professor = () => {
   const [traceSort, setTraceSort] = useState('popular');
   const [expandedQuestions, setExpandedQuestions] = useState<Record<string, boolean>>({});
   const [visibleCommentsPerQuestion, setVisibleCommentsPerQuestion] = useState<Record<string, number>>({});
+  const [showAllCourses, setShowAllCourses] = useState(false);
+  const [expandedTerms, setExpandedTerms] = useState<Set<string>>(new Set());
+  const [closingTerms, setClosingTerms] = useState<Set<string>>(new Set());
+  const COURSES_COLLAPSED_LIMIT = 5;
+  const MAX_VISIBLE_TERMS = 3;
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
 
   /* ── review pill ── */
@@ -242,7 +256,14 @@ const Professor = () => {
     }
     load();
     return () => { cancelled = true; };
-  }, [slug]);
+  }, [slug, user]);
+
+  /* ── scroll to reviews after sign-in redirect ── */
+  useEffect(() => {
+    if (reviewTabRestored && !loading && user && reviewsRef.current) {
+      reviewsRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [reviewTabRestored, loading, user]);
 
   /* ── back to top ── */
   useEffect(() => {
@@ -414,10 +435,14 @@ const Professor = () => {
     });
     const total = Object.values(counts).reduce((a, b) => a + b, 0);
     if (total === 0) return [];
-    return GRADE_ORDER.filter(g => counts[g]).map(g => ({
+    // Find the range of grades that appear and include all in-between
+    const presentIndices = GRADE_ORDER.map((g, i) => counts[g] ? i : -1).filter(i => i >= 0);
+    const minIdx = Math.min(...presentIndices);
+    const maxIdx = Math.max(...presentIndices);
+    return GRADE_ORDER.slice(minIdx, maxIdx + 1).map(g => ({
       grade: g,
-      count: counts[g],
-      pct: (counts[g] / total) * 100,
+      count: counts[g] || 0,
+      pct: ((counts[g] || 0) / total) * 100,
       color: GRADE_COLORS[g] || '#999'
     }));
   }, [filteredRmpReviews]);
@@ -551,7 +576,9 @@ const Professor = () => {
     setVisibleCommentsPerQuestion(p => ({ ...p, [q]: (p[q] || 5) + 10 }));
   };
 
-  useEffect(() => { setVisibleReviews(10); }, [sortBy, reviewTab, selectedCourses.size]);
+  useEffect(() => { setVisibleReviews(10); }, [sortBy, reviewTab]);
+  // Reset visible reviews when course filter changes, but only if the filtered list got smaller
+  useEffect(() => { setVisibleReviews(v => Math.min(v, Math.max(10, filteredRmpReviews.length))); }, [selectedCourses.size, filteredRmpReviews.length]);
 
   useEffect(() => {
     if (!isImageModalOpen) return;
@@ -573,7 +600,6 @@ const Professor = () => {
         <div className="prof-loading-spinner" />
         <p>Loading professor data…</p>
       </div>
-      <ThemeToggle />
     </div>
   );
 
@@ -581,6 +607,10 @@ const Professor = () => {
 
   return (
     <div className="prof-page">
+      <Breadcrumbs items={[
+        { label: 'Professors', to: '/professors' },
+        { label: profile.name },
+      ]} />
       <header className="prof-hero">
         <div className="prof-hero-bg" style={{ backgroundImage: `url(${neuIcon})` }} />
         <div className="prof-hero-glow" />
@@ -760,7 +790,7 @@ const Professor = () => {
               </div>
             </div>
             <div className="prof-courses-compact">
-              {sorted.map(([code, sections]) => {
+              {sorted.slice(0, COURSES_COLLAPSED_LIMIT).map(([code, sections]) => {
                 const nameMatch = sections[0]?.displayName.match(/\((.+?)\)/);
                 const courseName = nameMatch ? nameMatch[1] : '';
                 const terms = [...new Set(sections.map(s => cleanTerm(s.termTitle)))].filter(t => /\b20\d{2}\b/.test(t)).sort((a, b) => {
@@ -772,11 +802,13 @@ const Professor = () => {
                   const seasonB = b.split(' ')[0];
                   return (order[seasonB] || 0) - (order[seasonA] || 0);
                 });
+                const termsExpanded = expandedTerms.has(code);
+                const hiddenTermCount = terms.length - MAX_VISIBLE_TERMS;
                 const isSelected = selectedCourses.has(code);
                 return (
-                  <div 
-                    key={code} 
-                    className={`prof-course-row ${isSelected ? 'selected' : ''}`} 
+                  <div
+                    key={code}
+                    className={`prof-course-row ${isSelected ? 'selected' : ''}`}
                     onClick={() => toggleCourse(code)}
                   >
                     <div className="prof-course-row-main">
@@ -788,12 +820,124 @@ const Professor = () => {
                     </div>
                     {terms.length > 0 && (
                       <div className="prof-course-term-tags">
-                        {terms.map(t => <span key={t} className="prof-course-term-tag">{t}</span>)}
+                        {terms.slice(0, MAX_VISIBLE_TERMS).map(t => <span key={t} className="prof-course-term-tag">{t}</span>)}
+                        {hiddenTermCount > 0 && !termsExpanded && !closingTerms.has(code) && (
+                          <span
+                            className="prof-course-term-tag prof-course-term-more"
+                            onClick={(e) => { e.stopPropagation(); setExpandedTerms(prev => { const next = new Set(prev); next.add(code); return next; }); }}
+                          >
+                            +{hiddenTermCount} more
+                          </span>
+                        )}
+                        {terms.slice(MAX_VISIBLE_TERMS).map((t, i) => {
+                          const isClosing = closingTerms.has(code);
+                          const reverseI = hiddenTermCount - 1 - i;
+                          return <span key={t} className={`prof-course-term-tag prof-course-term-hidden ${termsExpanded || isClosing ? 'visible' : ''} ${isClosing ? 'closing' : ''}`} style={isClosing ? { animationDelay: `${reverseI * 0.04}s` } : termsExpanded ? { animationDelay: `${i * 0.04}s` } : undefined}>{t}</span>;
+                        })}
+                        {hiddenTermCount > 0 && (termsExpanded || closingTerms.has(code)) && (
+                          <span
+                            className={`prof-course-term-tag prof-course-term-more ${closingTerms.has(code) ? 'closing' : ''}`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (closingTerms.has(code)) return;
+                              setClosingTerms(prev => { const next = new Set(prev); next.add(code); return next; });
+                              setTimeout(() => {
+                                setExpandedTerms(prev => { const next = new Set(prev); next.delete(code); return next; });
+                                setClosingTerms(prev => { const next = new Set(prev); next.delete(code); return next; });
+                              }, hiddenTermCount * 40 + 200);
+                            }}
+                          >
+                            <svg className="prof-term-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="18 15 12 9 6 15" /></svg>
+                          </span>
+                        )}
                       </div>
                     )}
                   </div>
                 );
               })}
+              {sorted.length > COURSES_COLLAPSED_LIMIT && (
+                <>
+                  <div className={`prof-courses-extra ${showAllCourses ? 'open' : ''}`}>
+                    <div>{sorted.slice(COURSES_COLLAPSED_LIMIT).map(([code, sections]) => {
+                      const nameMatch = sections[0]?.displayName.match(/\((.+?)\)/);
+                      const courseName = nameMatch ? nameMatch[1] : '';
+                      const terms = [...new Set(sections.map(s => cleanTerm(s.termTitle)))].filter(t => /\b20\d{2}\b/.test(t)).sort((a, b) => {
+                        const yA = parseInt(a.match(/\d{4}/)?.[0] || '0');
+                        const yB = parseInt(b.match(/\d{4}/)?.[0] || '0');
+                        if (yA !== yB) return yB - yA;
+                        const order: Record<string, number> = { Spring: 1, Summer: 2, Fall: 3, Winter: 4 };
+                        const seasonA = a.split(' ')[0];
+                        const seasonB = b.split(' ')[0];
+                        return (order[seasonB] || 0) - (order[seasonA] || 0);
+                      });
+                      const termsExpanded = expandedTerms.has(code);
+                            const hiddenTermCount = terms.length - MAX_VISIBLE_TERMS;
+                      const isSelected = selectedCourses.has(code);
+                      return (
+                        <div
+                          key={code}
+                          className={`prof-course-row ${isSelected ? 'selected' : ''}`}
+                          onClick={() => toggleCourse(code)}
+                        >
+                          <div className="prof-course-row-main">
+                            <span className="prof-course-code">{code}</span>
+                            <span className="prof-course-title">{courseName || 'Course data from reviews'}</span>
+                            <span className="prof-course-terms">
+                              {sections.length > 0 ? `${sections.length} section${sections.length > 1 ? 's' : ''}` : 'RMP reviews only'}
+                            </span>
+                          </div>
+                          {terms.length > 0 && (
+                            <div className="prof-course-term-tags">
+                              {terms.slice(0, MAX_VISIBLE_TERMS).map(t => <span key={t} className="prof-course-term-tag">{t}</span>)}
+                              {hiddenTermCount > 0 && !termsExpanded && !closingTerms.has(code) && (
+                                <span
+                                  className="prof-course-term-tag prof-course-term-more"
+                                  onClick={(e) => { e.stopPropagation(); setExpandedTerms(prev => { const next = new Set(prev); next.add(code); return next; }); }}
+                                >
+                                  +{hiddenTermCount} more
+                                </span>
+                              )}
+                              {terms.slice(MAX_VISIBLE_TERMS).map((t, i) => {
+                                const isClosing = closingTerms.has(code);
+                                const reverseI = hiddenTermCount - 1 - i;
+                                return <span key={t} className={`prof-course-term-tag prof-course-term-hidden ${termsExpanded || isClosing ? 'visible' : ''} ${isClosing ? 'closing' : ''}`} style={isClosing ? { animationDelay: `${reverseI * 0.04}s` } : termsExpanded ? { animationDelay: `${i * 0.04}s` } : undefined}>{t}</span>;
+                              })}
+                              {hiddenTermCount > 0 && (termsExpanded || closingTerms.has(code)) && (
+                                <span
+                                  className={`prof-course-term-tag prof-course-term-more ${closingTerms.has(code) ? 'closing' : ''}`}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (closingTerms.has(code)) return;
+                                    setClosingTerms(prev => { const next = new Set(prev); next.add(code); return next; });
+                                    setTimeout(() => {
+                                      setExpandedTerms(prev => { const next = new Set(prev); next.delete(code); return next; });
+                                      setClosingTerms(prev => { const next = new Set(prev); next.delete(code); return next; });
+                                    }, hiddenTermCount * 40 + 200);
+                                  }}
+                                >
+                                  <svg className="prof-term-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="18 15 12 9 6 15" /></svg>
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}</div>
+                  </div>
+                  <button
+                    className="prof-courses-toggle"
+                    onClick={() => setShowAllCourses(v => !v)}
+                  >
+                    {showAllCourses ? 'Show fewer' : `+${sorted.length - COURSES_COLLAPSED_LIMIT} more courses`}
+                    <svg
+                      className={`prof-courses-toggle-icon ${showAllCourses ? 'expanded' : ''}`}
+                      width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+                    >
+                      <polyline points="6 9 12 15 18 9" />
+                    </svg>
+                  </button>
+                </>
+              )}
             </div>
           </section>
         );
@@ -914,7 +1058,7 @@ const Professor = () => {
                           <path d="M7 11V7a5 5 0 0 1 10 0v4" />
                         </svg>
                         <p>Sign in with your <strong>husky.neu.edu</strong> account to read these comments.</p>
-                        <button className="paywall-signin-btn small" onClick={(e) => { e.stopPropagation(); setShowSignIn(true); }}>Sign In</button>
+                        <button className="paywall-signin-btn small" onClick={(e) => { e.stopPropagation(); sessionStorage.setItem('prof_review_tab', 'trace'); setShowSignIn(true); }}>Sign In</button>
                       </div>
                     )}
                     {isExpanded && user && (
@@ -961,7 +1105,6 @@ const Professor = () => {
       </section>
 
       <Footer />
-      <ThemeToggle />
       <SignInModal open={showSignIn} onClose={() => setShowSignIn(false)} />
       <button
         className={`prof-back-to-top ${showBackToTop ? 'visible' : ''}`} 

@@ -91,7 +91,12 @@ export interface TraceComment {
 
 /* ---- Fetchers ---- */
 async function get<T>(path: string): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`);
+  const headers: Record<string, string> = {};
+  const token = localStorage.getItem('auth_token');
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  const res = await fetch(`${API_BASE}${path}`, { headers });
   if (!res.ok) throw new Error(`API ${res.status}: ${res.statusText}`);
   return res.json();
 }
@@ -145,6 +150,7 @@ export interface CatalogProfessor {
   rmpRating: number | null;
   traceRating: number | null;
   totalReviews: number;
+  totalComments: number;
   wouldTakeAgainPct: number | null;
   imageUrl: string | null;
 }

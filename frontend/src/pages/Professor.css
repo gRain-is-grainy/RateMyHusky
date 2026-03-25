@@ -41,7 +41,7 @@
 
 /* ═══════════ HERO ═══════════ */
 .prof-hero {
-  position: relative; padding: 130px 48px 52px;
+  position: relative; padding: 36px clamp(16px, 3vw, 48px) 52px;
   background: #f5f5f5; border-bottom: 1px solid #e8e8e8; overflow: hidden;
 }
 .prof-hero-bg {
@@ -56,7 +56,7 @@
   pointer-events: none; z-index: 0;
 }
 .prof-hero-inner {
-  position: relative; z-index: 1; max-width: 1200px; margin: 0 auto;
+  position: relative; z-index: 1;
   display: flex; align-items: flex-start; gap: 36px;
   animation: profFadeIn 0.5s ease both;
 }
@@ -84,7 +84,7 @@
 }
 
 .prof-hero-actions-row {
-  max-width: 1200px; margin: 20px auto 0; padding: 0 48px;
+  margin: 20px 0 0; padding: 0 clamp(16px, 3vw, 48px);
   display: flex; gap: 10px;
   animation: profSlideUp 0.5s 0.45s ease both;
 }
@@ -106,7 +106,7 @@
 
 /* ═══════════ STAT CARDS ═══════════ */
 .prof-stats {
-  max-width: 1200px; margin: 24px auto 0; padding: 0 48px;
+  margin: 24px 0 0; padding: 0 clamp(16px, 3vw, 48px);
   display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px;
   position: relative; z-index: 2;
 }
@@ -117,7 +117,8 @@
   transition: transform 0.2s, box-shadow 0.2s;
   animation: profCardIn 0.5s ease both;
 }
-.prof-stat-card:hover { transform: translateY(-3px); box-shadow: 0 8px 30px rgba(0,0,0,0.1); }
+.prof-stat-card { position: relative; }
+.prof-stat-card:hover { transform: translateY(-3px); box-shadow: 0 8px 30px rgba(0,0,0,0.1); z-index: 10; }
 .prof-stat-card:nth-child(1) { animation-delay: 0.1s; }
 .prof-stat-card:nth-child(2) { animation-delay: 0.15s; }
 .prof-stat-card:nth-child(3) { animation-delay: 0.2s; }
@@ -183,7 +184,7 @@
 .prof-difficulty-fill { height: 100%; border-radius: 3px; transition: width 1.2s cubic-bezier(0.4,0,0.2,1), background 0.5s ease; }
 
 /* ═══════════ SECTIONS ═══════════ */
-.prof-section { max-width: 1200px; margin: 0 auto; padding: 48px 48px 0; width: 100%; }
+.prof-section { padding: 48px clamp(16px, 3vw, 48px) 0; width: 100%; }
 .prof-section-header {
   display: flex;
   align-items: center;
@@ -237,8 +238,76 @@
 .prof-course-code { font-weight: 800; font-size: 0.95rem; color: #d6394c; min-width: 100px; flex-shrink: 0; }
 .prof-course-title { flex: 1; font-size: 0.95rem; font-weight: 600; color: #444; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .prof-course-terms { font-size: 0.82rem; color: #999; font-weight: 600; white-space: nowrap; flex-shrink: 0; }
-.prof-course-term-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
-.prof-course-term-tag { font-size: 0.72rem; font-weight: 700; color: #d6394c; background: #fef0f0; padding: 2px 8px; border-radius: 8px; }
+.prof-course-term-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; align-items: center; }
+.prof-course-term-tag { font-size: 0.72rem; font-weight: 700; color: #d6394c; background: #fef0f0; padding: 2px 8px; border-radius: 8px; white-space: nowrap; }
+.prof-course-term-more { color: #999; background: #f0f0f0; font-style: italic; cursor: pointer; transition: background 0.15s, color 0.15s; }
+.prof-course-term-more:hover { background: #e4e4e4; color: #d6394c; }
+
+.prof-course-term-hidden {
+  display: none;
+  opacity: 0;
+  transform: scale(0.85);
+}
+.prof-course-term-hidden.visible {
+  display: inline-flex;
+  opacity: 1;
+  transform: scale(1);
+  animation: termTagIn 0.25s ease both;
+}
+.prof-course-term-hidden.visible.closing {
+  animation: termTagOut 0.2s ease both;
+}
+
+@keyframes termTagIn {
+  from { opacity: 0; transform: scale(0.85); }
+  to { opacity: 1; transform: scale(1); }
+}
+@keyframes termTagOut {
+  from { opacity: 1; transform: scale(1); }
+  to { opacity: 0; transform: scale(0.85); }
+}
+
+.prof-term-chevron {
+  display: block;
+}
+.prof-course-term-more.closing {
+  pointer-events: none;
+  animation: termTagOut 0.2s ease both;
+}
+
+.prof-courses-extra {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.prof-courses-extra.open {
+  grid-template-rows: 1fr;
+}
+.prof-courses-extra > div {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.prof-courses-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  padding: 14px;
+  border: none;
+  border-top: 1px solid #f0f0f0;
+  background: transparent;
+  color: #d6394c;
+  font-family: 'Nunito', sans-serif;
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.prof-courses-toggle:hover { background: #fef8f8; }
+.prof-courses-toggle-icon { transition: transform 0.3s ease; }
+.prof-courses-toggle-icon.expanded { transform: rotate(180deg); }
 
 /* ═══════════ REVIEWS ═══════════ */
 .prof-reviews-section { padding-bottom: 60px; }
@@ -706,8 +775,8 @@
   bottom: 24px;
   left: 24px;
   z-index: 250;
-  width: 44px;
-  height: 44px;
+  width: 42px;
+  height: 42px;
   border-radius: 50%;
   background: #d6394c;
   color: #fff;
@@ -773,6 +842,10 @@
 .dark .prof-course-title { color: #ccc; }
 .dark .prof-course-terms { color: #777; }
 .dark .prof-course-term-tag { color: #e06070; background: #3a2020; }
+.dark .prof-course-term-more { color: #777; background: #333; }
+.dark .prof-course-term-more:hover { background: #3a3a3a; color: #e06070; }
+.dark .prof-courses-toggle { border-top-color: #333; color: #e06070; }
+.dark .prof-courses-toggle:hover { background: #2d2020; }
 .dark .trace-comment-term { color: #e06070; background: #3a2020; }
 .dark .trace-comment-course { color: #e06070; background: #3a2020; }
 .dark .prof-action-link { color: #e06070; }
@@ -810,21 +883,21 @@
    RESPONSIVE — TABLET (hide TOC)
    ═══════════════════════════════════════ */
 @media (max-width: 768px) {
-  .prof-hero { padding: 100px 20px 36px; }
-  .prof-hero-inner { flex-direction: column; align-items: center; text-align: center; }
-  .prof-avatar { width: 90px; height: 90px; font-size: 1.8rem; }
-  .prof-name { font-size: 1.7rem; }
+  .prof-hero { padding: 28px clamp(12px, 3vw, 20px) 36px; }
+  .prof-hero-inner { flex-direction: row; align-items: center; text-align: left; gap: 16px; }
+  .prof-avatar { width: 72px; height: 72px; font-size: 1.6rem; }
+  .prof-name { font-size: 1.5rem; }
 
-  .prof-hero-actions-row { padding: 0 20px; justify-content: center; }
+  .prof-hero-actions-row { justify-content: center; }
 
-  .prof-stats { grid-template-columns: repeat(3, 1fr); padding: 0 20px; }
-  .prof-section { padding: 36px 20px 0; }
+  .prof-stats { grid-template-columns: repeat(3, 1fr); }
+  .prof-section { padding: 36px clamp(12px, 3vw, 20px) 0; }
 
   .prof-charts-row { grid-template-columns: 1fr; }
 
-  .prof-reviews-header { flex-direction: column; align-items: flex-start; }
-  .prof-review-top { flex-direction: column; }
-  .prof-review-meta { flex-direction: row; align-items: center; }
+  .prof-reviews-header { flex-direction: row; align-items: center; gap: 10px; }
+  .prof-review-top { flex-direction: row; }
+  .prof-review-meta { flex-direction: column; align-items: flex-end; gap: 4px; }
   .prof-reviews-filters { flex-direction: column; }
   .prof-reviews-filters .feedback-dropdown { width: 100%; min-width: unset; }
 
@@ -840,17 +913,17 @@
    RESPONSIVE — SMALL PHONE
    ═══════════════════════════════════════ */
 @media (max-width: 480px) {
-  .prof-hero { padding: 80px 16px 28px; }
+  .prof-hero { padding: 20px clamp(12px, 3vw, 16px) 28px; }
   .prof-name { font-size: 1.4rem; }
   .prof-dept { font-size: 0.88rem; }
-  .prof-avatar { width: 76px; height: 76px; font-size: 1.5rem; }
+  .prof-avatar { width: 60px; height: 60px; font-size: 1.3rem; }
 
-  .prof-hero-actions-row { padding: 0 16px; flex-direction: column; align-items: stretch; }
-  .prof-compare-btn, .prof-rmp-btn { justify-content: center; }
+  .prof-hero-actions-row { flex-direction: column; align-items: center; }
+  .prof-compare-btn, .prof-rmp-btn { justify-content: center; min-width: 180px; }
 
-  .prof-stats { padding: 0 16px; grid-template-columns: repeat(2, 1fr); }
+  .prof-stats { grid-template-columns: repeat(2, 1fr); }
   .prof-stat-value { font-size: 1.5rem; }
-  .prof-section { padding: 28px 16px 0; }
+  .prof-section { padding: 28px clamp(12px, 3vw, 16px) 0; }
   .prof-section-title { font-size: 1.15rem; }
 
   .prof-review-card { padding: 16px 18px; }

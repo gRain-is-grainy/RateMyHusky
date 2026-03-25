@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import ThemeToggle from '../components/ThemeToggle';
 import StarRating from '../components/StarRating';
 import NotFound from './NotFound';
 import { fetchCourseData } from '../api/api';
 import type { CourseDetail } from '../api/api';
 import Footer from '../components/Footer';
+import { getInitials } from '../utils/nameUtils';
 import './Course.css';
 
 const INITIAL_INSTRUCTORS_VISIBLE = 5;
@@ -20,6 +20,7 @@ const Course = () => {
 	const [notFound, setNotFound] = useState(false);
 	const [visibleInstructorCount, setVisibleInstructorCount] = useState(INITIAL_INSTRUCTORS_VISIBLE);
 	const [visibleSectionCount, setVisibleSectionCount] = useState(INITIAL_SECTIONS_VISIBLE);
+	const [showBackToTop, setShowBackToTop] = useState(false);
 
 	useEffect(() => {
 		let cancelled = false;
@@ -49,6 +50,13 @@ const Course = () => {
 		setVisibleSectionCount(INITIAL_SECTIONS_VISIBLE);
 	}, [course?.summary.code]);
 
+	useEffect(() => {
+		const handler = () => setShowBackToTop(window.scrollY > 300);
+		window.addEventListener('scroll', handler, { passive: true });
+		handler();
+		return () => window.removeEventListener('scroll', handler);
+	}, []);
+
 	const topInstructors = useMemo(() => {
 		if (!course) return [];
 		return [...course.instructors]
@@ -65,7 +73,6 @@ const Course = () => {
 	if (loading) {
 		return (
 			<div className="course-page">
-				<ThemeToggle />
 				<div className="course-shell">
 					<div className="course-loading">Loading course data...</div>
 				</div>
@@ -89,7 +96,6 @@ const Course = () => {
 
 	return (
 		<div className="course-page">
-			<ThemeToggle />
 			<div className="course-shell">
 				<div className="course-breadcrumb">
 					<Link to="/courses">Courses</Link>
@@ -133,6 +139,7 @@ const Course = () => {
 							{topInstructors.map((prof, index) => (
 								<Link
 									to={prof.slug ? `/professors/${prof.slug}` : '#'}
+									state={prof.slug ? { fromPage: { label: `${code.toUpperCase()} – ${summary.name}`, url: `/courses/${code}` } } : undefined}
 									className={`course-top-prof-card${prof.slug ? '' : ' disabled'}`}
 									key={`${prof.name}-${index}`}
 									aria-label={prof.slug ? `View ${prof.name}` : `${prof.name} profile unavailable`}
@@ -185,7 +192,7 @@ const Course = () => {
 						<h2>Instructor Breakdown</h2>
 					</div>
 					<div className="course-table-wrap">
-						<table className="course-table">
+						<table className="course-table instructor-table">
 							<thead>
 								<tr>
 									<th>Instructor</th>
@@ -245,7 +252,7 @@ const Course = () => {
 						<h2>Section History</h2>
 					</div>
 					<div className="course-table-wrap">
-						<table className="course-table">
+						<table className="course-table section-table">
 							<thead>
 								<tr>
 									<th>Term</th>
@@ -303,7 +310,16 @@ const Course = () => {
 				</section>
 
 			</div>
-			<Footer />
+			<button
+			className={`back-to-top ${showBackToTop ? 'visible' : ''}`}
+			onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+			aria-label="Back to top"
+		>
+			<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+				<polyline points="18 15 12 9 6 15" />
+			</svg>
+		</button>
+		<Footer />
 		</div>
 	);
 };
@@ -315,15 +331,6 @@ function StatCard({ label, value }: { label: string; value: string }) {
 			<strong>{value}</strong>
 		</article>
 	);
-}
-
-function getInitials(name: string): string {
-	return name
-		.split(' ')
-		.filter(Boolean)
-		.slice(0, 2)
-		.map((part) => part[0]?.toUpperCase() ?? '')
-		.join('');
 }
 
 export default Course;

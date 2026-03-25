@@ -7,7 +7,7 @@
 .rating-bar-star {
   font-size: 0.9rem;
   font-weight: 700;
-  color: #888;
+  color: #f5a623;
   width: 40px;
   text-align: right;
   flex-shrink: 0;
@@ -43,7 +43,7 @@
 }
 
 .dark .rating-bar-star {
-  color: #999;
+  color: #f5a623;
 }
 
 .dark .rating-bar-count {

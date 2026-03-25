@@ -107,7 +107,7 @@
    SHARED SECTION STYLES
    ============================== */
 .section {
-  padding: 60px 48px;
+  padding: 60px clamp(16px, 3vw, 48px);
 }
 
 .section-header {
@@ -270,6 +270,22 @@
 
 @keyframes goatSpin {
   to { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+.goat-view-all {
+  display: block;
+  text-align: center;
+  margin-top: 16px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #d6394c;
+  text-decoration: none;
+  transition: color 0.15s;
+}
+
+.goat-view-all:hover {
+  color: #b82e3f;
+  text-decoration: underline;
 }
 
 .goat-header-row {
@@ -483,7 +499,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 48px;
-  max-width: 900px;
+  max-width: 1100px;
   margin: 0 auto;
 }
 
@@ -565,6 +581,15 @@
   border-radius: 50%;
   position: relative;
   box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.5), inset 0 0 0 2px rgba(0, 0, 0, 0.12);
+}
+
+.wheel-spinner.idle .wheel-disc {
+  animation: wheelIdleSpin 20s linear infinite;
+}
+
+@keyframes wheelIdleSpin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
 }
 
 .wheel-face {
@@ -744,6 +769,14 @@
   color: #fff !important;
 }
 
+.dark .goat-view-all {
+  color: #e06070;
+}
+
+.dark .goat-view-all:hover {
+  color: #d6394c;
+}
+
 .dark .goat-leaderboard {
   background: #242424;
   box-shadow: 0 2px 12px rgba(0,0,0,0.2);
@@ -874,7 +907,8 @@
   }
 
   .stats-banner {
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
     gap: 24px 40px;
     padding: 36px 24px;
   }

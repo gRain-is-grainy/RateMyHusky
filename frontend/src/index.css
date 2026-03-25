@@ -4,15 +4,17 @@
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+  font-family: inherit;
 }
 
 html, body, #root {
   height: 100%;
   width: 100%;
-  overflow-x: hidden;
+  overflow-x: clip;
 }
 
 body {
+  font-family: 'Nunito', sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -23,7 +25,7 @@ body {
 
 /* Prevent horizontal overflow on mobile */
 #root {
-  overflow-x: hidden;
+  overflow-x: clip;
 }
 
 /* Ensure images don't break layout */

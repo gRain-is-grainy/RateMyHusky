@@ -1,63 +1,81 @@
-## Run
-
-Unzip `trace_comments.zip` into the `backend/Better_Scraper/output_data/` directory.
-
-**Backend:**
-```
-pip install flask flask-cors pandas numpy
 # RateMyHusky
 
-A full-stack web application for searching, browsing, and comparing Northeastern University professors. Aggregates ratings from **RateMyProfessors (RMP)** and **TRACE** (NEU's official course evaluations).
+RateMyHusky is a full-stack web app for discovering, searching, and comparing Northeastern University professors.
+
+It combines:
+- RateMyProfessors (RMP) data
+- TRACE course evaluation data
+- Internal profile metadata such as course history and professor photos
 
 ## Features
 
-- **Professor Catalog** — Browse and filter professors by college, department, rating range, and review count
-- **Professor Profiles** — View RMP ratings, TRACE scores, course history, and student comments
-- **Compare** — Side-by-side comparison of two professors across key metrics
-- **Shuffle** — Slot-machine randomizer to discover professors
-- **Search** — Autocomplete search for professors and courses
-- **Google OAuth** — Sign in with your `husky.neu.edu` account (required for TRACE comments)
-- **Dark Mode** — Full theme toggle support
-- **Mobile Friendly** — Responsive layout across all pages
+- Professor catalog with filters for college, department, ratings, and review volume
+- Professor profile pages with RMP ratings, TRACE scores, comments, and related courses
+- Side-by-side professor comparison view
+- Search with autocomplete for professors and courses
+- Shuffle/random discovery experience
+- Google OAuth sign-in flow for gated functionality
+- Responsive UI with theme support
 
 ## Tech Stack
 
-| Layer    | Technology                                    |
-| -------- | --------------------------------------------- |
-| Frontend | React 19, TypeScript, Vite, React Router DOM  |
-| Backend  | Python 3, Flask, Pandas, NumPy                |
-| Auth     | Google OAuth 2.0, PyJWT                       |
-| Data     | CSV files (RMP scrapes, TRACE exports, photos)|
+| Layer | Technology |
+| --- | --- |
+| Frontend | React 19, TypeScript, Vite, React Router |
+| Backend | Python, Flask, Flask-CORS, Flask-Limiter |
+| Auth | Google OAuth 2.0, JWT (PyJWT) |
+| Database | CockroachDB (via psycopg2) |
+| Data ingestion | CSV-based scraper outputs + migration scripts |
 
-## Setup
-
-### Prerequisites
+## Prerequisites
 
 - Python 3.8+
 - Node.js 18+
-- Unzip `trace_comments.zip` into `backend/Better_Scraper/output_data/`
+- npm
+- A reachable CockroachDB instance
 
-### Backend
+## Quick Start
+
+1. Install backend dependencies.
+2. Configure backend environment variables.
+3. Start backend API server.
+4. Install frontend dependencies.
+5. Start frontend dev server.
+
+Detailed commands are below.
+
+## Backend Setup
+
+From the repository root:
 
 ```bash
-pip install flask flask-cors flask-limiter pandas numpy pyjwt requests python-dotenv
+pip install -r backend/requirements.txt
 ```
 
-Create `backend/.env`:
+Create backend/.env with at least:
 
-```
-GOOGLE_CLIENT_ID=<your-google-oauth-client-id>
-GOOGLE_CLIENT_SECRET=<your-google-oauth-client-secret>
+```env
+CRDB_DATABASE_URL=<your-cockroachdb-connection-string>
 JWT_SECRET=<generate-with-openssl-rand-hex-32>
 ```
+
+Optional (required for Google OAuth login flow):
+
+```env
+GOOGLE_CLIENT_ID=<your-google-oauth-client-id>
+GOOGLE_CLIENT_SECRET=<your-google-oauth-client-secret>
+FRONTEND_URL=http://localhost:5173
+```
+
+Run the backend:
 
 ```bash
 python backend/server.py
 ```
 
-If `python` doesn't work, use `python3` and `pip3` instead.
+Backend default: http://localhost:5001
 
-### Frontend
+## Frontend Setup
 
 ```bash
 cd frontend
@@ -65,28 +83,51 @@ npm install
 npm run dev
 ```
 
-The app runs at [http://localhost:5173](http://localhost:5173) with the backend on port 5000.
+Frontend default: http://localhost:5173
+
+The frontend calls the backend API on port 5001 in local development.
+
+## Data Notes
+
+- Scraper files are in backend/Better_Scraper.
+- CSV outputs are stored in backend/Better_Scraper/output_data.
+- The backend runtime serves data from CockroachDB, so CSV files are for ingestion/migration workflows.
+- If you are running scraper workflows that depend on TRACE comments, unzip trace_comments.zip into backend/Better_Scraper/output_data.
 
 ## Project Structure
 
-```
+```text
+.
 ├── backend/
-│   ├── server.py                  # Flask API server
-│   ├── .env                       # OAuth & JWT secrets (not committed)
+│   ├── server.py
+│   ├── requirements.txt
+│   ├── migrate_to_crdb.py
+│   ├── precompute.py
 │   └── Better_Scraper/
-│       └── output_data/           # CSV data files
-│           ├── rmp_professors.csv
-│           ├── rmp_reviews.csv
-│           ├── trace_courses.csv
-│           ├── trace_scores.csv
-│           ├── trace_comments.csv
-│           └── professor_photos.csv
+│       └── output_data/
 ├── frontend/
+│   ├── package.json
 │   └── src/
-│       ├── App.tsx                # Routes
-│       ├── api/api.ts             # API client
-│       ├── context/AuthContext.tsx # Auth provider
-│       ├── components/            # Navbar, SignInModal, Feedback
-│       └── pages/                 # Homepage, ProfessorCatalog, Professor, Compare
+│       ├── api/
+│       ├── components/
+│       ├── context/
+│       └── pages/
 └── README.md
+```
+
+## Useful Commands
+
+Backend:
+
+```bash
+python backend/server.py
+```
+
+Frontend:
+
+```bash
+cd frontend
+npm run dev
+npm run build
+npm run preview
 ```

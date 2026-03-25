@@ -63,6 +63,17 @@
   color: #888;
 }
 
+/* compact on mobile */
+@media (max-width: 700px) {
+  .rating-badge-sm {
+    padding: 4px 7px;
+    border-radius: 8px;
+    gap: 2px;
+  }
+  .rating-badge-sm .rating-badge-value { font-size: 0.78rem; }
+  .rating-badge-sm .rating-badge-label { font-size: 0.52rem; }
+}
+
 /* dark */
 .dark .rating-badge[data-color='high'] {
   background: #1a3a25;
