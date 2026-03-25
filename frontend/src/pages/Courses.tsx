@@ -83,6 +83,12 @@ export default function Courses() {
 	const [sidebarOpen, setSidebarOpen] = useState(false);
 	const [deptOpen, setDeptOpen] = useState(false);
 
+	useEffect(() => {
+		const close = () => setSidebarOpen(false);
+		window.addEventListener('close-filter-sidebar', close);
+		return () => window.removeEventListener('close-filter-sidebar', close);
+	}, []);
+
 	const [minRatingDraft, setMinRatingDraft] = useState(() => getFiltersFromSearchParams(searchParams).minRating);
 	const [maxRatingDraft, setMaxRatingDraft] = useState(() => getFiltersFromSearchParams(searchParams).maxRating);
 

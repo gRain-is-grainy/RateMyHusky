@@ -324,11 +324,12 @@
     top: 0;
     right: -280px;
     width: 260px;
-    height: 100vh;
+    height: 100dvh;
     flex-direction: column;
     align-items: flex-start;
     gap: 0;
-    padding: 72px 28px 28px;
+    padding: 48px 28px 28px;
+    overflow-y: auto;
     background: #fff;
     box-shadow: -4px 0 20px rgba(0,0,0,0.1);
     transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);

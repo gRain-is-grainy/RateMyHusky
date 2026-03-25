@@ -438,12 +438,14 @@ def extract_photo_from_profile(html, page_url):
             except ValueError:
                 pass
 
-        # Skip images inside site-level chrome.
-        # Only skip <nav> tags and elements with explicit site-level classes.
-        # Do NOT skip <header>/<footer> tags — many pages use these for content.
+        # Skip images inside site-level chrome (nav elements, mega-menus).
+        # Stop checking at body/html level — body often has theme classes
+        # like "mega-menu-primary" that would cause false positives.
         in_skip_section = False
         for depth, parent in enumerate(img.parents):
-            if depth > 4:
+            if depth > 5:
+                break
+            if parent.name in ('body', 'html', '[document]'):
                 break
             if parent.name == 'nav':
                 in_skip_section = True

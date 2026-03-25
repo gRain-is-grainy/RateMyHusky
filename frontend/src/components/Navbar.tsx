@@ -117,7 +117,7 @@ const Navbar = () => {
       {/* Hamburger button — mobile only */}
       <button
         className={`hamburger ${menuOpen ? 'open' : ''}`}
-        onClick={() => setMenuOpen(!menuOpen)}
+        onClick={() => { if (!menuOpen) window.dispatchEvent(new CustomEvent('close-filter-sidebar')); setMenuOpen(!menuOpen); }}
         aria-label="Toggle menu"
       >
         <span />
