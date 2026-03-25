@@ -60,7 +60,7 @@ const Dropdown = ({ options, value, onChange, placeholder, className = '' }: Dro
       </button>
 
       {isOpen && (
-        <ul className="dropdown-menu">
+        <ul className="dropdown-menu" onMouseDown={(e) => { if (e.target === e.currentTarget) setIsOpen(false); }}>
           {options.map((opt, i) => (
             <li
               key={opt.value}

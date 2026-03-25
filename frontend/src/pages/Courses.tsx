@@ -14,7 +14,7 @@ import './ProfessorCatalog.css';
 import './Courses.css';
 
 const SORT_OPTIONS = [
-	{ value: 'alpha', label: 'Code A-Z' },
+	{ value: 'alpha', label: 'A - Z' },
 	{ value: 'rating', label: 'Highest Rating' },
 	{ value: 'sections', label: 'Most Sections' },
 	{ value: 'recent', label: 'Most Recent' },
