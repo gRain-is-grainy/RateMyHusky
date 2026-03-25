@@ -163,7 +163,9 @@ const Homepage = () => {
   // Navigate to professor page
   const handleProfClick = (name: string) => {
     const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-    navigate(`/professors/${slug}`);
+    navigate(`/professors/${slug}`, {
+      state: { fromPage: { label: 'GOATED Professors', url: '/#goated' } },
+    });
   };
 
   const updatePill = useCallback(() => {
@@ -389,7 +391,7 @@ const Homepage = () => {
       </section>
 
       {/* ======== GOAT Professors Leaderboard ======== */}
-      <section className="section goat-section">
+      <section id="goated" className="section goat-section">
         <div className="section-header">
           <h2 className="section-title">GOATED Professors</h2>
         </div>
