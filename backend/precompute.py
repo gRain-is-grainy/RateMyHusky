@@ -454,6 +454,7 @@ def main():
         )
     """)
     chunk_insert(cur, "INSERT INTO course_catalog (code, name, department, search_text) VALUES %s", course_rows)
+    cur.execute("CREATE INDEX idx_cc_dept ON course_catalog (department)")
     conn.commit()
     print(f"  Inserted {len(course_rows)} courses")
 
