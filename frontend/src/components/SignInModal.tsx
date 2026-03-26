@@ -1,7 +1,10 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import neuIcon from '../assets/neu-circle-icon.png';
 import './SignInModal.css';
+
+const CLOSE_DURATION = 200; // ms — must match CSS animation duration
 
 interface Props {
   open: boolean;
@@ -10,6 +13,17 @@ interface Props {
 
 export default function SignInModal({ open, onClose }: Props) {
   const { login, user } = useAuth();
+  const navigate = useNavigate();
+  const [closing, setClosing] = useState(false);
+
+  const animatedClose = (callback?: () => void) => {
+    setClosing(true);
+    setTimeout(() => {
+      setClosing(false);
+      onClose();
+      callback?.();
+    }, CLOSE_DURATION);
+  };
 
   // Auto-close modal when user logs in (e.g. after mobile redirect)
   useEffect(() => {
@@ -29,10 +43,15 @@ export default function SignInModal({ open, onClose }: Props) {
 
   if (!open) return null;
 
+  const handleLinkClick = (e: React.MouseEvent<HTMLAnchorElement>, path: string) => {
+    e.preventDefault();
+    animatedClose(() => navigate(path));
+  };
+
   return (
-    <div className="signin-modal-overlay" onClick={onClose}>
-      <div className="signin-modal" onClick={e => e.stopPropagation()}>
-        <button className="signin-modal-close" onClick={onClose} aria-label="Close">
+    <div className={`signin-modal-overlay${closing ? ' closing' : ''}`} onClick={() => animatedClose()}>
+      <div className={`signin-modal${closing ? ' closing' : ''}`} onClick={e => e.stopPropagation()}>
+        <button className="signin-modal-close" onClick={() => animatedClose()} aria-label="Close">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
             <line x1="18" y1="6" x2="6" y2="18" />
             <line x1="6" y1="6" x2="18" y2="18" />
@@ -49,9 +68,9 @@ export default function SignInModal({ open, onClose }: Props) {
 
         <p className="signin-modal-terms">
           By signing in, you agree to our{' '}
-          <a href="/terms" target="_blank" rel="noopener noreferrer">Terms of Service</a>
+          <a href="/terms" onClick={e => handleLinkClick(e, '/terms')}>Terms of Service</a>
           {' '}and{' '}
-          <a href="/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a>.
+          <a href="/privacy" onClick={e => handleLinkClick(e, '/privacy')}>Privacy Policy</a>.
         </p>
 
         <button className="signin-modal-google-btn" onClick={login}>
