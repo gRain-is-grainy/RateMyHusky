@@ -81,20 +81,6 @@ const Navbar = () => {
     };
   }, [updatePill]);
 
-  // Lock body scroll and close menu on scroll when mobile menu is open
-  useEffect(() => {
-    if (menuOpen) {
-      document.body.style.overflow = 'hidden';
-      const handleScroll = () => setMenuOpen(false);
-      window.addEventListener('scroll', handleScroll, { passive: true });
-      return () => {
-        document.body.style.overflow = '';
-        window.removeEventListener('scroll', handleScroll);
-      };
-    } else {
-      document.body.style.overflow = '';
-    }
-  }, [menuOpen]);
 
   // Close user dropdown on outside click
   useEffect(() => {
