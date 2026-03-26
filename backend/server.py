@@ -187,15 +187,18 @@ def cache_set(key, data):
 
 def get_db():
     if 'db' not in g:
-        g.db = _get_pool().getconn()
+        key = id(g._get_current_object() if hasattr(g, '_get_current_object') else g)
+        g.db_key = key
+        g.db = _get_pool().getconn(key=key)
     return g.db
 
 
 @app.teardown_appcontext
 def return_db(exc):
     db = g.pop('db', None)
+    key = g.pop('db_key', None)
     if db is not None:
-        _get_pool().putconn(db)
+        _get_pool().putconn(db, key=key)
 
 
 def query(sql, params=None):

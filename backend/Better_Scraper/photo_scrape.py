@@ -739,17 +739,39 @@ def save_csv(results, output_path):
 
     with_photos = [r for r in results if r['image_url']]
 
-    # Count how many professors share each image URL
-    from collections import Counter
-    url_counts = Counter(r['image_url'] for r in with_photos)
-    duplicate_urls = {url for url, count in url_counts.items() if count > 1}
+    # Drop image URLs shared by professors with DIFFERENT last names.
+    # Same person listed twice (e.g., "William Goldman" & "William (Bill) Goldman",
+    # or "Mary Potts" & "Mary Potts-Santone") legitimately shares the same photo.
+    # We check if last names share a common root (any substring overlap ≥4 chars).
+    from collections import defaultdict
+    url_lastnames = defaultdict(set)
+    for r in with_photos:
+        parts = normalize_name(r['name']).split()
+        # Use last name with hyphens stripped to a base form
+        last = re.sub(r'[^a-z]', '', parts[-1]) if parts else ''
+        url_lastnames[r['image_url']].add(last)
 
-    if duplicate_urls:
+    def names_are_same_person(name_set):
+        """Check if a set of last names likely belong to the same person."""
+        names = list(name_set)
+        if len(names) <= 1:
+            return True
+        # Check if any name is a substring of another (potts in pottssantone)
+        for i, a in enumerate(names):
+            for b in names[i+1:]:
+                if a in b or b in a:
+                    return True
+        return False
+
+    bad_urls = {url for url, names in url_lastnames.items()
+                if len(names) > 1 and not names_are_same_person(names)}
+
+    if bad_urls:
         before = len(with_photos)
-        with_photos = [r for r in with_photos if r['image_url'] not in duplicate_urls]
+        with_photos = [r for r in with_photos if r['image_url'] not in bad_urls]
         dropped = before - len(with_photos)
-        print(f"  Dropped {dropped} entries with duplicate image URLs "
-              f"({len(duplicate_urls)} shared URLs)")
+        print(f"  Dropped {dropped} entries with mismatched duplicate image URLs "
+              f"({len(bad_urls)} shared URLs)")
 
     with open(output_path, 'w', newline='', encoding='utf-8') as f:
         writer = csv.DictWriter(f, fieldnames=['name', 'image_url', 'source_page'])
