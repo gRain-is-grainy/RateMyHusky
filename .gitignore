@@ -1,3 +1,4 @@
 backend/Better_Scraper/output_data/trace_comments.csv
 .env
 backend/.env
+.vercel

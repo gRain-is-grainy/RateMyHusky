@@ -75,6 +75,11 @@ ALIAS_MAP = {
     "john alexis gomez": "john alexis guerra gomez",
     "ji yong shin": "ji-yong shin",
     "ghita amor tijani": "ghita amor-tijani",
+    "bob lupi": "robert lupi",
+    "hany sadaka": "hanai sadaka",
+    "mary- susan potts": "mary-susan potts-santone",
+    "xiaotao (kelvin) liu": "xiaotao liu",
+    "kelvin liu": "xiaotao liu",
 }
 
 COLLEGE_MAP = {
@@ -195,6 +200,12 @@ def main():
     photos["_key"] = photos["name"].astype(str).apply(normalize_name)
     photos["_url"] = photos["image_url"].astype(str).apply(upgrade_image_url)
     photo_lookup = dict(zip(photos["_key"], photos["_url"]))
+    # Also map alias sources → canonical targets so both names find the photo
+    for alias_src, alias_tgt in ALIAS_MAP.items():
+        if alias_src in photo_lookup and alias_tgt not in photo_lookup:
+            photo_lookup[alias_tgt] = photo_lookup[alias_src]
+        elif alias_tgt in photo_lookup and alias_src not in photo_lookup:
+            photo_lookup[alias_src] = photo_lookup[alias_tgt]
 
     # ── Clean RMP data ──
     rmp_profs["rating"] = pd.to_numeric(rmp_profs["rating"], errors="coerce")
@@ -207,7 +218,19 @@ def main():
         ts[col] = pd.to_numeric(ts[col], errors="coerce").fillna(0).astype(int)
     ts["total_responses"] = ts["count_1"] + ts["count_2"] + ts["count_3"] + ts["count_4"] + ts["count_5"]
     ts["_weighted_sum"] = 1*ts["count_1"] + 2*ts["count_2"] + 3*ts["count_3"] + 4*ts["count_4"] + 5*ts["count_5"]
-    ts["mean"] = np.where(ts["total_responses"] > 0, ts["_weighted_sum"] / ts["total_responses"], np.nan)
+    # Preserve the original CSV mean when individual counts are all zeros (newer data may only have mean/median)
+    ts["_csv_mean"] = pd.to_numeric(ts["mean"], errors="coerce")
+    ts["mean"] = np.where(
+        ts["total_responses"] > 0,
+        ts["_weighted_sum"] / ts["total_responses"],
+        ts["_csv_mean"]
+    )
+    # Use completed count as total_responses when individual counts are missing but mean exists
+    ts["total_responses"] = np.where(
+        (ts["total_responses"] == 0) & ts["mean"].notna(),
+        ts["completed"],
+        ts["total_responses"]
+    )
 
     # ── Merge RMP aliases ──
     def merge_rmp_aliases(df):
@@ -255,7 +278,7 @@ def main():
 
     # ── TRACE proper name lookup ──
     name_sorted = tc.sort_values("term_id", ascending=False).drop_duplicates(subset=["name_key"])
-    name_sorted["_full"] = name_sorted["instructor_first_name"].astype(str).str.strip() + " " + name_sorted["instructor_last_name"].astype(str).str.strip()
+    name_sorted["_full"] = (name_sorted["instructor_first_name"].astype(str).str.strip() + " " + name_sorted["instructor_last_name"].astype(str).str.strip()).str.title()
     valid = name_sorted["instructor_first_name"].astype(str).str.strip().ne("") & name_sorted["instructor_last_name"].astype(str).str.strip().ne("")
     trace_name_lookup = dict(zip(name_sorted.loc[valid, "name_key"], name_sorted.loc[valid, "_full"]))
 

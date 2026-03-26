@@ -103,11 +103,12 @@
 
 @media (max-width: 768px) {
   .footer { padding: 32px 24px 0; }
-  .footer-top { flex-direction: column; gap: 28px; }
+  .footer-top { gap: 24px; }
+  .footer-brand { min-width: unset; }
+  .footer-brand-logo { width: 80px; }
   .footer-columns { gap: 32px; }
   .footer-bottom { flex-direction: column; text-align: center; gap: 16px; }
   .footer-bottom-links { justify-content: center; }
-  .footer-brand-logo { width: 80px; }
 }
 
 @media (max-width: 480px) {

@@ -6,9 +6,9 @@
 }
 
 .course-shell {
-	max-width: 1200px;
-	margin: 0 auto;
-	padding: 0 24px 56px;
+	max-width: none;
+	margin: 0;
+	padding: 0 clamp(24px, 4vw, 64px) 56px;
 	animation: courseFadeIn 0.5s ease both;
 }
 

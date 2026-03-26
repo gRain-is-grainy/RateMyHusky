@@ -69,8 +69,12 @@
 }
 
 /* Context overrides */
-.prof-page .breadcrumbs {
-  padding-top: 80px;
+.prof-hero .breadcrumbs {
+  padding: 0 0 16px;
+  max-width: none;
+  margin: 0;
+  z-index: 1;
+  position: relative;
 }
 
 .compare-page .breadcrumbs {

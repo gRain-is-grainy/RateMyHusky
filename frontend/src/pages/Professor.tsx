@@ -66,6 +66,41 @@ const AnimatedNumber = ({
   return <span ref={ref}>{display}</span>;
 };
 
+/* ───────── term collapse chevron ───────── */
+const TermCollapseChevron = () => {
+  const ref = useRef<SVGSVGElement>(null);
+  const [hasLeftSibling, setHasLeftSibling] = useState(false);
+
+  useLayoutEffect(() => {
+    const svg = ref.current;
+    if (!svg) return;
+    const wrapper = svg.parentElement;
+    if (!wrapper) return;
+    const check = () => {
+      const prev = wrapper.previousElementSibling as HTMLElement | null;
+      if (prev) {
+        const wTop = wrapper.getBoundingClientRect().top;
+        const prevTop = prev.getBoundingClientRect().top;
+        setHasLeftSibling(Math.abs(prevTop - wTop) < 5);
+      } else {
+        setHasLeftSibling(false);
+      }
+    };
+    check();
+    const frame = requestAnimationFrame(check);
+    const container = wrapper.parentElement;
+    const ro = container ? new ResizeObserver(check) : null;
+    if (container && ro) ro.observe(container);
+    return () => { ro?.disconnect(); cancelAnimationFrame(frame); };
+  });
+
+  return hasLeftSibling ? (
+    <svg ref={ref} className="prof-term-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
+  ) : (
+    <svg ref={ref} className="prof-term-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="18 15 12 9 6 15" /></svg>
+  );
+};
+
 /* ───────── sort / filter options ───────── */
 const sortOptions = [
   { value: 'newest', label: 'Newest First' },
@@ -77,7 +112,6 @@ const sortOptions = [
 const traceSortOptions = [
   { value: 'popular', label: 'Most Popular' },
   { value: 'newest', label: 'Most Recent' },
-  { value: 'alphabetical', label: 'A-Z' },
 ];
 
 // Strictly extract "Season Year" from messy term titles
@@ -607,13 +641,13 @@ const Professor = () => {
 
   return (
     <div className="prof-page">
-      <Breadcrumbs items={[
-        { label: 'Professors', to: '/professors' },
-        { label: profile.name },
-      ]} />
       <header className="prof-hero">
         <div className="prof-hero-bg" style={{ backgroundImage: `url(${neuIcon})` }} />
         <div className="prof-hero-glow" />
+        <Breadcrumbs items={[
+          { label: 'Professors', to: '/professors' },
+          { label: profile.name },
+        ]} />
         <div className="prof-hero-inner">
           <div
             className={`prof-avatar ${profile.imageUrl ? 'prof-avatar-clickable' : ''}`}
@@ -779,7 +813,29 @@ const Professor = () => {
           const code = getFormattedCourseCode(r.course).toUpperCase();
           if (code && !grouped.has(code)) grouped.set(code, []);
         });
-        const sorted = Array.from(grouped.entries()).sort(([a], [b]) => a.localeCompare(b));
+        // Build a map of course code -> most recent review date
+        const recentReviewDate = new Map<string, number>();
+        reviews.forEach(r => {
+          const code = getFormattedCourseCode(r.course).toUpperCase();
+          if (code && r.date) {
+            const ts = new Date(r.date).getTime();
+            if (!recentReviewDate.has(code) || ts > recentReviewDate.get(code)!) {
+              recentReviewDate.set(code, ts);
+            }
+          }
+        });
+        const sorted = Array.from(grouped.entries()).sort(([a, secA], [b, secB]) => {
+          // Primary: most recent review date (descending)
+          const reviewA = recentReviewDate.get(a) || 0;
+          const reviewB = recentReviewDate.get(b) || 0;
+          if (reviewA !== reviewB) return reviewB - reviewA;
+          // Secondary: most recent termId from trace data (descending)
+          const termA = secA.length > 0 ? Math.max(...secA.map(s => s.termId)) : 0;
+          const termB = secB.length > 0 ? Math.max(...secB.map(s => s.termId)) : 0;
+          if (termA !== termB) return termB - termA;
+          // Tertiary: alphabetical
+          return a.localeCompare(b);
+        });
         return (
           <section className="prof-section">
             <div className="prof-section-header">
@@ -847,7 +903,7 @@ const Professor = () => {
                               }, hiddenTermCount * 40 + 200);
                             }}
                           >
-                            <svg className="prof-term-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="18 15 12 9 6 15" /></svg>
+                            <TermCollapseChevron />
                           </span>
                         )}
                       </div>
@@ -915,7 +971,7 @@ const Professor = () => {
                                     }, hiddenTermCount * 40 + 200);
                                   }}
                                 >
-                                  <svg className="prof-term-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="18 15 12 9 6 15" /></svg>
+                                  <TermCollapseChevron />
                                 </span>
                               )}
                             </div>

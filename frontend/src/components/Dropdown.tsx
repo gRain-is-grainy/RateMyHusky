@@ -38,7 +38,7 @@ const Dropdown = ({ options, value, onChange, placeholder, className = '' }: Dro
   };
 
   return (
-    <div className={`dropdown ${className}`} ref={ref}>
+    <div className={`dropdown ${className}`} ref={ref} onClick={(e) => { if (e.target === e.currentTarget) setIsOpen(false); }}>
       <button
         className={`dropdown-trigger ${isOpen ? 'open' : ''} ${!selected ? 'placeholder' : ''}`}
         onClick={() => setIsOpen(!isOpen)}
@@ -60,7 +60,7 @@ const Dropdown = ({ options, value, onChange, placeholder, className = '' }: Dro
       </button>
 
       {isOpen && (
-        <ul className="dropdown-menu">
+        <ul className="dropdown-menu" onMouseDown={(e) => { if (e.target === e.currentTarget) setIsOpen(false); }}>
           {options.map((opt, i) => (
             <li
               key={opt.value}

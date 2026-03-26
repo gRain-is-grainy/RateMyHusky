@@ -15,6 +15,7 @@ export interface Professor {
   rmpReviews: number;
   traceReviews: number;
   totalReviews: number;
+  totalComments?: number;
   url: string;
 }
 

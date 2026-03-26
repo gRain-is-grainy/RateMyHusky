@@ -15,6 +15,7 @@ const Breadcrumbs = ({ items }: BreadcrumbsProps) => {
 
   // If we came from a specific page (e.g. Compare), prepend that as the first breadcrumb
   const fromPage = location.state?.fromPage as { label: string; url: string } | undefined;
+  const goatedCollege = location.state?.goatedCollege as string | undefined;
   // Preserve catalog filters when the first link points to /professors
   const catalogLink = location.state?.fromCatalog || '/professors';
 
@@ -33,7 +34,7 @@ const Breadcrumbs = ({ items }: BreadcrumbsProps) => {
             <li key={i} className="breadcrumbs-item">
               {!isLast && href ? (
                 <>
-                  <Link to={href} className="breadcrumbs-link">{item.label}</Link>
+                  <Link to={href} state={goatedCollege ? { goatedCollege } : undefined} className="breadcrumbs-link">{item.label}</Link>
                   <span className="breadcrumbs-separator" aria-hidden="true">
                     <svg width="7" height="11" viewBox="0 0 7 11" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M1 1l4.5 4.5L1 10" />

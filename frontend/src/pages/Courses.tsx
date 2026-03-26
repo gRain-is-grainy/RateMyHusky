@@ -14,7 +14,7 @@ import './ProfessorCatalog.css';
 import './Courses.css';
 
 const SORT_OPTIONS = [
-	{ value: 'alpha', label: 'Code A-Z' },
+	{ value: 'alpha', label: 'A - Z' },
 	{ value: 'rating', label: 'Highest Rating' },
 	{ value: 'sections', label: 'Most Sections' },
 	{ value: 'recent', label: 'Most Recent' },
@@ -82,6 +82,12 @@ export default function Courses() {
 	const [loading, setLoading] = useState(true);
 	const [sidebarOpen, setSidebarOpen] = useState(false);
 	const [deptOpen, setDeptOpen] = useState(false);
+
+	useEffect(() => {
+		const close = () => setSidebarOpen(false);
+		window.addEventListener('close-filter-sidebar', close);
+		return () => window.removeEventListener('close-filter-sidebar', close);
+	}, []);
 
 	const [minRatingDraft, setMinRatingDraft] = useState(() => getFiltersFromSearchParams(searchParams).minRating);
 	const [maxRatingDraft, setMaxRatingDraft] = useState(() => getFiltersFromSearchParams(searchParams).maxRating);
@@ -336,6 +342,19 @@ export default function Courses() {
 								onChangeLow={(v) => setMinRatingDraft(v)}
 								onChangeHigh={(v) => setMaxRatingDraft(v)}
 							/>
+							<div className="slider-tick-marks">
+								{Array.from({ length: 11 }, (_, i) => {
+									const val = i * 0.5;
+									return (
+										<div key={val} className="tick-mark">
+											<div className="tick-line" />
+											<span className="tick-label">
+												{val === 0 ? '0' : Number.isInteger(val) ? String(val) : ''}
+											</span>
+										</div>
+									);
+								})}
+							</div>
 						</div>
 					</div>
 				</aside>

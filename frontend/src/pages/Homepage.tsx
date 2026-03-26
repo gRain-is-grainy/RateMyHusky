@@ -2,7 +2,7 @@
 Primary Homepage Codespace
 */
 import { useState, useEffect, useRef, useCallback, useLayoutEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import SearchBar from '../components/SearchBar';
 import Footer from '../components/Footer';
 import { fetchStats, fetchColleges, fetchGoatProfessors, fetchRandomProfessor, fetchProfessorsCatalog } from '../api/api';
@@ -144,6 +144,17 @@ const RatingCell = ({ prof, isOpen, onToggle }: {
 
 const Homepage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // Scroll to hash anchor (e.g. /#shuffle, /#goated) on navigation
+  useEffect(() => {
+    if (location.hash) {
+      const el = document.getElementById(location.hash.slice(1));
+      if (el) {
+        setTimeout(() => el.scrollIntoView({ behavior: 'smooth' }), 100);
+      }
+    }
+  }, [location.hash]);
   const [stats, setStats] = useState<Stat[]>([]);
   const [colleges, setColleges] = useState<string[]>([]);
   const [selectedCollege, setSelectedCollege] = useState<string>('');
@@ -163,7 +174,9 @@ const Homepage = () => {
   // Navigate to professor page
   const handleProfClick = (name: string) => {
     const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-    navigate(`/professors/${slug}`);
+    navigate(`/professors/${slug}`, {
+      state: { fromPage: { label: 'GOATED Professors', url: '/#goated' }, goatedCollege: selectedCollege },
+    });
   };
 
   const updatePill = useCallback(() => {
@@ -233,7 +246,11 @@ const Homepage = () => {
         ]);
         setStats(statsData);
         setColleges(collegeData);
-        if (collegeData.length > 0) {
+        const state = location.state as { goatedCollege?: string } | null;
+        const restored = state?.goatedCollege;
+        if (restored && collegeData.includes(restored)) {
+          setSelectedCollege(restored);
+        } else if (collegeData.length > 0) {
           setSelectedCollege(collegeData[0]);
         }
       } catch (err) {
@@ -389,7 +406,7 @@ const Homepage = () => {
       </section>
 
       {/* ======== GOAT Professors Leaderboard ======== */}
-      <section className="section goat-section">
+      <section id="goated" className="section goat-section">
         <div className="section-header">
           <h2 className="section-title">GOATED Professors</h2>
         </div>
@@ -464,7 +481,7 @@ const Homepage = () => {
                   onToggle={() => setOpenTooltip(openTooltip === i ? null : i)}
                 />
                 <span className="goat-col-reviews">
-                  {p.totalReviews.toLocaleString()}
+                  {(p.totalComments ?? 0).toLocaleString()}
                 </span>
               </div>
             ))
@@ -482,7 +499,7 @@ const Homepage = () => {
       </section>
 
       {/* ======== Professor Randomizer ======== */}
-      <section className="section randomizer-section">
+      <section id="shuffle" className="section randomizer-section">
         <div className="randomizer-content">
           <div className="randomizer-text">
             <h2 className="section-title">🎲 Feeling Lucky?</h2>
@@ -532,7 +549,7 @@ const Homepage = () => {
             </div>
 
             {slotResult && (
-              <div className="wheel-result-card" onClick={() => navigate(`/professors/${slotResult.slug}`)}>
+              <div className="wheel-result-card" onClick={() => navigate(`/professors/${slotResult.slug}`, { state: { fromPage: { label: 'Shuffle Wheel', url: '/#shuffle' } } })}>
                 <span className="wheel-result-name">{slotResult.name}</span>
                 <span className="wheel-result-sub">{slotResult.dept}</span>
               </div>

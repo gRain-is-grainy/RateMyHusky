@@ -47,6 +47,7 @@ DIRECTORY_CONFIGS = [
     {"subdomain": "cssh",       "dir_path": "/faculty/"},
     {"subdomain": "law",        "dir_path": "/faculty/"},
     {"subdomain": "cps",        "dir_path": "/faculty/"},
+    {"subdomain": "coe",        "dir_path": "/faculty-staff-directory/"},
 ]
 
 # Department keyword → subdomain mapping (uses substring matching, not exact)
@@ -55,8 +56,11 @@ DEPT_KEYWORD_MAP = [
     # Khoury
     (["computer sci", "information sci", "cybersec", "data sci", "computer eng",
       "computer & info"], "www.khoury", "/people/"),
-    # COS
-    (["math", "physics", "chemistry", "chem", "biology", "biochem",
+    # Engineering — MUST be before COS so "Chemical Engineering" matches here
+    (["engineer", "mechanical", "electrical", "civil", "chemical eng",
+      "bioengin", "dean of eng"], "coe", "/people/"),
+    # COS — use "chemistry" not "chem" to avoid matching "Chemical Engineering"
+    (["math", "physics", "chemistry", "chem bio", "biology", "biochem",
       "environment", "marine", "neurosci", "interdisc studies - sci"], "cos", "/people/"),
     # D'Amore-McKim
     (["business", "finance", "account", "marketing", "management",
@@ -75,17 +79,25 @@ DEPT_KEYWORD_MAP = [
     (["law"], "law", "/faculty/"),
     # CPS
     (["education", "professional", "special program"], "cps", "/faculty/"),
-    # Engineering
-    (["engineer", "mechanical", "electrical", "civil", "chemical", "bioengin",
-      "dean of eng"], "coe", "/people/"),
 ]
 
-# Images to skip — banners, placeholders, research images, etc.
+# Images to skip — banners, placeholders, group/campus photos, etc.
 SKIP_PATTERNS = [
+    # Placeholders
     "placeholder", "silhouette", "no-photo", "avatar",
-    "generic", "blank", "mystery", "logo", "icon", "default-person",
-    "person-banner", "notched-n", "behrakis", "headshot-placeholder",
-    "featured-nav", "nu_rgb",
+    "generic", "blank", "mystery", "default-person", "headshot-placeholder",
+    # Logos and icons
+    "logo", "icon", "notched-n", "nu_rgb", "seal",
+    # Nav/banner images
+    "person-banner", "featured-nav", "banner", "hero-image",
+    # Group/event photos
+    "graduates", "graduation", "commencement", "ceremony", "group",
+    "class-of", "cohort",
+    # Campus/building photos
+    "centennial", "campus", "common", "building", "aerial", "quad",
+    "hall", "tulips", "entrance",
+    # Promotional/decorative
+    "promo", "graphic", "spiral", "cover-",
 ]
 
 # ---------------------------------------------------------------------------
@@ -115,16 +127,28 @@ def name_to_slug(name):
 
 
 def slug_variations(name):
-    """Generate slug variations for a name."""
+    """Generate slug variations for a name.
+
+    Includes both first-last and last-first formats since some colleges
+    (e.g., COE) use last-first URL slugs.
+    """
     slugs = set()
     base = name_to_slug(name)
     slugs.add(base)
 
     parts = normalize_name(name).split()
     if len(parts) >= 2:
+        # first-last (skip middle names)
         slugs.add(re.sub(r'[^a-z0-9]+', '-', f"{parts[0]} {parts[-1]}").strip('-'))
+        # last-first (COE format)
+        slugs.add(re.sub(r'[^a-z0-9]+', '-', f"{parts[-1]} {parts[0]}").strip('-'))
     if len(parts) >= 3:
+        # first-middle-last
         slugs.add(re.sub(r'[^a-z0-9]+', '-', f"{parts[0]} {parts[1]} {parts[-1]}").strip('-'))
+        # all-after-first-then-first (COE multi-word last name)
+        # e.g. "Hande Musdal Ondemir" → "musdal-ondemir-hande"
+        rest = ' '.join(parts[1:])
+        slugs.add(re.sub(r'[^a-z0-9]+', '-', f"{rest} {parts[0]}").strip('-'))
 
     return list(slugs)
 
@@ -222,7 +246,7 @@ def scrape_directory_page(session, url):
         soup = BeautifulSoup(resp.text, 'html.parser')
         people = []
         profile_pattern = re.compile(
-            r'/(people|faculty|directory|person)/[a-z0-9][\w-]+/?$', re.I
+            r'/(people|faculty|directory|person|student)/[a-z0-9][\w-]+/?$', re.I
         )
 
         seen_urls = set()
@@ -390,8 +414,23 @@ def scrape_all_directories(session, workers=10):
 # ---------------------------------------------------------------------------
 
 def extract_photo_from_profile(html, page_url):
-    """Extract the professor headshot URL from an individual profile page."""
+    """Extract the professor headshot URL from an individual profile page.
+
+    Only returns the first valid uploaded image that is:
+    - In wp-content/uploads (not theme assets)
+    - At least 150px on both sides
+    - NOT inside site nav/header/footer (by tag or site-level class)
+    - NOT a known placeholder, group photo, or campus image
+    """
     soup = BeautifulSoup(html, 'html.parser')
+
+    # Classes that indicate SITE-LEVEL nav/chrome (not content sections).
+    # We use word-boundary matching to avoid false positives like
+    # "single-people__header-figure" which is a content area.
+    skip_class_patterns = re.compile(
+        r'\b(site-header|site-footer|site-nav|mega-menu|main-menu'
+        r'|primary-nav|widget-area|sidebar)\b', re.I
+    )
 
     for img in soup.find_all('img'):
         src = img.get('src', '') or img.get('data-src', '')
@@ -411,14 +450,24 @@ def extract_photo_from_profile(html, page_url):
             except ValueError:
                 pass
 
-        in_nav = False
+        # Skip images inside site-level chrome (nav elements, mega-menus).
+        # Stop checking at body/html level — body often has theme classes
+        # like "mega-menu-primary" that would cause false positives.
+        in_skip_section = False
         for depth, parent in enumerate(img.parents):
-            if depth > 3:
+            if depth > 5:
                 break
-            if parent.name in ('nav', 'header', 'footer'):
-                in_nav = True
+            if parent.name in ('body', 'html', '[document]'):
                 break
-        if in_nav:
+            if parent.name == 'nav':
+                in_skip_section = True
+                break
+            parent_cls = ' '.join(parent.get('class') or []).lower()
+            parent_id = (parent.get('id') or '').lower()
+            if skip_class_patterns.search(parent_cls) or skip_class_patterns.search(parent_id):
+                in_skip_section = True
+                break
+        if in_skip_section:
             continue
 
         src = make_absolute(src, page_url)
@@ -485,7 +534,7 @@ def load_professors(data_dir):
                 last = str(row.get('instructorLastName', '')).strip()
                 dept = str(row.get('departmentName', '')).strip()
                 if first and last:
-                    name = f"{first} {last}"
+                    name = f"{first} {last}".title()
                     key = normalize_name(name)
                     if key not in profs:
                         profs[key] = {'name': name, 'department': dept}
@@ -515,40 +564,58 @@ def match_prof_to_directory(prof, directory_map, slug_index, lastname_index):
         if slug in slug_index:
             return slug_index[slug]
 
-    # Strategy 4: Last name match with first-name initial or substring
-    # Catches: "Elena Strange" → "Laney Strange" (same last name, different first)
-    # Also: "Dan Metzger" → "Daniel Metzger"
+    # Strategy 4: Last name match with first-name similarity.
+    # For common last names (>3 candidates), ONLY allow exact first-name matches
+    # to avoid false positives (Xiaotao→Xiaoping, Zhehui→Zheng, etc.)
+    # For uncommon last names (≤3 candidates), allow prefix/nickname matching.
     if len(parts) >= 2:
-        first = parts[0]
-        last = parts[-1]
-        candidates = lastname_index.get(re.sub(r'[^a-z]', '', last), [])
-        for entry in candidates:
-            entry_parts = name_to_key(entry['name']).split()
-            if len(entry_parts) < 2:
-                continue
-            entry_first = entry_parts[0]
-            entry_last = entry_parts[-1]
-            if entry_last != re.sub(r'[^a-z]', '', last):
-                continue
-            # Same last name — check if first names are compatible
-            # Match if: one starts with the other (Dan/Daniel), or same initial
-            if (first.startswith(entry_first[:3]) or entry_first.startswith(first[:3])
-                    or first[0] == entry_first[0]):
-                return entry
+        first = re.sub(r'[^a-z]', '', parts[0])
+        last = re.sub(r'[^a-z]', '', parts[-1])
+        if len(first) >= 2:
+            candidates = lastname_index.get(last, [])
+            is_common = len(candidates) > 3
+
+            best = None
+            best_score = 0
+            for entry in candidates:
+                entry_parts = name_to_key(entry['name']).split()
+                if len(entry_parts) < 2:
+                    continue
+                entry_first = entry_parts[0]
+                entry_last = entry_parts[-1]
+                if entry_last != last:
+                    continue
+
+                score = 0
+                if first == entry_first:
+                    score = 100  # exact match — always allowed
+                elif not is_common:
+                    # Only do fuzzy matching for uncommon last names
+                    if first.startswith(entry_first) or entry_first.startswith(first):
+                        score = 50 + min(len(first), len(entry_first))
+                    elif (first[0] == entry_first[0]
+                            and (len(entry_first) <= 4 or len(first) <= 4)):
+                        score = 10  # nickname: Dee/Denise
+
+                if score > best_score:
+                    best_score = score
+                    best = entry
+
+            if best and best_score >= 10:
+                return best
 
     # Strategy 5: Check if directory has entry with extra/fewer name parts
     if len(parts) == 2:
-        first, last = parts[0], parts[-1]
-        first_clean = re.sub(r'[^a-z]', '', first)
-        last_clean = re.sub(r'[^a-z]', '', last)
-        for dir_key, entry in directory_map.items():
-            dir_parts = dir_key.split()
-            if len(dir_parts) >= 2:
-                df = dir_parts[0]
-                dl = dir_parts[-1]
-                if dl == last_clean and (df == first_clean or df.startswith(first_clean[:3])
-                                          or first_clean.startswith(df[:3])):
-                    return entry
+        first = re.sub(r'[^a-z]', '', parts[0])
+        last = re.sub(r'[^a-z]', '', parts[-1])
+        if len(first) >= 3:
+            for dir_key, entry in directory_map.items():
+                dir_parts = dir_key.split()
+                if len(dir_parts) >= 2:
+                    df = dir_parts[0]
+                    dl = dir_parts[-1]
+                    if dl == last and first[:3] == df[:3]:
+                        return entry
 
     return None
 
@@ -676,10 +743,50 @@ def scrape_photos(profs, workers=15, limit=None, skip_directories=False):
 
 
 def save_csv(results, output_path):
-    """Save results to CSV."""
+    """Save results to CSV, rejecting duplicate image URLs.
+
+    If the same image URL was assigned to multiple professors, it's almost
+    certainly a shared/wrong image (campus photo, nav image, etc.), so we
+    drop ALL entries with that URL.
+    """
     os.makedirs(os.path.dirname(output_path) or '.', exist_ok=True)
 
     with_photos = [r for r in results if r['image_url']]
+
+    # Drop image URLs shared by multiple professors.
+    # - 3+ professors sharing a URL = always wrong (group/campus/promo image)
+    # - 2 professors sharing a URL = only OK if same person (name variant)
+    from collections import defaultdict, Counter
+    url_counts = Counter(r['image_url'] for r in with_photos)
+
+    # For URLs shared by exactly 2, check if it's the same person
+    url_lastnames = defaultdict(set)
+    for r in with_photos:
+        if url_counts[r['image_url']] == 2:
+            parts = normalize_name(r['name']).split()
+            last = re.sub(r'[^a-z]', '', parts[-1]) if parts else ''
+            url_lastnames[r['image_url']].add(last)
+
+    bad_urls = set()
+    for url, count in url_counts.items():
+        if count >= 3:
+            # 3+ professors = always a shared/wrong image
+            bad_urls.add(url)
+        elif count == 2:
+            # 2 professors = check if last names are related
+            names = list(url_lastnames.get(url, set()))
+            if len(names) == 2:
+                a, b = names
+                if a not in b and b not in a:
+                    bad_urls.add(url)
+
+    if bad_urls:
+        before = len(with_photos)
+        with_photos = [r for r in with_photos if r['image_url'] not in bad_urls]
+        dropped = before - len(with_photos)
+        print(f"  Dropped {dropped} entries with mismatched duplicate image URLs "
+              f"({len(bad_urls)} shared URLs)")
+
     with open(output_path, 'w', newline='', encoding='utf-8') as f:
         writer = csv.DictWriter(f, fieldnames=['name', 'image_url', 'source_page'])
         writer.writeheader()

@@ -7,7 +7,7 @@ const feedbackOptions = [
   { value: 'bug', label: 'Bug Report' },
   { value: 'feature', label: 'Feature Request' },
   { value: 'missing', label: 'Missing Data' },
-  { value: 'wrongname', label: 'Wrong Name' },
+  { value: 'incorrectdata', label: 'Incorrect Data' },
   { value: 'general', label: 'General Feedback' },
 ];
 

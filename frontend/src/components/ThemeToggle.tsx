@@ -10,6 +10,11 @@ const ThemeToggle = () => {
   const applyTheme = (dark: boolean) => {
     document.documentElement.classList.toggle('dark', dark);
     localStorage.setItem('theme', dark ? 'dark' : 'light');
+    // Update mobile browser chrome color
+    const color = dark ? '#1a1a1a' : '#ffffff';
+    document.querySelectorAll('meta[name="theme-color"]').forEach(m => {
+      (m as HTMLMetaElement).content = color;
+    });
     window.dispatchEvent(new CustomEvent('themechange', { detail: { isDark: dark } }));
   };
 

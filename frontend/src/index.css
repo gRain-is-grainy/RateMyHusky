@@ -21,6 +21,15 @@ body {
   -moz-osx-font-smoothing: grayscale;
   transition: background-color 0.3s, color 0.3s;
   -webkit-tap-highlight-color: transparent;
+  background-color: #ffffff;
+}
+
+html.dark body {
+  background-color: #1a1a1a;
+}
+
+html.dark {
+  background-color: #1a1a1a;
 }
 
 /* Prevent horizontal overflow on mobile */
@@ -34,7 +43,6 @@ img {
   height: auto;
 }
 
-/* Smooth scrolling */
 html {
-  scroll-behavior: smooth;
+  background-color: #ffffff;
 }

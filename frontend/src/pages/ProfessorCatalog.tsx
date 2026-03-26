@@ -126,6 +126,14 @@ export default function ProfessorCatalog() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [deptOpen, setDeptOpen] = useState(false);
   const [collegeOpen, setCollegeOpen] = useState(false);
+
+  useEffect(() => {
+    const close = () => setSidebarOpen(false);
+    window.addEventListener('close-filter-sidebar', close);
+    return () => window.removeEventListener('close-filter-sidebar', close);
+  }, []);
+
+
   const [viewMode, setViewMode] = useState<'grid' | 'list'>(() => (localStorage.getItem('catalog-view') as 'grid' | 'list') || 'grid');
   const [minRatingDraft, setMinRatingDraft] = useState(() => getFiltersFromSearchParams(searchParams).minRating);
   const [maxRatingDraft, setMaxRatingDraft] = useState(() => getFiltersFromSearchParams(searchParams).maxRating);
@@ -555,6 +563,7 @@ export default function ProfessorCatalog() {
                   min="0"
                   value={minReviewsDraft === 0 ? '' : minReviewsDraft}
                   placeholder="Min"
+                  onKeyDown={e => { if (['e', 'E', '+', '-', '.'].includes(e.key)) e.preventDefault(); }}
                   onChange={e => {
                     const v = parseInt(e.target.value, 10);
                     const clamped = isNaN(v) || v < 0 ? 0 : Math.min(v, REVIEW_INPUT_MAX);
@@ -571,6 +580,7 @@ export default function ProfessorCatalog() {
                   min="0"
                   value={maxReviewsDraft ?? ''}
                   placeholder="Max"
+                  onKeyDown={e => { if (['e', 'E', '+', '-', '.'].includes(e.key)) e.preventDefault(); }}
                   onChange={e => {
                     const v = parseInt(e.target.value, 10);
                     if (isNaN(v) || e.target.value === '') {
@@ -711,11 +721,18 @@ export default function ProfessorCatalog() {
                   </div>
                   <div className="prof-list-info">
                     <span className="prof-list-name">{prof.name}</span>
+                    <span className="prof-list-college">{prof.college}</span>
                     <span className="prof-list-dept">{prof.department}</span>
                   </div>
-                  <span className="prof-list-rating">
-                    {prof.avgRating != null ? prof.avgRating.toFixed(2) : 'N/A'}
-                  </span>
+                  <div className="prof-list-rating-center">
+                    <span className="prof-list-avg-num">{prof.avgRating != null ? prof.avgRating.toFixed(1) : 'N/A'}</span>
+                    <StarRating rating={prof.avgRating ?? 0} size="sm" />
+                  </div>
+                  <div className="prof-list-stats">
+                    <span className="prof-list-stat">{prof.totalReviews.toLocaleString()} ratings</span>
+                    <span className="prof-list-stat">{prof.totalComments.toLocaleString()} comments</span>
+                    <span className="prof-list-stat">{prof.wouldTakeAgainPct != null ? `${Math.round(prof.wouldTakeAgainPct)}% again` : '—'}</span>
+                  </div>
                 </div>
               ))}
             </div>

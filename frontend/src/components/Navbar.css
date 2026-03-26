@@ -309,6 +309,9 @@
 @media (max-width: 768px) {
   .navbar {
     padding: 10px 16px;
+    background: #fff;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
   }
 
   .navbar-logo {
@@ -324,11 +327,12 @@
     top: 0;
     right: -280px;
     width: 260px;
-    height: 100vh;
+    height: 100dvh;
     flex-direction: column;
     align-items: flex-start;
     gap: 0;
-    padding: 72px 28px 28px;
+    padding: 48px 28px 28px;
+    overflow-y: auto;
     background: #fff;
     box-shadow: -4px 0 20px rgba(0,0,0,0.1);
     transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -396,6 +400,16 @@
     padding: 16px 0;
   }
 
+  .navbar-right .navbar-user-avatar {
+    width: 20px;
+    height: 20px;
+  }
+
+  .navbar-right .navbar-user-name {
+    font-size: 1.05rem;
+    color: #666;
+  }
+
   .navbar-right .navbar-user-dropdown {
     position: static;
     box-shadow: none;
@@ -432,6 +446,12 @@
   }
 
   /* dark mobile */
+  .dark .navbar {
+    background: #1a1a1a;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
   .dark .navbar-right {
     background: #1a1a1a;
     box-shadow: -4px 0 20px rgba(0,0,0,0.6);
@@ -459,6 +479,10 @@
 
   .dark .navbar-right .navbar-user {
     border-bottom-color: #333;
+  }
+
+  .dark .navbar-right .navbar-user-name {
+    color: #ccc;
   }
 
   .dark .navbar-right .navbar-user-btn {
