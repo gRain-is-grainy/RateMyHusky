@@ -15,6 +15,24 @@ import { getInitials, stripPrefix } from '../utils/nameUtils';
 
 import './ProfessorCatalog.css';
 
+function splitProfName(name: string, maxFirst = 19): [string, string] {
+  if (name.length <= maxFirst) return [name, ''];
+  let splitIdx = -1;
+  let splitChar = '';
+  for (let i = Math.min(maxFirst, name.length - 1); i >= 0; i--) {
+    if (name[i] === ' ' || name[i] === '-') {
+      splitIdx = i;
+      splitChar = name[i];
+      break;
+    }
+  }
+  if (splitIdx === -1) return [name, ''];
+  if (splitChar === '-') {
+    return [name.slice(0, splitIdx + 1), name.slice(splitIdx + 1)];
+  }
+  return [name.slice(0, splitIdx), name.slice(splitIdx + 1)];
+}
+
 const SORT_OPTIONS = [
   { value: 'alpha',   label: 'A – Z' },
   { value: 'rating',  label: 'Highest Rating' },
@@ -756,7 +774,12 @@ export default function ProfessorCatalog() {
                   </div>
                   <div className="prof-card-info">
                     <div className="prof-card-info-top">
-                      <h3 className="prof-name">{stripPrefix(prof.name)}</h3>
+                      <h3 className="prof-name">
+                        {(() => {
+                          const [first, rest] = splitProfName(stripPrefix(prof.name));
+                          return rest ? <>{first}<br />{rest}</> : first;
+                        })()}
+                      </h3>
                       <div className="prof-card-rating-row">
                         <span className="prof-avg-num">{prof.avgRating != null ? prof.avgRating.toFixed(1) : 'N/A'}</span>
                         <StarRating rating={prof.avgRating ?? 0} size="sm" />

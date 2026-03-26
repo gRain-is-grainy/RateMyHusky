@@ -12,14 +12,28 @@
   animation: modalFadeIn 0.2s ease;
 }
 
+.signin-modal-overlay.closing {
+  animation: modalFadeOut 0.2s ease forwards;
+}
+
 @keyframes modalFadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
 }
 
+@keyframes modalFadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
 @keyframes modalSlideUp {
   from { opacity: 0; transform: translateY(20px) scale(0.97); }
   to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes modalSlideDown {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to { opacity: 0; transform: translateY(16px) scale(0.97); }
 }
 
 .signin-modal {
@@ -33,6 +47,10 @@
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
   animation: modalSlideUp 0.3s ease;
   font-family: 'Nunito', sans-serif;
+}
+
+.signin-modal.closing {
+  animation: modalSlideDown 0.2s ease forwards;
 }
 
 .signin-modal-close {

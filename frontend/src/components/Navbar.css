@@ -358,7 +358,7 @@
 
   .navbar-right .nav-link {
     width: 100%;
-    padding: 16px 0;
+    padding: 22px 0;
     font-size: 1.05rem;
     border-bottom: 1px solid #f0f0f0;
     border-radius: 0;
@@ -380,7 +380,7 @@
     margin-top: 0;
     width: 100%;
     text-align: left;
-    padding: 16px 0;
+    padding: 22px 0;
     font-size: 1.05rem;
     border-radius: 0;
     background: none;
@@ -397,7 +397,7 @@
 
   .navbar-right .navbar-user-btn {
     width: 100%;
-    padding: 16px 0;
+    padding: 22px 0;
   }
 
   .navbar-right .navbar-user-avatar {
@@ -527,7 +527,7 @@
     align-items: center;
     gap: 10px;
     width: 100%;
-    padding: 16px 0;
+    padding: 22px 0;
     font-family: 'Nunito', sans-serif;
     font-size: 1.05rem;
     font-weight: 600;

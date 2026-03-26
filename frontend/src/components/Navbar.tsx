@@ -81,20 +81,6 @@ const Navbar = () => {
     };
   }, [updatePill]);
 
-  // Lock body scroll and close menu on scroll when mobile menu is open
-  useEffect(() => {
-    if (menuOpen) {
-      document.body.style.overflow = 'hidden';
-      const handleScroll = () => setMenuOpen(false);
-      window.addEventListener('scroll', handleScroll, { passive: true });
-      return () => {
-        document.body.style.overflow = '';
-        window.removeEventListener('scroll', handleScroll);
-      };
-    } else {
-      document.body.style.overflow = '';
-    }
-  }, [menuOpen]);
 
   // Close user dropdown on outside click
   useEffect(() => {
@@ -110,7 +96,16 @@ const Navbar = () => {
   return (
     <>
     <nav className="navbar">
-      <Link to="/" className="navbar-logo">
+      <Link
+        to="/"
+        className="navbar-logo"
+        onClick={(e) => {
+          if (location.pathname === '/') {
+            e.preventDefault();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }
+        }}
+      >
         <span>Rate</span>MyHusky
       </Link>
 

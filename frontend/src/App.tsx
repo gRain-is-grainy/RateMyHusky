@@ -10,6 +10,8 @@ import Courses from './pages/Courses';
 import Course from './pages/Course';
 import Compare from './pages/Compare';
 import NotFound from './pages/NotFound';
+import Terms from './pages/Terms';
+import Privacy from './pages/Privacy';
 import Navbar from './components/Navbar';
 import FeedbackTab from './components/FeedbackTab';
 import ThemeToggle from './components/ThemeToggle';
@@ -37,6 +39,8 @@ function App() {
           <Route path="/courses" element={<Courses />} />
           <Route path="/courses/:code" element={<Course />} />
           <Route path="/compare" element={<Compare />} />
+          <Route path="/terms" element={<Terms />} />
+          <Route path="/privacy" element={<Privacy />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
         <FeedbackTab />
