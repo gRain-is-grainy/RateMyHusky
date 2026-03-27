@@ -621,6 +621,59 @@
 	color: inherit;
 }
 
+.compare-verdict {
+	margin: 10px 0 0;
+	padding: 0 clamp(16px, 3vw, 48px) 24px;
+	animation: compareFadeUp 0.85s ease both;
+}
+
+.compare-verdict-inner {
+	background: #fff;
+	border-radius: 16px;
+	border: 1px solid #e9e9e9;
+	box-shadow: 0 4px 18px rgba(0, 0, 0, 0.05);
+	padding: 24px;
+	text-align: center;
+}
+
+.compare-verdict-kicker {
+	font-size: 0.74rem;
+	text-transform: uppercase;
+	letter-spacing: 0.08em;
+	font-weight: 900;
+	color: #d6394c;
+	margin-bottom: 6px;
+}
+
+.compare-verdict-title {
+	font-size: 1.4rem;
+	font-weight: 900;
+	color: #272727;
+	margin-bottom: 8px;
+}
+
+.compare-verdict-body {
+	font-size: 0.9rem;
+	color: #666;
+	max-width: 600px;
+	margin: 0 auto;
+	line-height: 1.5;
+}
+
+.dark .compare-verdict-inner {
+	background: #242628;
+	border-color: #2c3035;
+	box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+}
+
+.dark .compare-verdict-title {
+	color: #f5f6f7;
+}
+
+.dark .compare-verdict-body {
+	color: #a1a7af;
+}
+
 @media (max-width: 1000px) {
 	.compare-controls {
 		grid-template-columns: 1fr;
