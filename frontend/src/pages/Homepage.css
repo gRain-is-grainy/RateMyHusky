@@ -303,6 +303,13 @@
   color: #999;
 }
 
+.goat-header-row > span {
+  font-size: inherit;
+  font-weight: inherit;
+  color: inherit;
+  padding: 0;
+}
+
 .goat-row {
   display: grid;
   grid-template-columns: 60px 2fr 1.5fr 1.5fr 0.8fr;
