@@ -1,9 +1,9 @@
 """
-TRACE Master Scraper v4
-Scrapes all reports, outputs one CSV with all fields.
+TRACE Master Scraper v5 (with demographics)
+Scrapes all reports, outputs one CSV with all fields including demographics.
 
 Usage:
-  1. Update COOKIES if expired
+  1. Paste fresh cookies into COOKIES
   2. Set LIST_URL for semester
   3. Run: source ~/trace-env/bin/activate && python3 master_scraper.py
 """
@@ -21,32 +21,31 @@ from html.parser import HTMLParser
 import html as html_module
 
 # ═══════════════════════════════════════════
-# CONFIGURATION
+# CONFIGURATION - UPDATE BEFORE RUNNING
 # ═══════════════════════════════════════════
 
 COOKIES = {
     "_ga": "GA1.1.509540977.1774198087",
     "cookiesession1": "678B2A87D44C29A1595AAB0DF919F4B6",
+    "_ga_262EDTH0JM": "GS2.1.s1774623376$o12$g0$t1774623381$j55$l0$h0",
     "BlueNextOriginalPath": "/rv.aspx?uid=5660d4f83cbd7a5460463a3454acf9bb&redi=1&SelectedIDforPrint=c0d7284255dab34acc9fd045c1e1ea53e7b9e7efa42c4841dac738545aa34abbf47a5f340cb81c1ec2b5ac2b3844c7cf&ReportType=2&isLive=0&dsid=498dbdbc97a49b840a35dfe28dbd4975&regl=en-US",
-    "BlueNextRefreshToken": "0438172A0B6259A21009895240F28CA452D2CF977BACAD09FA04C8FD097A1F10",
-    "BlueNextAccessToken": "eyJhbGciOiJSUzI1NiIsImtpZCI6IkEyOTk1ODFDQTAwRDE0QUZCRkQ0RjgzOEMwQzVDNTdERDgwMzJGOENSUzI1NiIsIng1dCI6Im9wbFlIS0FORkstXzFQZzR3TVhGZmRnREw0dyIsInR5cCI6ImF0K2p3dCJ9.eyJuYmYiOjE3NzQ0MDM0ODQsImV4cCI6MTc3NDQwNzA4NCwiaXNzIjoiaHR0cHM6Ly9ub3J0aGVhc3Rlcm4tYXV0aC5ibHVlcmEuY29tIiwiY2xpZW50X2lkIjoiQUE2M0U3NjMtRTdFRS00NEU4LUI5M0UtQTYwRTA2QTM3QzkyIiwic3ViIjoiYWIyNjI1NWItYzVjOS00NDM5LTk4YzQtMDQxNDFhNzEwMGRhIiwiYXV0aF90aW1lIjoxNzc0NDAzNDgxLCJpZHAiOiIwNjc0ZDVlNi0wYWVjLTRhZGEtODc2Yy03MDkwZDIxMjllNzEiLCJnc2lkIjoiODIwMzJFMjEwQjE2M0E1NEQwOTlGRkUxRkYyNkMwNjciLCJzc29faWQiOiIxIiwiZXh0ZXJuYWxfaWRwX3VzZXJuYW1lIjoiMDAyNTcxOTkzIiwianRpIjoiRTMyQTczNUZCRUI3NTUxMDEzQzQ2RTU0N0ZBOTQwREIiLCJpYXQiOjE3NzQ0MDM0ODQsInNjb3BlIjpbIm9wZW5pZCIsIm9mZmxpbmVfYWNjZXNzIl0sImFtciI6WyJleHRlcm5hbCJdfQ.bTNJQ5rfOtRHwrONW9dD_A9vR0ka3gRjWaH-usxyIXn1jIXDvDWvvJKLa0jPUAogzI35wAgsYfdtDFxLUbzySAoU4mUh4-VVMCWtNPoznuOEmzTeg39q7LYwEKrGVjCJwY1oXqGT4yefsP1WFQsQofsx3-qXgStrji29Zg4rLCCBwRyEUonfrpOox9woCQ9DZFZYdslf-ykuXVSWrzHHAWx5NS18PksIO5VekRHD-rLa-CyhG5RmYWPeQx4nXDleCOO-3bPltVpdZmnDEmHj1iwgGURYzFOWMnTLpxM0UC48iUwtpgC0c2UtCWvh_y077oxQtmHZTBvXRQiFE0UEAr4S9QztGYU5mkZrQrWtPdywzgQV7XqTdynAiG21koa2V9j_xmHHC9k4pJWxp7DO05VDPloD_jfdvtVx9sktiRGtnGDic69qx-lSMPxkaidvKWykvkv4in6n3oqY-37YxeOD4Si-tGeOeuWZRHOF9Z_XN8PvZzaZd3uQyrKaJC1gQ0qK7UBqWq-McwwpbSVy7XhtRdmJYAtNeERpKjVv31cT7eJGRG7LrkdVrcdtoPuu1aOg-waQZP-Zwm8Wax2ewZq38aR-Te6W8xyG9PucSM6OjXnKBvvtQ2Sj-2jpVjrC0Biu5zOUrkbuPmJv-YJrp6jkToWaDckq9NmyT3w2lHU",
-    "BlueNextIdToken": "eyJhbGciOiJSUzI1NiIsImtpZCI6IkEyOTk1ODFDQTAwRDE0QUZCRkQ0RjgzOEMwQzVDNTdERDgwMzJGOENSUzI1NiIsIng1dCI6Im9wbFlIS0FORkstXzFQZzR3TVhGZmRnREw0dyIsInR5cCI6IkpXVCJ9.eyJuYmYiOjE3NzQ0MDM0ODQsImV4cCI6MTc3NDQwMzc4NCwiaXNzIjoiaHR0cHM6Ly9ub3J0aGVhc3Rlcm4tYXV0aC5ibHVlcmEuY29tIiwiYXVkIjoiQUE2M0U3NjMtRTdFRS00NEU4LUI5M0UtQTYwRTA2QTM3QzkyIiwiaWF0IjoxNzc0NDAzNDg0LCJhdF9oYXNoIjoiVzhqY0U5VF9BRWkxdEFVWEw4OUZrdyIsInNfaGFzaCI6Ik8xZUVzYXlRQ0VmNXhTSlZwWkZTdUEiLCJzdWIiOiJhYjI2MjU1Yi1jNWM5LTQ0MzktOThjNC0wNDE0MWE3MTAwZGEiLCJhdXRoX3RpbWUiOjE3NzQ0MDM0ODEsImlkcCI6IjA2NzRkNWU2LTBhZWMtNGFkYS04NzZjLTcwOTBkMjEyOWU3MSIsImFtciI6WyJleHRlcm5hbCJdLCJnc2lkIjoiODIwMzJFMjEwQjE2M0E1NEQwOTlGRkUxRkYyNkMwNjcifQ.CgiIDnm2YAQi8XpfnIsEARJboy3WB5CK18rWLyLtvYUtFgYMIpI1gukBQEjXY58GFFEeF3cMpgDYsIknl7iHFdYR7XLXQfqQvfBLcSfXJFKdO-hJRz0_q-Dew8kzZR1NUGFh7i6gBrzljHghZNmsKOcFK6iGqcRiT2N8h1CiDWvCvDZI_FqPN03rbV7KUI8i6Wp95Wy1h-x9NdzfAygo6zwnlaqjGBqFbvmi6UmqYN0Pn0gQZFjG2eYZbKEK1gUmX_zqTerHRkJbSupPW2Y2fKtPE3BrqOOQNcxF7nl6836jCbmt1sUvI4XGEpMNr5uo-WhQec9xbe7Mkbumoq-15LAeNRUf8zyrMKYq7rvY11gPuAEitNwxAtuXQpVt1A5gT09w6WoMobq7UmYNL0nUizImEyhBzMLBMy-AXbB4JSOxuTUQ0kzmS6Rw0rI3TV_eu2QWaN3eE7BRohFD-CMIUEATV78j1wCSfL1kkoDgEmItnP1uZ8WYUH5LiH7PUu-sjquP8ai8uvVOPJCsNs9FdZzAj9hI_sZ6Bpe9QcI1M-J67d3kkPclbSP0MwJ7NS7yw8-JAqE2TzW2TNZNtRH52xDhya8_C6v_hb4cqzaL4AfhHvX2qBNArBG_jO0CwDflOMTeRFe-NVHriDGr2sOdXamhTFzeZ0KNLvqrypEq7ko",
-    "ASP.NET_SessionId": "awabay4rqgs4qyiujtkuez5r",
-    "CookieName": "ADB3F981191C74784F6F923C29F3EFC7C7D073110D3DC7979F64E854C50D753AF8870B2F5C9CFC09E04AFDA913F02491D04967295C63757120DBD229A9894CED664B3DA0DAD4ADE7E2D7D5645844EBF9D003D4198CBBF1C056BE5996C60C0A3D400FF091C267DEC558AC7DCE54ADA60185B2FC5445834BDC900FA78FB7818D120E00F2CCEF2994890D4B248E611AE98CAC55DC475D97AF88B3D8425794C88313F26A1681BEF6D4B83A2C287E082980EDD4812873329508ECF36E5E9F86A8E884B79A54A8AAC182571AF1E1A225186370CF54999A2F6CE6F7816A5A724331F344",
-    "session_token": "54f4183a3e3a49f7ab699544c397cf13",
-    "_ga_262EDTH0JM": "GS2.1.s1774403482$o8$g0$t1774403527$j15$l0$h0",
+    "BlueNextRefreshToken": "2DB285A53C7F9E47E3A86FE3F927163E27CF69A95C166887B85DACA3AA8E0F1C",
+    "BlueNextAccessToken": "eyJhbGciOiJSUzI1NiIsImtpZCI6IkEyOTk1ODFDQTAwRDE0QUZCRkQ0RjgzOEMwQzVDNTdERDgwMzJGOENSUzI1NiIsIng1dCI6Im9wbFlIS0FORkstXzFQZzR3TVhGZmRnREw0dyIsInR5cCI6ImF0K2p3dCJ9.eyJuYmYiOjE3NzQ2MjMzODIsImV4cCI6MTc3NDYyNjk4MiwiaXNzIjoiaHR0cHM6Ly9ub3J0aGVhc3Rlcm4tYXV0aC5ibHVlcmEuY29tIiwiY2xpZW50X2lkIjoiQUE2M0U3NjMtRTdFRS00NEU4LUI5M0UtQTYwRTA2QTM3QzkyIiwic3ViIjoiYWIyNjI1NWItYzVjOS00NDM5LTk4YzQtMDQxNDFhNzEwMGRhIiwiYXV0aF90aW1lIjoxNzc0NjIzMzc1LCJpZHAiOiIwNjc0ZDVlNi0wYWVjLTRhZGEtODc2Yy03MDkwZDIxMjllNzEiLCJnc2lkIjoiMENCNEQyQUJBRTkxMjI1QjdBMzI2RUE3NUE4QzAyREUiLCJzc29faWQiOiIxIiwiZXh0ZXJuYWxfaWRwX3VzZXJuYW1lIjoiMDAyNTcxOTkzIiwianRpIjoiNDY5MUExMEFCMEI4RDYzMEZFNENCOUE3MTQxMTdDNUMiLCJpYXQiOjE3NzQ2MjMzODIsInNjb3BlIjpbIm9wZW5pZCIsIm9mZmxpbmVfYWNjZXNzIl0sImFtciI6WyJleHRlcm5hbCJdfQ.pl8U_8Sv_hB77fcSAC6na6SPj7skAN55n7BRI_pb8KvIruUtCcoJSsdjVPQNCHzBqONrssY_0X7cZAvnrRuyC9JUNA0laNs3bKxQdPwsyZiK0OENA5i0mQ_6ELBA_Rze-ORJJnn7Sh7mDCZweSSQK0W3SwCQhBJsAr5fk4hF0Y_kqMF1A7DKxqRegsLB19qImhW1eyejYSx9HjLm1VHsVBb5NbAaTnLEN0EshAaBKNxnEt4TrA7DSLq7LyTZq-xAPPK-T8O0Y9ZdgM6bzxsLwtmVwFm_tb5PjEtiHTlOkXB09e4WsH6f-mBgEdandI7CY5TeJSg_3GQDYhizUzcH_twfT7nvJ9-NivEGn9jqhaMnt3UZERhnZTGNPyX_aFGGZIdXLXN3jQ4ZSC--g1g2ILjQjXZ1sNd-mTkIIKbVDErmbJAUgq2q8l14PfqtyBrlQjCCCDqbTWDZbKHJn5xQ3LGzOGqe2BZa1MBBFU2Utz_Ghpu5LD4tkGHtPiyES2qkKKKnsfxfKi31sxdlYYFZOAkpy1-v41S0hHjxgauGraEk0HR7dMZx6FYODbc4opYsdG1ZcJpr-Vb5sjZWhmQdNnLAFfFnzsoXWElXDqMYF6C4IAf3DHTyDshJWGIY3OECiN_Ndsb_jzA3zgG2xhY_WsDFf_TMgJ5kBiRge0obA1I",
+    "BlueNextIdToken": "eyJhbGciOiJSUzI1NiIsImtpZCI6IkEyOTk1ODFDQTAwRDE0QUZCRkQ0RjgzOEMwQzVDNTdERDgwMzJGOENSUzI1NiIsIng1dCI6Im9wbFlIS0FORkstXzFQZzR3TVhGZmRnREw0dyIsInR5cCI6IkpXVCJ9.eyJuYmYiOjE3NzQ2MjMzODIsImV4cCI6MTc3NDYyMzY4MiwiaXNzIjoiaHR0cHM6Ly9ub3J0aGVhc3Rlcm4tYXV0aC5ibHVlcmEuY29tIiwiYXVkIjoiQUE2M0U3NjMtRTdFRS00NEU4LUI5M0UtQTYwRTA2QTM3QzkyIiwiaWF0IjoxNzc0NjIzMzgyLCJhdF9oYXNoIjoiOUJzRW10SlNGc0JvNXVaQWF0N1JWUSIsInNfaGFzaCI6InFRMHhhX2JrZmxqVFhGenF3MlNUaEEiLCJzdWIiOiJhYjI2MjU1Yi1jNWM5LTQ0MzktOThjNC0wNDE0MWE3MTAwZGEiLCJhdXRoX3RpbWUiOjE3NzQ2MjMzNzUsImlkcCI6IjA2NzRkNWU2LTBhZWMtNGFkYS04NzZjLTcwOTBkMjEyOWU3MSIsImFtciI6WyJleHRlcm5hbCJdLCJnc2lkIjoiMENCNEQyQUJBRTkxMjI1QjdBMzI2RUE3NUE4QzAyREUifQ.Z2VBo7LHjrWNmoDD5ZAlxEZQpgYFxMoFO_FdMq0udpVqsZt9bHb5ELLb53Q9ESZWcNptyMYZdQ2BZhmZuIzxgp0IoGdkf9r-J7TYRCZjf3jY0v1mkqVGXh-6-5Bj4olYDk3dV8FA1aodn5c0WHSOf1BOy_Mcovrank8jvR0lBOIqTSe1QK5HRAfLrvgBFcEwvmY9s81zwwF3NU2Gjez0jEaWqO87QaKb2r21P2y2HbGAKmiAHhtzTC3v_VocSL67aH6mBDb3eJnF_yw3EYYnYs8KSTE11IaK37Mn3lyIjU11xvhVgwN0uIDDVvkMLWEAxase7LkrV1XtFr_WkQVyhH0jlQJAzQ0GECKDh-kM7pz9f15lf4H51Zio9Br4A3rHRi2HV5wKiD5ImarQj09yuiqawrybJjB-XWJa89vHosygVX000z2VdlvfY7ztEAhYaYbuwv8acsLQgNMfVJHY5tWgXQCC1AB0fBbvUAl4X2ewOkSRVl3_gxfbYD5CIZpS9wu-Z6uhfXJ_43571dOL1HV83ufhSJebu1PyhfQ-zTmlnsfCyxHAJD68A7HG_YUpdyumr-5pZDLaUu_GEsivnPq0JjYHUszJUbHzRowsBarwEq05cOCnQW0EAPxgElD7gfDm9n9s9BXA95Q377m95LWYhZY_tkMlqyuh1paVwIk",
+    "ASP.NET_SessionId": "4hsb5ilwqrl3ftzziaixgxvw",
+    "CookieName": "FF82D7CD0B1B77F651F78FC5FB60F6013DB0687BD7FAB287C426DCBB5ED118BE3BDD0414E488862195388BE9DBE839B88310205DD762868E118D8DBBE3F2982617B0863716B76F6BBF9EE7283244248780542F0960693CF5E955A4039F433BB8840E20224D875E824C09B95497652C901663FF7AA89C8D2BD6175B86DEA77C41CDB87179103327835B083D7134B9E1631A89C6D61517AB3D2D980BBA58FDEFE22F216C8A8FF10285B05ED7CF0ADF671B3131E75F1D1C5A5F55699D7C6DF0BEB9D07784B142D906C2DD25B10143BD7F03329EDDF4B810812834D0826DCB787CE5",
+    "session_token": "e5220999a44f482f8deb577034ea5da2",
 }
-
 BASE_URL = "https://northeastern-bc.bluera.com"
 
-# ── SET SEMESTER HERE ──
-LIST_URL = f"{BASE_URL}/rpvlf.aspx?rid=fdf8a2a3-773c-42df-9284-09b0303fb52a&regl=en-US&haslang=true"
+# Fall 2025:
+#LIST_URL = f"{BASE_URL}/rpvlf.aspx?rid=694b0639-6919-433a-9b04-5aaba2ab962a&regl=en-US&haslang=true"
 # Summer 2025:
-# LIST_URL = f"{BASE_URL}/rpvlf.aspx?rid=fdf8a2a3-773c-42df-9284-09b0303fb52a&regl=en-US&haslang=true"
+LIST_URL = f"{BASE_URL}/rpvlf.aspx?rid=fdf8a2a3-773c-42df-9284-09b0303fb52a&regl=en-US&haslang=true"
 
 URLS_FILE = "trace_urls.json"
-RESULTS_FILE = "summer.json"
-OUTPUT_CSV = "summer.csv"
+RESULTS_FILE = "trace_results.json"
+OUTPUT_CSV = "Summer 2025.csv"
 TIMEOUT = 60
 
 # ═══════════════════════════════════════════
@@ -91,6 +90,35 @@ def text_to_score(text):
     return None
 
 
+def parse_demographics(soup):
+    """Parse frequency/demographics blocks (attendance, hours per week)."""
+    demographics = []
+    for block in soup.find_all("div", class_="FrequencyBlock_FullMain"):
+        title_el = block.find("h4", class_="FrequencyQuestionTitle")
+        if not title_el:
+            continue
+        question = title_el.get_text(strip=True)
+
+        distribution = {}
+        for li in block.find_all("li"):
+            label_div = li.find("div", class_="frequency-data-item-choice-text")
+            count_div = li.find("div", class_="frequency-data-item-choice-nb")
+            if label_div and count_div:
+                label = label_div.get_text(strip=True)
+                try:
+                    count = int(count_div.get_text(strip=True))
+                except ValueError:
+                    count = 0
+                distribution[label] = count
+
+        if distribution:
+            demographics.append({
+                "question": question,
+                "distribution": distribution,
+            })
+    return demographics
+
+
 def parse_report_html(html_text):
     soup = BeautifulSoup(html_text, "html.parser")
 
@@ -99,7 +127,6 @@ def parse_report_html(html_text):
     title_text = title_tag.text.strip() if title_tag else ""
     m = re.search(r"Student TRACE report for (.+)", title_text)
     course_info = m.group(1).strip() if m else title_text
-    display_name = title_text.replace(" - ", "").strip()
 
     # Term
     term = ""
@@ -118,10 +145,8 @@ def parse_report_html(html_text):
     # Audience & responses
     aud_el = soup.find("span", id=re.compile(r"lblInvited"))
     resp_el = soup.find("span", id=re.compile(r"lblResponded"))
-    rate_el = soup.find("span", id=re.compile(r"lblRespRateValue"))
     audience = int(aud_el.text.strip()) if aud_el else None
     responses = int(resp_el.text.strip()) if resp_el else None
-    response_rate = rate_el.text.strip() if rate_el else None
 
     # Section headings
     headings = [h3.find("strong").get_text(strip=True)
@@ -193,17 +218,19 @@ def parse_report_html(html_text):
                     if score is not None and question:
                         score_dist.setdefault(question, []).append(score)
 
+    # Demographics
+    demographics = parse_demographics(soup)
+
     return {
-        "display_name": display_name,
         "course_info": course_info,
         "term": term,
         "created_date": created_date,
         "audience": audience,
         "responses": responses,
-        "response_rate": response_rate,
         "sections": sections,
         "comments": comments,
         "score_distributions": {q: dict(Counter(scores)) for q, scores in score_dist.items()},
+        "demographics": demographics,
     }
 
 
@@ -223,64 +250,71 @@ def fetch(session, method, url, **kwargs):
 
 def results_to_csv(results, output_file):
     fieldnames = [
-        "display_name", "term", "created_date", "course_info",
-        "audience", "responses", "response_rate",
+        "term", "created_date", "course_info", "audience",
         "section", "question",
-        "Number of Responses", "Response Rate",
+        "Number of Responses",
         "Course Mean", "Dept. Mean", "Univ. Mean",
         "Course Median", "Dept. Median", "Univ. Median",
         "count_5", "count_4", "count_3", "count_2", "count_1",
         "comment_prompt", "comments_json",
+        "demographics_json",
     ]
     rows = []
     for r in results:
         if "error" in r: continue
         base = {
-            "display_name": r.get("display_name", ""),
             "term": r.get("term", ""),
             "created_date": r.get("created_date", ""),
             "course_info": r.get("course_info", ""),
             "audience": r.get("audience", ""),
-            "responses": r.get("responses", ""),
-            "response_rate": r.get("response_rate", ""),
         }
         score_dists = r.get("score_distributions", {})
         comments_by_prompt = {}
         for c in r.get("comments", []):
             comments_by_prompt.setdefault(c["prompt"], []).append(c["comment"])
 
+        # Summary rows
         for s in r.get("sections", []):
             for q in s.get("questions", []):
                 row = {**base, "section": s["section"]}
                 qtext = q.get("question", "")
                 if qtext.isdigit() and "Effectiveness" in s["section"]:
-                    row["question"] = "What is your overall rating of this instructor teaching effectiveness?"
+                    row["question"] = "What is your overall rating of this instructor's teaching effectiveness?"
                     row["Number of Responses"] = int(qtext)
                     keys = [k for k in q if k != "question"]
                     vals = [q[k] for k in keys]
-                    correct = ["Response Rate", "Course Mean", "Dept. Mean", "Univ. Mean",
+                    correct = ["_skip", "Course Mean", "Dept. Mean", "Univ. Mean",
                                "Course Median", "Dept. Median", "Univ. Median"]
                     for i, k in enumerate(correct):
-                        row[k] = vals[i] if i < len(vals) else ""
+                        if k != "_skip":
+                            row[k] = vals[i] if i < len(vals) else ""
                     qtext = row["question"]
                 else:
                     row["question"] = qtext
-                    for k in ["Number of Responses", "Response Rate", "Course Mean",
-                              "Dept. Mean", "Univ. Mean", "Course Median",
-                              "Dept. Median", "Univ. Median"]:
+                    row["Number of Responses"] = q.get("Number of Responses", "")
+                    for k in ["Course Mean", "Dept. Mean", "Univ. Mean",
+                              "Course Median", "Dept. Median", "Univ. Median"]:
                         row[k] = q.get(k, "")
                 dist = score_dists.get(qtext, {})
-                row["count_5"] = dist.get(5, 0)
-                row["count_4"] = dist.get(4, 0)
-                row["count_3"] = dist.get(3, 0)
-                row["count_2"] = dist.get(2, 0)
-                row["count_1"] = dist.get(1, 0)
+                row["count_5"] = dist.get(5, dist.get("5", 0))
+                row["count_4"] = dist.get(4, dist.get("4", 0))
+                row["count_3"] = dist.get(3, dist.get("3", 0))
+                row["count_2"] = dist.get(2, dist.get("2", 0))
+                row["count_1"] = dist.get(1, dist.get("1", 0))
                 rows.append(row)
 
+        # Comment rows
         for prompt, comment_list in comments_by_prompt.items():
             row = {**base, "section": "Comments",
                    "comment_prompt": prompt,
                    "comments_json": json.dumps(comment_list, ensure_ascii=False)}
+            rows.append(row)
+
+        # Demographics rows
+        for demo in r.get("demographics", []):
+            row = {**base, "section": "Demographics",
+                   "question": demo["question"],
+                   "demographics_json": json.dumps(demo["distribution"], ensure_ascii=False)}
             rows.append(row)
 
     with open(output_file, "w", newline="", encoding="utf-8") as f:
@@ -291,6 +325,10 @@ def results_to_csv(results, output_file):
 
 
 if __name__ == "__main__":
+    if not COOKIES:
+        print("ERROR: Paste fresh cookies into the COOKIES dict.")
+        sys.exit(1)
+
     s = requests.Session()
     s.cookies.update(COOKIES)
     s.headers.update({"User-Agent": "Mozilla/5.0"})
@@ -298,7 +336,7 @@ if __name__ == "__main__":
     print("Testing session...")
     test = fetch(s, "GET", LIST_URL)
     if not test or "Sign in" in test.text:
-        print("ERROR: Cookies expired. Paste fresh ones.")
+        print("ERROR: Cookies expired.")
         sys.exit(1)
     print("Session valid!\n")
 
@@ -365,10 +403,11 @@ if __name__ == "__main__":
                 parsed = parse_report_html(r.text)
                 parsed["report_name"] = report["name"]
                 nc = len(parsed.get("comments", []))
-                nd = len(parsed.get("score_distributions", {}))
+                nd = len(parsed.get("demographics", []))
+                ns = len(parsed.get("score_distributions", {}))
                 results.append(parsed)
                 new_dl += 1
-                print(f"  [{i+1}/{total}] ✓ {report['name']} ({nc} comments, {nd} scored q's)")
+                print(f"  [{i+1}/{total}] ✓ {report['name']} ({nc} comments, {ns} scored, {nd} demo)")
             except Exception as e:
                 results.append({"report_name": report["name"], "error": str(e)})
                 print(f"  [{i+1}/{total}] ✗ {e}")

@@ -424,24 +424,28 @@ function Compare() {
 			left: leftDept,
 			right: rightDept,
 			winner: null,
+			weight: 0,
 		},
 		{
 			label: 'Overall Rating',
 			left: formatMetric(leftProfile?.avgRating ?? leftCatalogProfessor?.avgRating),
 			right: formatMetric(rightProfile?.avgRating ?? rightCatalogProfessor?.avgRating),
 			winner: pickWinner(leftProfile?.avgRating ?? leftCatalogProfessor?.avgRating, rightProfile?.avgRating ?? rightCatalogProfessor?.avgRating),
+			weight: 3,
 		},
 		{
 			label: 'RMP Rating',
 			left: formatMetric(leftRmp),
 			right: formatMetric(rightRmp),
 			winner: pickWinner(leftRmp, rightRmp),
+			weight: 2,
 		},
 		{
 			label: 'TRACE Rating',
 			left: formatMetric(leftTrace),
 			right: formatMetric(rightTrace),
 			winner: pickWinner(leftTrace, rightTrace),
+			weight: 2,
 		},
 		{
 			label: 'Difficulty',
@@ -450,12 +454,14 @@ function Compare() {
 			leftClass: getDifficultyClass(leftProfile?.difficulty),
 			rightClass: getDifficultyClass(rightProfile?.difficulty),
 			winner: pickWinner(leftProfile?.difficulty, rightProfile?.difficulty, 'lower'),
+			weight: 1.5,
 		},
 		{
 			label: 'Total Reviews',
 			left: leftProfile?.totalRatings?.toLocaleString() ?? leftCatalogProfessor?.totalReviews?.toLocaleString() ?? 'N/A',
 			right: rightProfile?.totalRatings?.toLocaleString() ?? rightCatalogProfessor?.totalReviews?.toLocaleString() ?? 'N/A',
 			winner: pickWinner(leftProfile?.totalRatings ?? leftCatalogProfessor?.totalReviews, rightProfile?.totalRatings ?? rightCatalogProfessor?.totalReviews, 'higher', 0),
+			weight: 0.5,
 		},
 		{
 			label: 'Would Take Again',
@@ -468,6 +474,7 @@ function Compare() {
 					? 'N/A'
 					: `${rightProfile.wouldTakeAgainPct.toFixed(0)}%`,
 			winner: pickWinner(leftProfile?.wouldTakeAgainPct, rightProfile?.wouldTakeAgainPct, 'higher', 0),
+			weight: 2,
 		},
 		{
 			label: 'Recent TRACE Snapshot',
@@ -484,11 +491,45 @@ function Compare() {
 			footnoteLeft: leftSnapshot?.course,
 			footnoteRight: rightSnapshot?.course,
 			winner: pickWinner(leftSnapshot?.score, rightSnapshot?.score),
+			weight: 1.5,
 		},
 	];
 
 	const bothSelected = Boolean(leftSlug) && Boolean(rightSlug);
 	const bothReady = bothSelected && !leftLoading && !rightLoading;
+
+	const recommendation = (() => {
+		if (!bothReady || !leftProfile || !rightProfile) return null;
+
+		let leftScore = 0;
+		let rightScore = 0;
+		const leftKeyWins: string[] = [];
+		const rightKeyWins: string[] = [];
+
+		for (const row of compareRows) {
+			if (!row.weight || row.winner === null) continue;
+			if (row.winner === 'left') {
+				leftScore += row.weight;
+				if (row.weight >= 2) leftKeyWins.push(row.label);
+			} else {
+				rightScore += row.weight;
+				if (row.weight >= 2) rightKeyWins.push(row.label);
+			}
+		}
+
+		if (leftScore === 0 && rightScore === 0) return null;
+
+		const leftName = leftCatalogProfessor?.name ?? leftProfile.name ?? 'Professor A';
+		const rightName = rightCatalogProfessor?.name ?? rightProfile.name ?? 'Professor B';
+
+		if (leftScore > rightScore) {
+			return { winner: 'left' as const, name: leftName, otherName: rightName, keyWins: leftKeyWins };
+		} else if (rightScore > leftScore) {
+			return { winner: 'right' as const, name: rightName, otherName: leftName, keyWins: rightKeyWins };
+		} else {
+			return { winner: 'tie' as const, leftName, rightName };
+		}
+	})();
 
 	const renderProfileCard = (
 		slug: string,
@@ -735,6 +776,32 @@ function Compare() {
 					})}
 				</div>
 			</section>
+
+		{recommendation && (
+			<section className="compare-verdict">
+				<div className="compare-verdict-inner">
+					{recommendation.winner === 'tie' ? (
+						<>
+							<p className="compare-verdict-title">It's a tie</p>
+							<p className="compare-verdict-body">
+								{recommendation.leftName} and {recommendation.rightName} are evenly matched
+								across the key metrics. Both are solid choices, so consider factors like course availability or teaching style.
+							</p>
+						</>
+					) : (
+						<>
+							<p className="compare-verdict-kicker">Our Recommendation</p>
+							<p className="compare-verdict-title">{recommendation.name}</p>
+							<p className="compare-verdict-body">
+								{recommendation.keyWins.length > 0
+									? `${recommendation.name} has the edge in ${recommendation.keyWins.join(', ')}, making them the stronger overall choice.`
+									: `${recommendation.name} comes out ahead based on the available data.`}
+							</p>
+						</>
+					)}
+				</div>
+			</section>
+		)}
 
 			</main>
 			<Footer />
