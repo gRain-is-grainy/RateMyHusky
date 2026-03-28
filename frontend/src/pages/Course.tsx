@@ -242,7 +242,7 @@ const Course = () => {
 
 				<section className="course-panel">
 					<div className="course-panel-header">
-						<h2>Section History</h2>
+						<h2>Rating History</h2>
 					</div>
 					<SectionHistoryChart sections={course.sections} />
 				</section>

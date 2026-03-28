@@ -11,22 +11,23 @@ interface Props {
 	sections: CourseSection[];
 }
 
-interface TermPoint {
-	term: string;
-	termId: number;
+interface YearPoint {
+	year: string;
 	avg: number | null;
 	trace: number | null;
 	rmp: number | null;
 }
 
-function buildChartData(sections: CourseSection[]): TermPoint[] {
-	const termMap = new Map<number, { title: string; traceSum: number; traceCount: number; rmpSum: number; rmpCount: number }>();
+function buildChartData(sections: CourseSection[]): YearPoint[] {
+	const yearMap = new Map<string, { traceSum: number; traceCount: number; rmpSum: number; rmpCount: number }>();
 
 	for (const s of sections) {
-		let entry = termMap.get(s.termId);
+		const match = s.termTitle.match(/\b(20\d{2})\b/);
+		const year = match ? match[0] : 'Unknown';
+		let entry = yearMap.get(year);
 		if (!entry) {
-			entry = { title: s.termTitle, traceSum: 0, traceCount: 0, rmpSum: 0, rmpCount: 0 };
-			termMap.set(s.termId, entry);
+			entry = { traceSum: 0, traceCount: 0, rmpSum: 0, rmpCount: 0 };
+			yearMap.set(year, entry);
 		}
 		if (s.overallRating != null) {
 			entry.traceSum += s.overallRating;
@@ -38,21 +39,21 @@ function buildChartData(sections: CourseSection[]): TermPoint[] {
 		}
 	}
 
-	return Array.from(termMap.entries())
-		.sort(([a], [b]) => a - b)
-		.map(([termId, d]) => {
+	return Array.from(yearMap.entries())
+		.sort(([a], [b]) => Number(a) - Number(b))
+		.map(([year, d]) => {
 			const trace = d.traceCount > 0 ? +(d.traceSum / d.traceCount).toFixed(2) : null;
 			const rmp = d.rmpCount > 0 ? +(d.rmpSum / d.rmpCount).toFixed(2) : null;
 			let avg: number | null = null;
 			if (trace != null && rmp != null) avg = +((trace + rmp) / 2).toFixed(2);
 			else if (trace != null) avg = trace;
 			else if (rmp != null) avg = rmp;
-			return { term: d.title, termId, avg, trace, rmp };
+			return { year, avg, trace, rmp };
 		});
 }
 
 const RANGE_OPTIONS = [
-	{ label: 'All Terms', value: 0 },
+	{ label: 'All Years', value: 0 },
 	{ label: 'Last 5', value: 5 },
 	{ label: 'Last 10', value: 10 },
 	{ label: 'Last 20', value: 20 },
@@ -62,7 +63,7 @@ export default function SectionHistoryChart({ sections }: Props) {
 	const [mode, setMode] = useState<Mode>('aggregate');
 	const [range, setRange] = useState(0);
 
-	const allData = useMemo(() => buildChartData(sections), [sections]);
+	const allData = useMemo<YearPoint[]>(() => buildChartData(sections), [sections]);
 	const data = range > 0 ? allData.slice(-range) : allData;
 
 	if (data.length === 0) return null;
@@ -102,11 +103,9 @@ export default function SectionHistoryChart({ sections }: Props) {
 					<LineChart data={data} margin={{ top: 12, right: 20, left: 0, bottom: 4 }}>
 						<CartesianGrid strokeDasharray="3 3" stroke="var(--sh-grid)" />
 						<XAxis
-							dataKey="term"
+							dataKey="year"
 							tick={{ fontSize: 11, fill: 'var(--sh-axis)' }}
-							angle={-30}
-							textAnchor="end"
-							height={60}
+							height={40}
 							interval="preserveStartEnd"
 						/>
 						<YAxis

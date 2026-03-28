@@ -72,6 +72,17 @@ const pickWinner = (
 	return l < r ? 'left' : 'right';
 };
 
+const cleanTermTitle = (t: string): string => {
+	const fullMatch = t.match(/(Spring|Fall|Summer|Winter)\s*([A-Z0-9]*)\s*(20\d{2})/i);
+	if (fullMatch) {
+		const season = fullMatch[1].charAt(0).toUpperCase() + fullMatch[1].slice(1).toLowerCase();
+		const modifier = fullMatch[2].trim();
+		const year = fullMatch[3];
+		return modifier ? `${season} ${modifier} ${year}` : `${season} ${year}`;
+	}
+	return t.trim();
+};
+
 const getRecentTraceSnapshot = (profile: ProfessorProfile | null): TraceSnapshot | null => {
 	if (!profile?.traceCourses?.length) return null;
 
@@ -84,7 +95,7 @@ const getRecentTraceSnapshot = (profile: ProfessorProfile | null): TraceSnapshot
 		const overallScore = course.scores.find((score) => /overall/i.test(score.question));
 		if (overallScore && typeof overallScore.mean === 'number') {
 			return {
-				term: course.termTitle,
+				term: cleanTermTitle(course.termTitle),
 				course: course.displayName,
 				score: overallScore.mean,
 			};
