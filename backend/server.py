@@ -557,6 +557,7 @@ def professor_profile(slug):
         "totalRatings": prof["total_reviews"],
         "professorUrl": prof["professor_url"],
         "imageUrl": prof["image_url"],
+        "hoursPerWeek": round(prof["avg_hours"], 1) if prof["avg_hours"] else None,
     }
 
     # ── TRACE courses + scores (batched into 2 queries instead of N+1) ──

@@ -65,6 +65,7 @@ export interface ProfessorProfile {
   reviews: ProfessorReview[];
   traceComments: TraceComment[];
   imageUrl: string | null;
+  hoursPerWeek: number | null;
 }
 
 export interface ProfessorReview {

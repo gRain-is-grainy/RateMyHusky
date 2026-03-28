@@ -415,6 +415,7 @@ const Professor = () => {
         difficulty: profile.difficulty ?? 0,
         totalRatings: profile.totalRatings,
         wouldTakeAgainPct: profile.wouldTakeAgainPct,
+        hoursPerWeek: profile.hoursPerWeek,
       };
     }
 
@@ -427,6 +428,7 @@ const Professor = () => {
         : 0,
       totalRatings: filteredRmpReviews.length + traceWeight,
       wouldTakeAgainPct: profile.wouldTakeAgainPct,
+      hoursPerWeek: profile.hoursPerWeek,
     };
   }, [profile, filteredRmpReviews, filteredTraceCourses, allCourseCodes, selectedCourses]);
 
@@ -737,6 +739,12 @@ const Professor = () => {
             {stats.wouldTakeAgainPct !== null ? <AnimatedNumber value={stats.wouldTakeAgainPct} decimals={0} suffix="%" /> : '—'}
           </span>
           <span className="prof-stat-label">Would Take Again</span>
+        </div>
+        <div className="prof-stat-card">
+          <span className="prof-stat-value">
+            {stats.hoursPerWeek !== null && stats.hoursPerWeek !== undefined ? <AnimatedNumber value={stats.hoursPerWeek} decimals={1} suffix="h" /> : '—'}
+          </span>
+          <span className="prof-stat-label">Hrs / Week</span>
         </div>
         <div className="prof-stat-card prof-stat-clickable" onClick={() => chartsRef.current?.scrollIntoView({ behavior: 'smooth' })}>
           <span className="prof-stat-value">{stats.totalRatings.toLocaleString()}</span>
