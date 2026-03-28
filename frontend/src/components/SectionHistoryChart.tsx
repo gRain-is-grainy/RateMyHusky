@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
 	LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts';
@@ -11,23 +11,26 @@ interface Props {
 	sections: CourseSection[];
 }
 
-interface YearPoint {
-	year: string;
+interface TermPoint {
+	term: string;
+	termId: number;
+	year: number;
 	avg: number | null;
 	trace: number | null;
 	rmp: number | null;
 }
 
-function buildChartData(sections: CourseSection[]): YearPoint[] {
-	const yearMap = new Map<string, { traceSum: number; traceCount: number; rmpSum: number; rmpCount: number }>();
+function buildChartData(sections: CourseSection[]): TermPoint[] {
+	const termMap = new Map<number, { title: string; year: number; traceSum: number; traceCount: number; rmpSum: number; rmpCount: number }>();
 
 	for (const s of sections) {
-		const match = s.termTitle.match(/\b(20\d{2})\b/);
-		const year = match ? match[0] : 'Unknown';
-		let entry = yearMap.get(year);
+		let entry = termMap.get(s.termId);
 		if (!entry) {
-			entry = { traceSum: 0, traceCount: 0, rmpSum: 0, rmpCount: 0 };
-			yearMap.set(year, entry);
+			const cleaned = s.termTitle.replace(/^\d{6}:\s*/, '').replace(/\s*\d{6}/g, '').trim();
+			const yearMatch = cleaned.match(/\b(20\d{2})\b/);
+			const year = yearMatch ? Number(yearMatch[1]) : 0;
+			entry = { title: cleaned, year, traceSum: 0, traceCount: 0, rmpSum: 0, rmpCount: 0 };
+			termMap.set(s.termId, entry);
 		}
 		if (s.overallRating != null) {
 			entry.traceSum += s.overallRating;
@@ -39,39 +42,74 @@ function buildChartData(sections: CourseSection[]): YearPoint[] {
 		}
 	}
 
-	return Array.from(yearMap.entries())
-		.sort(([a], [b]) => Number(a) - Number(b))
-		.map(([year, d]) => {
+	return Array.from(termMap.entries())
+		.sort(([a], [b]) => a - b)
+		.map(([termId, d]) => {
 			const trace = d.traceCount > 0 ? +(d.traceSum / d.traceCount).toFixed(2) : null;
 			const rmp = d.rmpCount > 0 ? +(d.rmpSum / d.rmpCount).toFixed(2) : null;
 			let avg: number | null = null;
 			if (trace != null && rmp != null) avg = +((trace + rmp) / 2).toFixed(2);
 			else if (trace != null) avg = trace;
 			else if (rmp != null) avg = rmp;
-			return { year, avg, trace, rmp };
+			return { term: d.title, termId, year: d.year, avg, trace, rmp };
 		});
 }
 
 const RANGE_OPTIONS = [
 	{ label: 'All Years', value: 0 },
-	{ label: 'Last 5', value: 5 },
-	{ label: 'Last 10', value: 10 },
-	{ label: 'Last 20', value: 20 },
+	{ label: '1 Year', value: 1 },
+	{ label: '5 Years', value: 5 },
+	{ label: '10 Years', value: 10 },
 ] as const;
 
 export default function SectionHistoryChart({ sections }: Props) {
 	const [mode, setMode] = useState<Mode>('aggregate');
 	const [range, setRange] = useState(0);
+	const tabsRef = useRef<HTMLDivElement>(null);
+	const [pillStyle, setPillStyle] = useState({ left: 0, width: 0, opacity: 0 });
+	const [pillReady, setPillReady] = useState(false);
 
-	const allData = useMemo<YearPoint[]>(() => buildChartData(sections), [sections]);
-	const data = range > 0 ? allData.slice(-range) : allData;
+	const updatePill = useCallback(() => {
+		if (!tabsRef.current) return;
+		const activeTab = tabsRef.current.querySelector('.sh-toggle-btn.active') as HTMLElement;
+		if (activeTab) {
+			setPillStyle({ left: activeTab.offsetLeft, width: activeTab.offsetWidth, opacity: 1 });
+		}
+	}, []);
+
+	useLayoutEffect(() => {
+		updatePill();
+	}, [mode, updatePill]);
+
+	useEffect(() => {
+		updatePill();
+		const timer = setTimeout(() => setPillReady(true), 150);
+		return () => clearTimeout(timer);
+	}, [updatePill]);
+
+	const allData = useMemo<TermPoint[]>(() => buildChartData(sections), [sections]);
+
+	const data = useMemo(() => {
+		if (range === 0) return allData;
+		const maxYear = Math.max(...allData.map(p => p.year).filter(y => y > 0));
+		return allData.filter(p => p.year >= maxYear - range + 1);
+	}, [allData, range]);
 
 	if (data.length === 0) return null;
 
 	return (
 		<div className="sh-chart-wrap">
 			<div className="sh-chart-controls">
-				<div className="sh-toggle">
+				<div className="sh-toggle" ref={tabsRef}>
+					<div
+						className={`sh-pill-bg ${pillReady ? 'animate' : ''}`}
+						style={{
+							transform: `translateX(${pillStyle.left}px)`,
+							width: `${pillStyle.width}px`,
+							opacity: pillStyle.opacity,
+							visibility: pillStyle.opacity === 0 ? 'hidden' : 'visible',
+						}}
+					/>
 					<button
 						type="button"
 						className={`sh-toggle-btn ${mode === 'aggregate' ? 'active' : ''}`}
@@ -100,12 +138,14 @@ export default function SectionHistoryChart({ sections }: Props) {
 
 			<div className="sh-chart-container">
 				<ResponsiveContainer width="100%" height={300}>
-					<LineChart data={data} margin={{ top: 12, right: 20, left: 0, bottom: 4 }}>
+					<LineChart data={data} margin={{ top: 12, right: 20, left: 30, bottom: 4 }}>
 						<CartesianGrid strokeDasharray="3 3" stroke="var(--sh-grid)" />
 						<XAxis
-							dataKey="year"
+							dataKey="term"
 							tick={{ fontSize: 11, fill: 'var(--sh-axis)' }}
-							height={40}
+							angle={-30}
+							textAnchor="end"
+							height={60}
 							interval="preserveStartEnd"
 						/>
 						<YAxis
