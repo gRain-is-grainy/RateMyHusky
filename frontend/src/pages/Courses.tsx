@@ -108,6 +108,7 @@ export default function Courses() {
 	const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
 	const [numCols, setNumCols] = useState(4);
+	const [isMeasured, setIsMeasured] = useState(false);
 	const gridObserverRef = useRef<ResizeObserver | null>(null);
 	const gridRef = useCallback((node: HTMLDivElement | null) => {
 		if (gridObserverRef.current) {
@@ -118,6 +119,7 @@ export default function Courses() {
 		const update = () => {
 			const cols = window.getComputedStyle(node).gridTemplateColumns.split(' ').length;
 			setNumCols(cols);
+			setIsMeasured(true);
 		};
 		gridObserverRef.current = new ResizeObserver(update);
 		gridObserverRef.current.observe(node);
@@ -132,11 +134,12 @@ export default function Courses() {
 	}, []);
 
 	useEffect(() => {
+		if (!isMeasured) return;
 		setLoading(true);
 		fetchCoursesCatalog({
 			q: filters.q || undefined,
 			dept: filters.dept || undefined,
-			minRating: filters.minRating > 0 ? filters.minRating : undefined,
+			minRating: Math.max(filters.minRating, 0.01),
 			maxRating: filters.maxRating < 5 ? filters.maxRating : undefined,
 			sort: filters.sort,
 			page: filters.page,
@@ -149,7 +152,7 @@ export default function Courses() {
 			})
 			.catch(console.error)
 			.finally(() => setLoading(false));
-	}, [filters, pageSize]);
+	}, [filters, pageSize, isMeasured]);
 
 	useEffect(() => {
 		const next = buildSearchParamsFromFilters(filters);
