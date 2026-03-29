@@ -156,6 +156,7 @@ export default function ProfessorCatalog() {
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [numCols, setNumCols] = useState(4);
+  const [isMeasured, setIsMeasured] = useState(false);
   const gridObserverRef = useRef<ResizeObserver | null>(null);
   const gridRef = useCallback((node: HTMLDivElement | null) => {
     if (gridObserverRef.current) {
@@ -166,6 +167,7 @@ export default function ProfessorCatalog() {
     const update = () => {
       const cols = window.getComputedStyle(node).gridTemplateColumns.split(' ').length;
       setNumCols(cols);
+      setIsMeasured(true);
     };
     gridObserverRef.current = new ResizeObserver(update);
     gridObserverRef.current.observe(node);
@@ -190,6 +192,7 @@ export default function ProfessorCatalog() {
 
   // Fetch professors when any filter changes
   useEffect(() => {
+    if (viewMode === 'grid' && !isMeasured) return;
     setLoading(true);
     fetchProfessorsCatalog({
       q:          filters.q          || undefined,
@@ -210,7 +213,7 @@ export default function ProfessorCatalog() {
       })
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, [filters, pageSize]);
+  }, [filters, pageSize, isMeasured, viewMode]);
 
   // Keep filters in the URL so the catalog view is shareable/bookmarkable.
   useEffect(() => {
