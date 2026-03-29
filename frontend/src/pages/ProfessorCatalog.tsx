@@ -155,18 +155,26 @@ export default function ProfessorCatalog() {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Responsive page size: fewer cards on smaller screens
-  const [viewportWidth, setViewportWidth] = useState(() => window.innerWidth);
-  useEffect(() => {
-    const onResize = () => setViewportWidth(window.innerWidth);
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
+  const [numCols, setNumCols] = useState(4);
+  const gridObserverRef = useRef<ResizeObserver | null>(null);
+  const gridRef = useCallback((node: HTMLDivElement | null) => {
+    if (gridObserverRef.current) {
+      gridObserverRef.current.disconnect();
+      gridObserverRef.current = null;
+    }
+    if (!node) return;
+    const update = () => {
+      const cols = window.getComputedStyle(node).gridTemplateColumns.split(' ').length;
+      setNumCols(cols);
+    };
+    gridObserverRef.current = new ResizeObserver(update);
+    gridObserverRef.current.observe(node);
+    update();
   }, []);
-  const pageSize = useMemo(() => {
-    if (viewportWidth <= 480) return viewMode === 'list' ? 8 : 6;
-    if (viewportWidth <= 768) return 9;
-    return 20;
-  }, [viewportWidth, viewMode]);
+
+  // pageSize = cols × 4 rows: always even, always fills the grid completely.
+  // List mode uses a fixed even count since it has no grid columns.
+  const pageSize = viewMode === 'list' ? 10 : numCols * 4;
 
   // Fetch colleges once
   useEffect(() => {
@@ -673,7 +681,7 @@ export default function ProfessorCatalog() {
           </p>
 
           {loading ? (
-            <div className={viewMode === 'list' ? 'catalog-list' : 'catalog-grid'}>
+            <div className={viewMode === 'list' ? 'catalog-list' : 'catalog-grid'} ref={viewMode === 'grid' ? gridRef : undefined}>
               {Array.from({ length: pageSize }).map((_, i) => (
                 <div key={i} className={viewMode === 'list' ? 'prof-list-item skeleton' : 'prof-card skeleton'} />
               ))}
@@ -737,7 +745,7 @@ export default function ProfessorCatalog() {
               ))}
             </div>
           ) : (
-            <div className="catalog-grid">
+            <div className="catalog-grid" ref={gridRef}>
               {professors.map(prof => (
                 <div
                   key={prof.slug}

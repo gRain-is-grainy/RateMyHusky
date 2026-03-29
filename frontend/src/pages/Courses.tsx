@@ -107,18 +107,25 @@ export default function Courses() {
 	const searchInputRef = useRef<HTMLInputElement>(null);
 	const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-	const [viewportWidth, setViewportWidth] = useState(() => window.innerWidth);
-	useEffect(() => {
-		const onResize = () => setViewportWidth(window.innerWidth);
-		window.addEventListener('resize', onResize);
-		return () => window.removeEventListener('resize', onResize);
+	const [numCols, setNumCols] = useState(4);
+	const gridObserverRef = useRef<ResizeObserver | null>(null);
+	const gridRef = useCallback((node: HTMLDivElement | null) => {
+		if (gridObserverRef.current) {
+			gridObserverRef.current.disconnect();
+			gridObserverRef.current = null;
+		}
+		if (!node) return;
+		const update = () => {
+			const cols = window.getComputedStyle(node).gridTemplateColumns.split(' ').length;
+			setNumCols(cols);
+		};
+		gridObserverRef.current = new ResizeObserver(update);
+		gridObserverRef.current.observe(node);
+		update();
 	}, []);
 
-	const pageSize = useMemo(() => {
-		if (viewportWidth <= 480) return 8;
-		if (viewportWidth <= 768) return 9;
-		return 20;
-	}, [viewportWidth]);
+	// pageSize = cols × 4 rows: always even, always fills the grid completely
+	const pageSize = numCols * 4;
 
 	useEffect(() => {
 		fetchCourseDepartments().then(setDepartments).catch(console.error);
@@ -427,7 +434,7 @@ export default function Courses() {
 					</p>
 
 					{loading ? (
-						<div className="catalog-grid">
+						<div className="catalog-grid" ref={gridRef}>
 							{Array.from({ length: pageSize }).map((_, i) => (
 								<div key={i} className="prof-card skeleton" />
 							))}
@@ -440,7 +447,7 @@ export default function Courses() {
 							</button>
 						</div>
 					) : (
-						<div className="catalog-grid">
+						<div className="catalog-grid" ref={gridRef}>
 							{courses.map((course) => (
 								<div
 									key={course.code}
