@@ -134,7 +134,7 @@ export async function fetchProfessorData(slug: string): Promise<ProfessorProfile
 
 export async function fetchProfessorReviews(slug: string): Promise<ProfessorReviews | null> {
   const token = localStorage.getItem('auth_token');
-  const key = `${slug}:${token ? 'a' : 'u'}`;
+  const key = `${slug}:${token ?? 'u'}`;
   if (_profReviewsCache.has(key)) return _profReviewsCache.get(key)!;
   try {
     const data = await get<ProfessorReviews>(`/api/professors/${encodeURIComponent(slug)}/reviews`);

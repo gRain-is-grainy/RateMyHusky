@@ -330,9 +330,8 @@ def main():
     raw_files = []
     for fname in sorted(os.listdir(DATA_DIR)):
         if fname.endswith(".csv"):
-            full_path = os.path.join(DATA_DIR, fname)
-            if full_path not in manifest["processed_files"]:
-                raw_files.append(full_path)
+            if fname not in manifest["processed_files"]:
+                raw_files.append(os.path.join(DATA_DIR, fname))
 
     if not raw_files:
         print("No new CSV files to process. All files already in manifest.")
@@ -422,7 +421,7 @@ def main():
 
     # ── Update manifest ──
     for csv_path in raw_files:
-        manifest["processed_files"].append(csv_path)
+        manifest["processed_files"].append(os.path.basename(csv_path))
     manifest["id_ranges"] = {
         "courseId": f"{COURSE_ID_OFFSET + 1} - {COURSE_ID_OFFSET + _course_counter}",
         "instructorId": f"{INSTRUCTOR_ID_OFFSET + 1} - {INSTRUCTOR_ID_OFFSET + _instructor_counter}",

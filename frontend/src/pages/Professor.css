@@ -247,7 +247,8 @@
 .prof-course-term-tag { font-size: 0.72rem; font-weight: 700; color: #d6394c; background: #fef0f0; padding: 2px 8px; border-radius: 8px; white-space: nowrap; }
 .prof-course-term-more { color: #999; background: #f0f0f0; font-style: italic; cursor: pointer; transition: background 0.15s, color 0.15s; }
 .prof-course-term-more:hover { background: #e4e4e4; color: #d6394c; }
-.prof-course-view { display: flex; justify-content: flex-end; margin-top: 3px; }
+.prof-course-lower { display: flex; align-items: flex-end; justify-content: space-between; margin-top: 6px; gap: 8px; }
+.prof-course-view { display: flex; flex-shrink: 0; }
 .prof-course-view-btn { font-size: 0.78rem; font-weight: 700; color: #d6394c; text-decoration: none; padding: 4px 10px; border-radius: 6px; border: 1.5px solid #d6394c; transition: background 0.15s, color 0.15s; }
 .prof-course-view-btn:hover { background: #d6394c; color: #fff; }
 

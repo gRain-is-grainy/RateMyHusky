@@ -927,52 +927,54 @@ const Professor = () => {
                         {sections.length > 0 ? `${sections.length} section${sections.length > 1 ? 's' : ''}` : 'RMP reviews only'}
                       </span>
                     </div>
-                    {terms.length > 0 && (
-                      <div className="prof-course-term-tags">
-                        {terms.slice(0, MAX_VISIBLE_TERMS).map(t => <span key={t} className="prof-course-term-tag">{t}</span>)}
-                        {hiddenTermCount > 0 && !termsExpanded && !closingTerms.has(code) && (
-                          <span
-                            className="prof-course-term-tag prof-course-term-more"
-                            onClick={(e) => { e.stopPropagation(); setExpandedTerms(prev => { const next = new Set(prev); next.add(code); return next; }); }}
+                    <div className="prof-course-lower">
+                      {terms.length > 0 && (
+                        <div className="prof-course-term-tags">
+                          {terms.slice(0, MAX_VISIBLE_TERMS).map(t => <span key={t} className="prof-course-term-tag">{t}</span>)}
+                          {hiddenTermCount > 0 && !termsExpanded && !closingTerms.has(code) && (
+                            <span
+                              className="prof-course-term-tag prof-course-term-more"
+                              onClick={(e) => { e.stopPropagation(); setExpandedTerms(prev => { const next = new Set(prev); next.add(code); return next; }); }}
+                            >
+                              +{hiddenTermCount} more
+                            </span>
+                          )}
+                          {terms.slice(MAX_VISIBLE_TERMS).map((t, i) => {
+                            const isClosing = closingTerms.has(code);
+                            const reverseI = hiddenTermCount - 1 - i;
+                            return <span key={t} className={`prof-course-term-tag prof-course-term-hidden ${termsExpanded || isClosing ? 'visible' : ''} ${isClosing ? 'closing' : ''}`} style={isClosing ? { animationDelay: `${reverseI * 0.04}s` } : termsExpanded ? { animationDelay: `${i * 0.04}s` } : undefined}>{t}</span>;
+                          })}
+                          {hiddenTermCount > 0 && (termsExpanded || closingTerms.has(code)) && (
+                            <span
+                              className={`prof-course-term-tag prof-course-term-more ${closingTerms.has(code) ? 'closing' : ''}`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (closingTerms.has(code)) return;
+                                setClosingTerms(prev => { const next = new Set(prev); next.add(code); return next; });
+                                setTimeout(() => {
+                                  setExpandedTerms(prev => { const next = new Set(prev); next.delete(code); return next; });
+                                  setClosingTerms(prev => { const next = new Set(prev); next.delete(code); return next; });
+                                }, hiddenTermCount * 40 + 200);
+                              }}
+                            >
+                              <TermCollapseChevron />
+                            </span>
+                          )}
+                        </div>
+                      )}
+                      {sections.length > 0 && (
+                        <div className="prof-course-view">
+                          <Link
+                            to={`/courses/${code.toLowerCase()}`}
+                            state={{ fromPage: { label: profile.name, url: `/professors/${slug}` } }}
+                            className="prof-course-view-btn"
+                            onClick={(e) => e.stopPropagation()}
                           >
-                            +{hiddenTermCount} more
-                          </span>
-                        )}
-                        {terms.slice(MAX_VISIBLE_TERMS).map((t, i) => {
-                          const isClosing = closingTerms.has(code);
-                          const reverseI = hiddenTermCount - 1 - i;
-                          return <span key={t} className={`prof-course-term-tag prof-course-term-hidden ${termsExpanded || isClosing ? 'visible' : ''} ${isClosing ? 'closing' : ''}`} style={isClosing ? { animationDelay: `${reverseI * 0.04}s` } : termsExpanded ? { animationDelay: `${i * 0.04}s` } : undefined}>{t}</span>;
-                        })}
-                        {hiddenTermCount > 0 && (termsExpanded || closingTerms.has(code)) && (
-                          <span
-                            className={`prof-course-term-tag prof-course-term-more ${closingTerms.has(code) ? 'closing' : ''}`}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (closingTerms.has(code)) return;
-                              setClosingTerms(prev => { const next = new Set(prev); next.add(code); return next; });
-                              setTimeout(() => {
-                                setExpandedTerms(prev => { const next = new Set(prev); next.delete(code); return next; });
-                                setClosingTerms(prev => { const next = new Set(prev); next.delete(code); return next; });
-                              }, hiddenTermCount * 40 + 200);
-                            }}
-                          >
-                            <TermCollapseChevron />
-                          </span>
-                        )}
-                      </div>
-                    )}
-                    {sections.length > 0 && (
-                      <div className="prof-course-view">
-                        <Link
-                          to={`/courses/${code.toLowerCase()}`}
-                          state={{ fromPage: { label: profile.name, url: `/professors/${slug}` } }}
-                          className="prof-course-view-btn"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          View Course
-                        </Link>
-                      </div>
-                    )}
+                            View Course
+                          </Link>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 );
               })}
@@ -1007,52 +1009,54 @@ const Professor = () => {
                               {sections.length > 0 ? `${sections.length} section${sections.length > 1 ? 's' : ''}` : 'RMP reviews only'}
                             </span>
                           </div>
-                          {terms.length > 0 && (
-                            <div className="prof-course-term-tags">
-                              {terms.slice(0, MAX_VISIBLE_TERMS).map(t => <span key={t} className="prof-course-term-tag">{t}</span>)}
-                              {hiddenTermCount > 0 && !termsExpanded && !closingTerms.has(code) && (
-                                <span
-                                  className="prof-course-term-tag prof-course-term-more"
-                                  onClick={(e) => { e.stopPropagation(); setExpandedTerms(prev => { const next = new Set(prev); next.add(code); return next; }); }}
+                          <div className="prof-course-lower">
+                            {terms.length > 0 && (
+                              <div className="prof-course-term-tags">
+                                {terms.slice(0, MAX_VISIBLE_TERMS).map(t => <span key={t} className="prof-course-term-tag">{t}</span>)}
+                                {hiddenTermCount > 0 && !termsExpanded && !closingTerms.has(code) && (
+                                  <span
+                                    className="prof-course-term-tag prof-course-term-more"
+                                    onClick={(e) => { e.stopPropagation(); setExpandedTerms(prev => { const next = new Set(prev); next.add(code); return next; }); }}
+                                  >
+                                    +{hiddenTermCount} more
+                                  </span>
+                                )}
+                                {terms.slice(MAX_VISIBLE_TERMS).map((t, i) => {
+                                  const isClosing = closingTerms.has(code);
+                                  const reverseI = hiddenTermCount - 1 - i;
+                                  return <span key={t} className={`prof-course-term-tag prof-course-term-hidden ${termsExpanded || isClosing ? 'visible' : ''} ${isClosing ? 'closing' : ''}`} style={isClosing ? { animationDelay: `${reverseI * 0.04}s` } : termsExpanded ? { animationDelay: `${i * 0.04}s` } : undefined}>{t}</span>;
+                                })}
+                                {hiddenTermCount > 0 && (termsExpanded || closingTerms.has(code)) && (
+                                  <span
+                                    className={`prof-course-term-tag prof-course-term-more ${closingTerms.has(code) ? 'closing' : ''}`}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      if (closingTerms.has(code)) return;
+                                      setClosingTerms(prev => { const next = new Set(prev); next.add(code); return next; });
+                                      setTimeout(() => {
+                                        setExpandedTerms(prev => { const next = new Set(prev); next.delete(code); return next; });
+                                        setClosingTerms(prev => { const next = new Set(prev); next.delete(code); return next; });
+                                      }, hiddenTermCount * 40 + 200);
+                                    }}
+                                  >
+                                    <TermCollapseChevron />
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                            {sections.length > 0 && (
+                              <div className="prof-course-view">
+                                <Link
+                                  to={`/courses/${code.toLowerCase()}`}
+                                  state={{ fromPage: { label: profile.name, url: `/professors/${slug}` } }}
+                                  className="prof-course-view-btn"
+                                  onClick={(e) => e.stopPropagation()}
                                 >
-                                  +{hiddenTermCount} more
-                                </span>
-                              )}
-                              {terms.slice(MAX_VISIBLE_TERMS).map((t, i) => {
-                                const isClosing = closingTerms.has(code);
-                                const reverseI = hiddenTermCount - 1 - i;
-                                return <span key={t} className={`prof-course-term-tag prof-course-term-hidden ${termsExpanded || isClosing ? 'visible' : ''} ${isClosing ? 'closing' : ''}`} style={isClosing ? { animationDelay: `${reverseI * 0.04}s` } : termsExpanded ? { animationDelay: `${i * 0.04}s` } : undefined}>{t}</span>;
-                              })}
-                              {hiddenTermCount > 0 && (termsExpanded || closingTerms.has(code)) && (
-                                <span
-                                  className={`prof-course-term-tag prof-course-term-more ${closingTerms.has(code) ? 'closing' : ''}`}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    if (closingTerms.has(code)) return;
-                                    setClosingTerms(prev => { const next = new Set(prev); next.add(code); return next; });
-                                    setTimeout(() => {
-                                      setExpandedTerms(prev => { const next = new Set(prev); next.delete(code); return next; });
-                                      setClosingTerms(prev => { const next = new Set(prev); next.delete(code); return next; });
-                                    }, hiddenTermCount * 40 + 200);
-                                  }}
-                                >
-                                  <TermCollapseChevron />
-                                </span>
-                              )}
-                            </div>
-                          )}
-                          {sections.length > 0 && (
-                            <div className="prof-course-view">
-                              <Link
-                                to={`/courses/${code.toLowerCase()}`}
-                                state={{ fromPage: { label: profile.name, url: `/professors/${slug}` } }}
-                                className="prof-course-view-btn"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                View Course
-                              </Link>
-                            </div>
-                          )}
+                                  View Course
+                                </Link>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       );
                     })}</div>

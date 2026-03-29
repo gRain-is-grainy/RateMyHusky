@@ -545,22 +545,11 @@ def search():
 # ──────────────────────────────────────────────
 @app.route("/api/professors/<slug>")
 def professor_profile(slug):
-    # Validate auth upfront for cache separation
-    is_authed = False
-    token = _get_auth_token()
-    if token:
-        try:
-            pyjwt.decode(token, JWT_SECRET, algorithms=["HS256"])
-            is_authed = True
-        except (pyjwt.ExpiredSignatureError, pyjwt.InvalidTokenError):
-            pass
-
-    cache_key = f"prof:{slug}:{'a' if is_authed else 'u'}"
+    cache_key = f"prof:{slug}"
     cached = cache_get(cache_key)
     if cached:
         resp = jsonify(cached)
-        resp.headers["Cache-Control"] = "private, max-age=300" if is_authed else "public, max-age=300"
-        resp.headers["Vary"] = "Authorization"
+        resp.headers["Cache-Control"] = "public, max-age=300"
         return resp
 
     # Look up professor from catalog
@@ -667,8 +656,7 @@ def professor_profile(slug):
 
     cache_set(cache_key, profile)
     resp = jsonify(profile)
-    resp.headers["Cache-Control"] = "private, max-age=300" if is_authed else "public, max-age=300"
-    resp.headers["Vary"] = "Authorization"
+    resp.headers["Cache-Control"] = "public, max-age=300"
     return resp
 
 
@@ -746,26 +734,18 @@ def professor_reviews(slug):
 
         if or_conditions:
             comment_rows = query(
-                f"SELECT course_url, question, comment FROM trace_comments WHERE {' OR '.join(or_conditions)}",
+                f"SELECT tc_term_id, tc_course_id, course_url, question, comment FROM trace_comments WHERE {' OR '.join(or_conditions)}",
                 or_params
             )
             for c in comment_rows:
                 comment_text = sanitize(c["comment"]) if c["comment"] else ""
                 if not comment_text.strip():
                     continue
-                url = str(c["course_url"] or "")
-                term_id = 0
-                try:
-                    sp_matches = re.findall(r"sp=(\d+)", url)
-                    if len(sp_matches) >= 3:
-                        term_id = int(sp_matches[2])
-                except (ValueError, IndexError):
-                    pass
                 comments.append({
-                    "courseUrl": url,
+                    "courseUrl": str(c["course_url"] or ""),
                     "question": str(c["question"] or ""),
                     "comment": comment_text if is_authed else "",
-                    "termId": term_id,
+                    "termId": int(c["tc_term_id"]) if c["tc_term_id"] else 0,
                 })
 
     result = {"reviews": reviews, "traceComments": comments}

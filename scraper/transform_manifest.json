@@ -1,9 +1,9 @@
 {
   "processed_files": [
-    "C:\\Users\\Ben\\Desktop\\College Stuff\\Oasis\\s26-group-8\\scraper\\data\\Fall 2025.csv",
-    "C:\\Users\\Ben\\Desktop\\College Stuff\\Oasis\\s26-group-8\\scraper\\data\\Fall A 2025.csv",
-    "C:\\Users\\Ben\\Desktop\\College Stuff\\Oasis\\s26-group-8\\scraper\\data\\Summer 2 2025.csv",
-    "C:\\Users\\Ben\\Desktop\\College Stuff\\Oasis\\s26-group-8\\scraper\\data\\Summer 2025.csv"
+    "Fall 2025.csv",
+    "Fall A 2025.csv",
+    "Summer 2 2025.csv",
+    "Summer 2025.csv"
   ],
   "source_tag": "scraper_v2",
   "id_ranges": {
