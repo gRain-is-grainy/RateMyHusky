@@ -6,6 +6,7 @@ Usage: python precompute.py
 """
 
 import os, re, unicodedata
+from html import unescape
 import numpy as np
 import pandas as pd
 import psycopg2
@@ -35,6 +36,9 @@ def upgrade_image_url(url):
 
 
 ALIAS_MAP = {
+    "ant woodall": "anthony woodall",
+    "dan grindle": "daniel grindle",
+    "mary kate dodgson": "mary dodgson",
     "laney strange": "elena strange",
     "ben tasker": "benjamin tasker",
     "alberto de la torre": "alberto de la torre duran",
@@ -105,6 +109,7 @@ COLLEGE_MAP = {
     "Managerial Science": "Business", "Organizational Behavior": "Business",
     "Organizational Leadership": "Business", "Human Resources Management": "Business",
     "Leadership": "Business",
+    "Dean of College of Sciences": "Science",
     "Mathematics": "Science", "Physics": "Science", "Chemistry": "Science",
     "Biology": "Science", "Biochemistry": "Science",
     "Environmental Science": "Science", "Environmental Studies": "Science",
@@ -147,6 +152,7 @@ COLLEGE_MAP = {
     "Public Policy": "CSSH", "Public Administration": "CSSH",
     "Urban Studies": "CSSH", "Humanities": "CSSH",
     "Education": "Professional Studies", "Professional Studies": "Professional Studies",
+    "Col of Professional Studies": "Professional Studies",
     "Counseling & Educational Psych": "Professional Studies",
     "Counseling amp Educational Psych": "Professional Studies",
     "Counseling  Educational Psych": "Professional Studies",
@@ -192,6 +198,19 @@ def main():
         "instructorLastName": "instructor_last_name", "departmentName": "department_name",
         "displayName": "display_name",
     }, inplace=True)
+    tc["department_name"] = tc["department_name"].astype(str).apply(unescape)
+
+    # Backfill missing departments using course prefix (e.g. "ENGW" -> "English")
+    # Affects future terms scraped before department metadata was populated
+    tc["_prefix"] = tc["display_name"].str.extract(r"^([A-Z]+)\d")
+    prefix_dept_map = (
+        tc[tc["department_name"].notna() & (tc["department_name"] != "nan")]
+        .groupby("_prefix")["department_name"]
+        .agg(lambda x: x.value_counts().index[0])
+    )
+    missing = tc["department_name"].isna() | (tc["department_name"] == "nan")
+    tc.loc[missing, "department_name"] = tc.loc[missing, "_prefix"].map(prefix_dept_map)
+    tc.drop(columns=["_prefix"], inplace=True)
     ts.rename(columns={
         "courseId": "course_id", "instructorId": "instructor_id", "termId": "term_id",
     }, inplace=True)
@@ -212,6 +231,7 @@ def main():
     rmp_profs["num_ratings"] = pd.to_numeric(rmp_profs["num_ratings"], errors="coerce")
     rmp_profs.dropna(subset=["rating", "num_ratings"], inplace=True)
     rmp_profs["name"] = rmp_profs["name"].astype(str).str.replace(r'\s+', ' ', regex=True).str.strip()
+    rmp_profs["department"] = rmp_profs["department"].astype(str).str.replace(r'\bamp\b', '&', regex=True)
 
     # ── Fix TRACE scores ──
     for col in ["count_1", "count_2", "count_3", "count_4", "count_5", "completed"]:
@@ -369,7 +389,15 @@ def main():
     for _, row in rmp_profs.iterrows():
         has_rmp = int(row["num_ratings"]) > 0 and float(row["rating"]) > 0
         has_trace = pd.notna(row["trace_overall"]) and int(row["trace_reviews"]) > 0
-        dept = str(row["trace_dept"]) if pd.notna(row["trace_dept"]) else str(row["department"])
+        rmp_dept = str(row["department"])
+        trace_dept_val = str(row["trace_dept"]) if pd.notna(row["trace_dept"]) else None
+        # Prefer trace_dept, but fall back to RMP dept if trace would move the professor to a different college
+        if trace_dept_val and get_college(trace_dept_val) != "Other" and get_college(trace_dept_val) == get_college(rmp_dept):
+            dept = trace_dept_val
+        elif get_college(rmp_dept) != "Other":
+            dept = rmp_dept
+        else:
+            dept = trace_dept_val or rmp_dept
         college = get_college(dept)
 
         wta = None

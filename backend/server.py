@@ -398,7 +398,7 @@ def goat_professors():
     else:
         rows = query("""
             SELECT * FROM professors_catalog
-            WHERE college = %s AND total_reviews >= %s AND trace_rating IS NOT NULL
+            WHERE college = %s AND total_reviews >= %s
             ORDER BY avg_rating DESC NULLS LAST, total_reviews DESC
             LIMIT %s
         """, (college, min_reviews, limit))
