@@ -290,7 +290,7 @@
 
 .goat-header-row {
   display: grid;
-  grid-template-columns: 60px 2fr 1.5fr 1.5fr 0.8fr;
+  grid-template-columns: 36px 2fr 1.5fr 1.5fr 0.8fr;
   align-items: center;
   padding: 0 24px;
   height: 48px;
@@ -303,9 +303,16 @@
   color: #999;
 }
 
+.goat-header-row > span {
+  font-size: inherit;
+  font-weight: inherit;
+  color: inherit;
+  padding: 0;
+}
+
 .goat-row {
   display: grid;
-  grid-template-columns: 60px 2fr 1.5fr 1.5fr 0.8fr;
+  grid-template-columns: 36px 2fr 1.5fr 1.5fr 0.8fr;
   align-items: center;
   padding: 0 24px;
   height: 56px;
@@ -334,10 +341,10 @@
   font-size: 1.1rem;
   font-weight: 900;
   color: #888;
-  text-align: center;
   display: flex;
   align-items: center;
   justify-content: center;
+  text-align: center;
 }
 
 .goat-top3 .goat-col-rank {
@@ -347,16 +354,25 @@
 .goat-col-name {
   display: flex;
   align-items: center;
+  min-width: 0;
 }
 
 .goat-name-text {
   font-weight: 900;
   font-size: 0.92rem;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .goat-col-dept {
   font-size: 0.82rem;
   color: #888;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .goat-col-rating {
@@ -376,7 +392,7 @@
   font-size: 0.85rem;
   color: #888;
   font-weight: 700;
-  padding-left: 8px;
+  text-align: left;
 }
 
 /* ---- partial stars ---- */
@@ -1069,6 +1085,7 @@
 
   .goat-col-reviews {
     font-size: 0.75rem;
+    text-align: left;
   }
 
   .randomizer-desc {

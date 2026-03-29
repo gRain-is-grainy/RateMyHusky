@@ -6,12 +6,12 @@ import { fetchCourseData } from '../api/api';
 import type { CourseDetail } from '../api/api';
 import Footer from '../components/Footer';
 import { getInitials } from '../utils/nameUtils';
+import SectionHistoryChart from '../components/SectionHistoryChart';
+import Breadcrumbs from '../components/Breadcrumbs';
 import './Course.css';
 
 const INITIAL_INSTRUCTORS_VISIBLE = 5;
 const INSTRUCTORS_VISIBLE_STEP = 5;
-const INITIAL_SECTIONS_VISIBLE = 8;
-const SECTIONS_VISIBLE_STEP = 8;
 
 const Course = () => {
 	const { code = '' } = useParams<{ code: string }>();
@@ -19,7 +19,6 @@ const Course = () => {
 	const [loading, setLoading] = useState(true);
 	const [notFound, setNotFound] = useState(false);
 	const [visibleInstructorCount, setVisibleInstructorCount] = useState(INITIAL_INSTRUCTORS_VISIBLE);
-	const [visibleSectionCount, setVisibleSectionCount] = useState(INITIAL_SECTIONS_VISIBLE);
 	const [showBackToTop, setShowBackToTop] = useState(false);
 
 	useEffect(() => {
@@ -47,7 +46,6 @@ const Course = () => {
 
 	useEffect(() => {
 		setVisibleInstructorCount(INITIAL_INSTRUCTORS_VISIBLE);
-		setVisibleSectionCount(INITIAL_SECTIONS_VISIBLE);
 	}, [course?.summary.code]);
 
 	useEffect(() => {
@@ -86,22 +84,17 @@ const Course = () => {
 
 	const summary = course.summary;
 	const visibleInstructors = course.instructors.slice(0, visibleInstructorCount);
-	const visibleSections = course.sections.slice(0, visibleSectionCount);
 	const hasMoreInstructors = visibleInstructorCount < course.instructors.length;
-	const hasMoreSections = visibleSectionCount < course.sections.length;
 	const canCollapseInstructors = visibleInstructorCount > INITIAL_INSTRUCTORS_VISIBLE;
-	const canCollapseSections = visibleSectionCount > INITIAL_SECTIONS_VISIBLE;
 	const hasExpandableInstructors = course.instructors.length > INITIAL_INSTRUCTORS_VISIBLE;
-	const hasExpandableSections = course.sections.length > INITIAL_SECTIONS_VISIBLE;
 
 	return (
 		<div className="course-page">
 			<div className="course-shell">
-				<div className="course-breadcrumb">
-					<Link to="/courses">Courses</Link>
-					<span>/</span>
-					<span>{summary.code}</span>
-				</div>
+				<Breadcrumbs items={[
+					{ label: 'Courses', to: '/courses' },
+					{ label: summary.code },
+				]} />
 
 				<header className="course-hero">
 					<div>
@@ -249,64 +242,9 @@ const Course = () => {
 
 				<section className="course-panel">
 					<div className="course-panel-header">
-						<h2>Section History</h2>
+						<h2>Rating History</h2>
 					</div>
-					<div className="course-table-wrap">
-						<table className="course-table section-table">
-							<thead>
-								<tr>
-									<th>Term</th>
-									<th>Section</th>
-									<th>Instructor</th>
-									<th>Overall</th>
-									<th>Enrollment</th>
-									<th>Responses</th>
-								</tr>
-							</thead>
-							<tbody>
-								{visibleSections.map((row) => (
-									<tr key={`${row.courseId}-${row.instructorId}-${row.termId}`}>
-										<td>{row.termTitle}</td>
-										<td>{row.section || '-'}</td>
-										<td>{row.instructor}</td>
-										<td>{row.overallRating != null ? row.overallRating.toFixed(2) : 'N/A'}</td>
-										<td>{row.enrollment}</td>
-										<td>{row.totalResponses}</td>
-									</tr>
-								))}
-							</tbody>
-						</table>
-					</div>
-					{hasExpandableSections && (
-						<div className="course-expand-controls" aria-label="Section history controls">
-							<button
-								type="button"
-								className="course-expand-btn"
-								aria-label="Collapse sections"
-								title="Collapse sections"
-								disabled={!canCollapseSections}
-								onClick={() => setVisibleSectionCount(INITIAL_SECTIONS_VISIBLE)}
-							>
-								<span className="visually-hidden">Collapse sections</span>
-								<span className="course-expand-chevron up" aria-hidden="true" />
-							</button>
-							<button
-								type="button"
-								className="course-expand-btn"
-								aria-label="Show more sections"
-								title="Show more sections"
-								disabled={!hasMoreSections}
-								onClick={() =>
-									setVisibleSectionCount((prev) =>
-										Math.min(prev + SECTIONS_VISIBLE_STEP, course.sections.length)
-									)
-								}
-							>
-								<span className="visually-hidden">Show more sections</span>
-								<span className="course-expand-chevron down" aria-hidden="true" />
-							</button>
-						</div>
-					)}
+					<SectionHistoryChart sections={course.sections} />
 				</section>
 
 			</div>

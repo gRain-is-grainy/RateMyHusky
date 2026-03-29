@@ -7,7 +7,7 @@ import Dropdown from '../components/Dropdown';
 import StarRating from '../components/StarRating';
 import RatingBar from '../components/RatingBar';
 import Breadcrumbs from '../components/Breadcrumbs';
-import { fetchProfessorData } from '../api/api';
+import { fetchProfessorData, fetchProfessorReviews } from '../api/api';
 import type { ProfessorProfile, ProfessorReview, TraceComment } from '../api/api';
 import { useAuth } from '../context/AuthContext';
 import SignInModal from '../components/SignInModal';
@@ -116,12 +116,17 @@ const traceSortOptions = [
 
 // Strictly extract "Season Year" from messy term titles
 const cleanTerm = (t: string): string => {
+  // Match terms like "Fall 2025", "Fall A 2025", "Summer 2 2025"
+  const fullMatch = t.match(/(Spring|Fall|Summer|Winter)\s*([A-Z]|\d)?\s*(20\d{2})/i);
+  if (fullMatch) {
+    const season = fullMatch[1].charAt(0).toUpperCase() + fullMatch[1].slice(1).toLowerCase();
+    const modifier = (fullMatch[2] ?? '').trim();
+    const year = fullMatch[3];
+    return modifier ? `${season} ${modifier} ${year}` : `${season} ${year}`;
+  }
   const seasonMatch = t.match(/(Spring|Fall|Summer|Winter)/i);
   if (!seasonMatch) return t.trim();
   const season = seasonMatch[1].charAt(0).toUpperCase() + seasonMatch[1].slice(1).toLowerCase();
-  // Try standard 4-digit year first (e.g. "Fall 2019")
-  const yearMatch = t.match(/\b(20\d{2})\b/);
-  if (yearMatch) return `${season} ${yearMatch[1]}`;
   // Fallback: extract year from 6-digit term codes like "202130" → "2021"
   const termCodeMatch = t.match(/(20\d{2})\d{2}/);
   if (termCodeMatch) return `${season} ${termCodeMatch[1]}`;
@@ -198,6 +203,7 @@ const Professor = () => {
   const [reviews, setReviews] = useState<ProfessorReview[]>([]);
   const [traceComments, setTraceComments] = useState<TraceComment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [reviewsLoading, setReviewsLoading] = useState(true);
   const [error, setError] = useState('');
   const [reviewTabRestored] = useState(() => sessionStorage.getItem('prof_review_tab') === 'trace');
   const [reviewTab, setReviewTab] = useState<'rmp' | 'trace'>(() => {
@@ -265,7 +271,7 @@ const Professor = () => {
     };
   }, [updateReviewPill, loading]);
 
-  /* ── data loading ── */
+  /* ── profile loading ── */
   useEffect(() => {
     if (!slug) {
       setLoading(false);
@@ -280,24 +286,54 @@ const Professor = () => {
         if (cancelled) return;
         if (!data) {
           setError('Professor not found.');
-        } else { 
-          setProfile(data); 
-          setReviews(data.reviews || []); 
-          setTraceComments(data.traceComments || []); 
+        } else {
+          setProfile(data);
         }
       } catch { if (!cancelled) setError('Failed to load professor data.'); }
       finally { if (!cancelled) setLoading(false); }
     }
     load();
     return () => { cancelled = true; };
+  }, [slug]);
+
+  /* ── reviews loading (re-runs on auth change to pick up comment text) ── */
+  useEffect(() => {
+    if (!slug) return;
+    let cancelled = false;
+    async function loadReviews() {
+      setReviewsLoading(true);
+      try {
+        const data = await fetchProfessorReviews(slug!);
+        if (cancelled) return;
+        if (data) {
+          setReviews(data.reviews || []);
+          setTraceComments(data.traceComments || []);
+        }
+      } catch { /* reviews are non-critical */ }
+      finally { if (!cancelled) setReviewsLoading(false); }
+    }
+    loadReviews();
+    return () => { cancelled = true; };
   }, [slug, user]);
 
-  /* ── scroll to reviews after sign-in redirect ── */
+  /* ── scroll to reviews after sign-in redirect (mobile: page reload) ── */
   useEffect(() => {
     if (reviewTabRestored && !loading && user && reviewsRef.current) {
       reviewsRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   }, [reviewTabRestored, loading, user]);
+
+  /* ── scroll to reviews after sign-in popup (desktop: no reload) ── */
+  const prevUserRef = useRef<typeof user>(undefined);
+  useEffect(() => {
+    const wasLoggedOut = !prevUserRef.current;
+    prevUserRef.current = user;
+    if (wasLoggedOut && user && sessionStorage.getItem('prof_review_tab') === 'trace') {
+      sessionStorage.removeItem('prof_review_tab');
+      setReviewTab('trace');
+      setTimeout(() => reviewsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150);
+    }
+  }, [user]);
 
   /* ── back to top ── */
   useEffect(() => {
@@ -348,9 +384,18 @@ const Professor = () => {
 
   const hasInitializedSelection = useRef(false);
   useEffect(() => {
-    if (allCourseCodes.length > 0 && !hasInitializedSelection.current) {
+    if (allCourseCodes.length === 0) return;
+    if (!hasInitializedSelection.current) {
       setSelectedCourses(new Set(allCourseCodes));
       hasInitializedSelection.current = true;
+    } else {
+      // Merge any new course codes from reviews into the existing selection
+      setSelectedCourses(prev => {
+        const next = new Set(prev);
+        let changed = false;
+        allCourseCodes.forEach(c => { if (!next.has(c)) { next.add(c); changed = true; } });
+        return changed ? next : prev;
+      });
     }
   }, [allCourseCodes]);
 
@@ -410,6 +455,7 @@ const Professor = () => {
         difficulty: profile.difficulty ?? 0,
         totalRatings: profile.totalRatings,
         wouldTakeAgainPct: profile.wouldTakeAgainPct,
+        hoursPerWeek: profile.hoursPerWeek,
       };
     }
 
@@ -422,6 +468,7 @@ const Professor = () => {
         : 0,
       totalRatings: filteredRmpReviews.length + traceWeight,
       wouldTakeAgainPct: profile.wouldTakeAgainPct,
+      hoursPerWeek: profile.hoursPerWeek,
     };
   }, [profile, filteredRmpReviews, filteredTraceCourses, allCourseCodes, selectedCourses]);
 
@@ -695,10 +742,10 @@ const Professor = () => {
       <section className="prof-stats">
         <div className="prof-stat-card prof-stat-clickable">
           <span className="prof-stat-value"><AnimatedNumber value={stats.avgRating} /></span>
-          <span className="prof-stat-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+          <span className="prof-stat-label" style={{ display: 'block', textAlign: 'center', position: 'relative' }}>
             Overall Rating
             {(stats.rmpRating !== null || stats.traceRating !== null) && (
-              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.6 }}><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+              <svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ position: 'absolute', top: '50%', transform: 'translateY(-50%)', marginLeft: '4px', opacity: 0.6 }}><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
             )}
           </span>
           <StarRating rating={stats.avgRating ?? 0} size="lg" />
@@ -732,6 +779,12 @@ const Professor = () => {
             {stats.wouldTakeAgainPct !== null ? <AnimatedNumber value={stats.wouldTakeAgainPct} decimals={0} suffix="%" /> : '—'}
           </span>
           <span className="prof-stat-label">Would Take Again</span>
+        </div>
+        <div className="prof-stat-card">
+          <span className="prof-stat-value">
+            {stats.hoursPerWeek !== null && stats.hoursPerWeek !== undefined ? <AnimatedNumber value={stats.hoursPerWeek} decimals={1} suffix="h" /> : '—'}
+          </span>
+          <span className="prof-stat-label">Hrs / Week</span>
         </div>
         <div className="prof-stat-card prof-stat-clickable" onClick={() => chartsRef.current?.scrollIntoView({ behavior: 'smooth' })}>
           <span className="prof-stat-value">{stats.totalRatings.toLocaleString()}</span>
@@ -908,6 +961,18 @@ const Professor = () => {
                         )}
                       </div>
                     )}
+                    {sections.length > 0 && (
+                      <div className="prof-course-view">
+                        <Link
+                          to={`/courses/${code.toLowerCase()}`}
+                          state={{ fromPage: { label: profile.name, url: `/professors/${slug}` } }}
+                          className="prof-course-view-btn"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          View Course
+                        </Link>
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -976,6 +1041,18 @@ const Professor = () => {
                               )}
                             </div>
                           )}
+                          {sections.length > 0 && (
+                            <div className="prof-course-view">
+                              <Link
+                                to={`/courses/${code.toLowerCase()}`}
+                                state={{ fromPage: { label: profile.name, url: `/professors/${slug}` } }}
+                                className="prof-course-view-btn"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                View Course
+                              </Link>
+                            </div>
+                          )}
                         </div>
                       );
                     })}</div>
@@ -1021,7 +1098,13 @@ const Professor = () => {
           </div>
         </div>
 
-        {reviewTab === 'rmp' && (
+        {reviewsLoading && (
+          <div className="prof-loading" style={{ padding: '2rem 0' }}>
+            <div className="prof-loading-spinner" />
+          </div>
+        )}
+
+        {!reviewsLoading && reviewTab === 'rmp' && (
           <>
             <div className="prof-reviews-filters">
               <Dropdown className="feedback-dropdown" options={sortOptions} value={sortBy} onChange={setSortBy} placeholder="Sort by…" />
@@ -1076,7 +1159,7 @@ const Professor = () => {
           </>
         )}
 
-        {reviewTab === 'trace' && (
+        {!reviewsLoading && reviewTab === 'trace' && (
           <div className="prof-trace-container">
             {user && (
               <div className="prof-trace-controls">

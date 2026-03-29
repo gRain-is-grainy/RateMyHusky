@@ -182,7 +182,7 @@ def process_csv(csv_path: str, term_override: str = None):
 
             first_name, last_name = split_instructor_name(instructor_name)
             enrollment = safe_int(row.get("audience", 0))
-            completed = safe_int(row.get("responses", 0))
+            completed = safe_int(row.get("Number of Responses") or row.get("responses", 0))
 
             # Build display_name in existing format: "CS2500:01 (Course Name) - Instructor"
             display_name = f"{course_code}:{section_num} ({course_name}) - {instructor_name}"
@@ -228,6 +228,39 @@ def process_csv(csv_path: str, term_override: str = None):
                                 })
                     except (json.JSONDecodeError, TypeError):
                         pass
+                continue
+
+            # ── Demographics rows (hours per week only) ──
+            if section_type == "Demographics":
+                if "hours per week" in question.lower():
+                    demo_json = row.get("demographics_json", "").strip()
+                    if demo_json:
+                        try:
+                            dist = json.loads(demo_json)
+                            midpoints = {"0-2": 1, "3-4": 3.5, "5-7": 6, "8-10": 9, "More than 10": 12}
+                            total_n = sum(dist.get(k, 0) for k in midpoints)
+                            if total_n > 0:
+                                mean_val = round(
+                                    sum(dist.get(k, 0) * v for k, v in midpoints.items()) / total_n, 2
+                                )
+                                scores.append({
+                                    "courseId": course_id,
+                                    "instructorId": instructor_id,
+                                    "termId": term_id,
+                                    "enrollment": enrollment,
+                                    "completed": completed,
+                                    "question": question,
+                                    "count_5": safe_int(dist.get("More than 10", 0)),
+                                    "count_4": safe_int(dist.get("8-10", 0)),
+                                    "count_3": safe_int(dist.get("5-7", 0)),
+                                    "count_2": safe_int(dist.get("3-4", 0)),
+                                    "count_1": safe_int(dist.get("0-2", 0)),
+                                    "mean": mean_val,
+                                    "median": "",
+                                    "std_dev": "",
+                                })
+                        except (json.JSONDecodeError, TypeError):
+                            pass
                 continue
 
             # ── Score rows ──

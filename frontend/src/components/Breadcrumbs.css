@@ -81,6 +81,12 @@
   padding: 12px 24px 0;
 }
 
+.course-shell .breadcrumbs {
+  padding: 12px 0 0;
+  max-width: none;
+  margin: 0;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .breadcrumbs {

@@ -113,8 +113,8 @@ const RatingCell = ({ prof, isOpen, onToggle }: {
       className="goat-col-rating goat-rating-wrapper"
       onClick={(e) => { e.stopPropagation(); onToggle(); }}
     >
-      <Stars rating={prof.avgRating ?? 0} />
       <span className="goat-score">{prof.avgRating?.toFixed(2) ?? '—'}</span>
+      <Stars rating={prof.avgRating ?? 0} />
       <span className="goat-rating-hint">ⓘ</span>
 
       {isOpen && (

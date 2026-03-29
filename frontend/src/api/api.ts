@@ -62,9 +62,13 @@ export interface ProfessorProfile {
   totalRatings: number;
   professorUrl: string | null;
   traceCourses: TraceCourse[];
+  imageUrl: string | null;
+  hoursPerWeek: number | null;
+}
+
+export interface ProfessorReviews {
   reviews: ProfessorReview[];
   traceComments: TraceComment[];
-  imageUrl: string | null;
 }
 
 export interface ProfessorReview {
@@ -90,6 +94,11 @@ export interface TraceComment {
   termId: number;
 }
 
+/* ---- Session caches (cleared on page refresh, keyed by slug/code) ---- */
+const _profCache = new Map<string, ProfessorProfile>();
+const _profReviewsCache = new Map<string, ProfessorReviews>();
+const _courseCache = new Map<string, CourseDetail>();
+
 /* ---- Fetchers ---- */
 async function get<T>(path: string): Promise<T> {
   const headers: Record<string, string> = {};
@@ -111,10 +120,26 @@ export const fetchGoatProfessors = (college: string, limit = 10) =>
 
 export const fetchRandomProfessor = () => get<RandomProfessor>("/api/random-professor");
 
-/* ---- Professor page fetcher (single call returns everything) ---- */
+/* ---- Professor page fetchers ---- */
 export async function fetchProfessorData(slug: string): Promise<ProfessorProfile | null> {
+  if (_profCache.has(slug)) return _profCache.get(slug)!;
   try {
-    return await get<ProfessorProfile>(`/api/professors/${encodeURIComponent(slug)}`);
+    const data = await get<ProfessorProfile>(`/api/professors/${encodeURIComponent(slug)}`);
+    _profCache.set(slug, data);
+    return data;
+  } catch {
+    return null;
+  }
+}
+
+export async function fetchProfessorReviews(slug: string): Promise<ProfessorReviews | null> {
+  const token = localStorage.getItem('auth_token');
+  const key = `${slug}:${token ? 'a' : 'u'}`;
+  if (_profReviewsCache.has(key)) return _profReviewsCache.get(key)!;
+  try {
+    const data = await get<ProfessorReviews>(`/api/professors/${encodeURIComponent(slug)}/reviews`);
+    _profReviewsCache.set(key, data);
+    return data;
   } catch {
     return null;
   }
@@ -218,6 +243,7 @@ export interface CourseSection {
   instructor: string;
   enrollment: number;
   overallRating: number | null;
+  rmpRating: number | null;
   totalResponses: number;
   completed: number;
 }
@@ -290,8 +316,11 @@ export function fetchCoursesCatalog(params: {
 }
 
 export async function fetchCourseData(code: string): Promise<CourseDetail | null> {
+  if (_courseCache.has(code)) return _courseCache.get(code)!;
   try {
-    return await get<CourseDetail>(`/api/courses/${encodeURIComponent(code)}`);
+    const data = await get<CourseDetail>(`/api/courses/${encodeURIComponent(code)}`);
+    _courseCache.set(code, data);
+    return data;
   } catch {
     return null;
   }

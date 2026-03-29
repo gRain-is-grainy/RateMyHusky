@@ -72,6 +72,8 @@ const pickWinner = (
 	return l < r ? 'left' : 'right';
 };
 
+const cleanTermTitle = (t: string): string => t.replace(/^\d{6}:\s*/, '').replace(/\s*\d{6}/g, '').trim();
+
 const getRecentTraceSnapshot = (profile: ProfessorProfile | null): TraceSnapshot | null => {
 	if (!profile?.traceCourses?.length) return null;
 
@@ -84,7 +86,7 @@ const getRecentTraceSnapshot = (profile: ProfessorProfile | null): TraceSnapshot
 		const overallScore = course.scores.find((score) => /overall/i.test(score.question));
 		if (overallScore && typeof overallScore.mean === 'number') {
 			return {
-				term: course.termTitle,
+				term: cleanTermTitle(course.termTitle),
 				course: course.displayName,
 				score: overallScore.mean,
 			};

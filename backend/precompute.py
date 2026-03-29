@@ -300,6 +300,13 @@ def main():
     trace_lookup = dict(zip(trace_avg["name_key"], trace_avg["trace_overall"]))
     print(f"Matched {len(trace_lookup)} instructors to TRACE overall scores")
 
+    # ── TRACE hours per week (weighted avg of hours question) ──
+    hours_q = ts[ts["question"].str.lower().str.contains("hours per week", na=False)].copy()
+    hours_q.dropna(subset=["mean"], inplace=True)
+    hours_merged = hours_q.merge(instructor_courses, on=["course_id", "instructor_id"], how="inner")
+    hours_avg = hours_merged.groupby("name_key").apply(weighted_avg, include_groups=False).reset_index().rename(columns={0: "avg_hours"})
+    hours_lookup = dict(zip(hours_avg["name_key"], hours_avg["avg_hours"]))
+
     # ── TRACE review counts ──
     instructor_sections = tc[["course_id", "instructor_id", "term_id", "name_key"]].drop_duplicates(
         subset=["course_id", "instructor_id", "term_id"]
@@ -315,6 +322,7 @@ def main():
     rmp_profs["trace_overall"] = rmp_profs["_name_key"].map(trace_lookup)
     rmp_profs["trace_reviews"] = rmp_profs["_name_key"].map(trace_reviews_lookup).fillna(0).astype(int)
     rmp_profs["trace_dept"] = rmp_profs["_name_key"].map(trace_dept_lookup)
+    rmp_profs["avg_hours"] = rmp_profs["_name_key"].map(hours_lookup)
 
     # Fuzzy match unmatched
     trace_by_last = {}
@@ -336,6 +344,8 @@ def main():
                 rmp_profs.at[idx, "trace_overall"] = trace_lookup.get(tc_name)
                 rmp_profs.at[idx, "trace_reviews"] = trace_reviews_lookup.get(tc_name, 0)
                 rmp_profs.at[idx, "trace_dept"] = trace_dept_lookup.get(tc_name)
+                if rmp_profs.at[idx, "avg_hours"] != rmp_profs.at[idx, "avg_hours"]:  # isnan
+                    rmp_profs.at[idx, "avg_hours"] = hours_lookup.get(tc_name)
                 break
 
     rmp_profs["trace_reviews"] = rmp_profs["trace_reviews"].fillna(0).astype(int)
@@ -387,6 +397,10 @@ def main():
             slug = slug + "-2"
         seen_slugs.add(slug)
 
+        avg_hours = None
+        if pd.notna(row.get("avg_hours")) and float(row["avg_hours"]) > 0:
+            avg_hours = round(float(row["avg_hours"]), 2)
+
         catalog_rows.append((
             slug, display_name, row["_name_key"], dept, college,
             float(row["avg_rating"]) if pd.notna(row["avg_rating"]) else None,
@@ -396,6 +410,7 @@ def main():
             wta, difficulty,
             row.get("professor_url", None) or None,
             photo_lookup.get(row["_name_key"], None),
+            avg_hours,
         ))
 
     # TRACE-only professors
@@ -414,12 +429,14 @@ def main():
         if slug in seen_slugs:
             slug = slug + "-2"
         seen_slugs.add(slug)
+        avg_hours_t = round(float(hours_lookup[nk]), 2) if nk in hours_lookup and pd.notna(hours_lookup[nk]) else None
         catalog_rows.append((
             slug, display_name, nk, dept, get_college(dept),
             avg, None, avg,
             0, t_rev, t_rev,
             None, None, None,
             photo_lookup.get(nk, None),
+            avg_hours_t,
         ))
 
     print(f"Built catalog with {len(catalog_rows)} professors")
@@ -471,14 +488,15 @@ def main():
             would_take_again_pct FLOAT,
             difficulty FLOAT,
             professor_url TEXT,
-            image_url TEXT
+            image_url TEXT,
+            avg_hours FLOAT
         )
     """)
     chunk_insert(cur, """
         INSERT INTO professors_catalog
         (slug, name, name_key, department, college, avg_rating, rmp_rating, trace_rating,
          num_ratings, trace_reviews, total_reviews, would_take_again_pct, difficulty,
-         professor_url, image_url)
+         professor_url, image_url, avg_hours)
         VALUES %s
     """, catalog_rows)
     cur.execute("CREATE INDEX idx_pc_name_key ON professors_catalog (name_key)")

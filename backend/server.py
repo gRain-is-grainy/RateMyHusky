@@ -187,12 +187,35 @@ def cache_set(key, data):
                 del _cache[k]
 
 
+def _acquire_fresh_conn():
+    key = id(g._get_current_object() if hasattr(g, '_get_current_object') else g)
+    g.db_key = key
+    g.db = _get_pool().getconn(key=key)
+    return g.db
+
+
+def _discard_db_conn():
+    """Return the current request's connection to the pool and mark it closed."""
+    db = g.pop('db', None)
+    key = g.pop('db_key', None)
+    if db is not None:
+        try:
+            _get_pool().putconn(db, key=key, close=True)
+        except Exception:
+            try:
+                db.close()
+            except Exception:
+                pass
+
+
 def get_db():
     if 'db' not in g:
-        key = id(g._get_current_object() if hasattr(g, '_get_current_object') else g)
-        g.db_key = key
-        g.db = _get_pool().getconn(key=key)
-    return g.db
+        return _acquire_fresh_conn()
+    conn = g.db
+    if conn.closed:
+        _discard_db_conn()
+        return _acquire_fresh_conn()
+    return conn
 
 
 @app.teardown_appcontext
@@ -200,14 +223,28 @@ def return_db(exc):
     db = g.pop('db', None)
     key = g.pop('db_key', None)
     if db is not None:
-        _get_pool().putconn(db, key=key)
+        try:
+            _get_pool().putconn(db, key=key)
+        except KeyError:
+            try:
+                db.close()
+            except Exception:
+                pass
 
 
 def query(sql, params=None):
-    conn = get_db()
-    cur = conn.cursor(cursor_factory=RealDictCursor)
-    cur.execute(sql, params or ())
-    return cur.fetchall()
+    try:
+        conn = get_db()
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        cur.execute(sql, params or ())
+        return cur.fetchall()
+    except (psycopg2.InterfaceError, psycopg2.OperationalError):
+        # Connection was stale — discard it and retry once with a fresh one
+        _discard_db_conn()
+        conn = get_db()
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        cur.execute(sql, params or ())
+        return cur.fetchall()
 
 
 def query_one(sql, params=None):
@@ -551,6 +588,7 @@ def professor_profile(slug):
         "totalRatings": prof["total_reviews"],
         "professorUrl": prof["professor_url"],
         "imageUrl": prof["image_url"],
+        "hoursPerWeek": round(prof["avg_hours"], 1) if prof["avg_hours"] else None,
     }
 
     # ── TRACE courses + scores (batched into 2 queries instead of N+1) ──
@@ -627,6 +665,41 @@ def professor_profile(slug):
 
     profile["traceCourses"] = trace_course_list
 
+    cache_set(cache_key, profile)
+    resp = jsonify(profile)
+    resp.headers["Cache-Control"] = "private, max-age=300" if is_authed else "public, max-age=300"
+    resp.headers["Vary"] = "Authorization"
+    return resp
+
+
+@app.route("/api/professors/<slug>/reviews")
+def professor_reviews(slug):
+    is_authed = False
+    token = _get_auth_token()
+    if token:
+        try:
+            pyjwt.decode(token, JWT_SECRET, algorithms=["HS256"])
+            is_authed = True
+        except (pyjwt.ExpiredSignatureError, pyjwt.InvalidTokenError):
+            pass
+
+    cache_key = f"prof_reviews:{slug}:{'a' if is_authed else 'u'}"
+    cached = cache_get(cache_key)
+    if cached:
+        resp = jsonify(cached)
+        resp.headers["Cache-Control"] = "private, max-age=300" if is_authed else "public, max-age=300"
+        resp.headers["Vary"] = "Authorization"
+        return resp
+
+    prof = query_one("SELECT name_key FROM professors_catalog WHERE slug = %s", (slug,))
+    if not prof:
+        name_key = slug.strip().lower().replace("-", " ")
+        prof = query_one("SELECT name_key FROM professors_catalog WHERE name_key = %s", (name_key,))
+    if not prof:
+        return jsonify({"error": "Professor not found"}), 404
+
+    name_key = prof["name_key"]
+
     # ── RMP reviews ──
     review_rows = query("""
         SELECT professor_name, department, overall_rating, course,
@@ -652,17 +725,18 @@ def professor_profile(slug):
             "online_class": str(r["online_class"] or ""),
             "comment": sanitize(r["comment"]) if r["comment"] else "",
         })
-    profile["reviews"] = reviews
 
     # ── TRACE comments ──
-    # Always fetch question + counts; only include comment text when authed
+    trace_course_rows = query(
+        "SELECT course_id, term_id, instructor_id FROM trace_courses WHERE name_key = %s",
+        (name_key,)
+    )
+
+    comments = []
     if trace_course_rows:
         keys = set()
         for c in trace_course_rows:
-            cid = int(c["course_id"])
-            iid = int(c["instructor_id"])
-            tid = int(c["term_id"]) if c["term_id"] else 0
-            keys.add((cid, iid, tid))
+            keys.add((int(c["course_id"]), int(c["instructor_id"]), int(c["term_id"]) if c["term_id"] else 0))
 
         or_conditions = []
         or_params = []
@@ -675,13 +749,10 @@ def professor_profile(slug):
                 f"SELECT course_url, question, comment FROM trace_comments WHERE {' OR '.join(or_conditions)}",
                 or_params
             )
-
-            comments = []
             for c in comment_rows:
                 comment_text = sanitize(c["comment"]) if c["comment"] else ""
                 if not comment_text.strip():
                     continue
-
                 url = str(c["course_url"] or "")
                 term_id = 0
                 try:
@@ -690,21 +761,16 @@ def professor_profile(slug):
                         term_id = int(sp_matches[2])
                 except (ValueError, IndexError):
                     pass
-
                 comments.append({
                     "courseUrl": url,
                     "question": str(c["question"] or ""),
                     "comment": comment_text if is_authed else "",
                     "termId": term_id,
                 })
-            profile["traceComments"] = comments
-        else:
-            profile["traceComments"] = []
-    else:
-        profile["traceComments"] = []
 
-    cache_set(cache_key, profile)
-    resp = jsonify(profile)
+    result = {"reviews": reviews, "traceComments": comments}
+    cache_set(cache_key, result)
+    resp = jsonify(result)
     resp.headers["Cache-Control"] = "private, max-age=300" if is_authed else "public, max-age=300"
     resp.headers["Vary"] = "Authorization"
     return resp
@@ -1229,7 +1295,7 @@ def course_profile(code):
     if name_keys:
         placeholders = ",".join(["%s"] * len(name_keys))
         prof_rows = query(
-            f"SELECT name_key, slug, image_url, total_reviews, would_take_again_pct, difficulty "
+            f"SELECT name_key, slug, image_url, total_reviews, would_take_again_pct, difficulty, rmp_rating "
             f"FROM professors_catalog WHERE name_key IN ({placeholders})", name_keys
         )
         prof_map = {r["name_key"]: r for r in prof_rows}
@@ -1265,18 +1331,22 @@ def course_profile(code):
         sc = score_map.get(key)
         fname = (s["instructor_first_name"] or "").strip()
         lname = (s["instructor_last_name"] or "").strip()
+        name = f"{fname} {lname}".strip()
         overall_mean = None
         if sc and _safe_int(sc["total_responses"]) > 0:
             overall_mean = round(_safe_float(sc["weighted_sum"]) / _safe_int(sc["total_responses"]), 2)
+        prof = prof_map.get(normalize_name(name))
+        rmp_rating = round(prof["rmp_rating"], 2) if prof and prof.get("rmp_rating") else None
         section_rows.append({
             "courseId": _safe_int(s["course_id"]),
             "instructorId": _safe_int(s["instructor_id"]),
             "termId": _safe_int(s["term_id"]),
             "termTitle": s["term_title"] or "",
             "section": s["section"] or "",
-            "instructor": f"{fname} {lname}".strip(),
+            "instructor": name,
             "enrollment": _safe_int(s["enrollment"]),
             "overallRating": overall_mean,
+            "rmpRating": rmp_rating,
             "totalResponses": _safe_int(sc["total_responses"]) if sc else 0,
             "completed": _safe_int(sc["completed"]) if sc else 0,
         })
