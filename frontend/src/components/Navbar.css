@@ -13,6 +13,8 @@
   -webkit-backdrop-filter: blur(12px);
   border-bottom: 1px solid rgba(0, 0, 0, 0.06);
   font-family: 'Nunito', sans-serif;
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
 }
 
 .navbar-logo {

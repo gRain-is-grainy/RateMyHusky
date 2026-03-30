@@ -31,6 +31,36 @@ load_dotenv()
 # ──────────────────────────────────────────────
 #  Helpers
 # ──────────────────────────────────────────────
+def term_sort_key(title: str) -> int:
+    """Returns a numeric sort key where higher = more recent term.
+    Order within a year: Fall(7) > Fall A(6) > Full Summer(5) > Summer 2(4) > Summer 1(3) > Spring(2) > Spring A(1)
+    """
+    if not title:
+        return 0
+    lower = title.lower()
+    # Try word-bounded year first, then 4-digit prefix of 6-digit code (e.g. "202510")
+    m = re.search(r'\b(20\d{2})\b', lower) or re.search(r'(20\d{2})\d{2}', lower)
+    if not m:
+        return 0
+    year = int(m.group(1))
+    if re.search(r'\bfall\b', lower):
+        sub = 6 if re.search(r'\bfall\s+a\b', lower) else 7
+    elif re.search(r'\bfull\s+summer\b', lower):
+        sub = 5
+    elif re.search(r'\bsummer\b', lower):
+        if re.search(r'\bsummer\s+2\b', lower):
+            sub = 4
+        elif re.search(r'\bsummer\s+1\b', lower):
+            sub = 3
+        else:
+            sub = 4
+    elif re.search(r'\bspring\b', lower):
+        sub = 1 if re.search(r'\bspring\s+a\b', lower) else 2
+    else:
+        sub = 0
+    return year * 10 + sub
+
+
 def normalize_name(name):
     s = str(name).strip().lower()
     s = unicodedata.normalize('NFKD', s).encode('ascii', 'ignore').decode('ascii')
@@ -1251,12 +1281,15 @@ def course_profile(code):
     instructor_ids = set()
     latest_term_id = 0
     latest_term_title = ""
+    latest_term_sort = -1
 
     for s in sections:
         total_enrollment += _safe_int(s["enrollment"])
         instructor_ids.add(s["instructor_id"])
         tid = _safe_int(s["term_id"])
-        if tid > latest_term_id:
+        tsort = term_sort_key(s["term_title"] or "")
+        if tsort > latest_term_sort:
+            latest_term_sort = tsort
             latest_term_id = tid
             latest_term_title = s["term_title"] or ""
         key = (s["course_id"], s["instructor_id"], s["term_id"])
@@ -1614,6 +1647,56 @@ def submit_feedback():
         return jsonify({"error": "Failed to send email"}), 500
 
     return jsonify({"ok": True})
+
+
+@app.route("/api/trace-dept-avg")
+def trace_dept_avg():
+    department = request.args.get("department", "").strip()
+    try:
+        term_id = int(request.args.get("term_id", "0"))
+    except (ValueError, TypeError):
+        term_id = 0
+
+    if not department or not term_id:
+        return jsonify([])
+
+    cache_key = f"trace_dept_avg:{department}:{term_id}"
+    cached = cache_get(cache_key)
+    if cached:
+        resp = jsonify(cached)
+        resp.headers["Cache-Control"] = "public, max-age=3600"
+        return resp
+
+    rows = query("""
+        SELECT ts.question,
+               SUM(COALESCE(ts.count_1, 0) + COALESCE(ts.count_2, 0) + COALESCE(ts.count_3, 0)
+                   + COALESCE(ts.count_4, 0) + COALESCE(ts.count_5, 0)) AS total_responses,
+               SUM(1 * COALESCE(ts.count_1, 0) + 2 * COALESCE(ts.count_2, 0)
+                   + 3 * COALESCE(ts.count_3, 0) + 4 * COALESCE(ts.count_4, 0)
+                   + 5 * COALESCE(ts.count_5, 0)) AS weighted_sum
+        FROM trace_scores ts
+        JOIN trace_courses tc
+            ON ts.course_id = tc.course_id
+           AND ts.instructor_id = tc.instructor_id
+           AND ts.term_id = tc.term_id
+        WHERE tc.department_name = %s AND tc.term_id = %s
+        GROUP BY ts.question
+    """, (department, term_id))
+
+    result = []
+    for r in rows:
+        total = int(r["total_responses"] or 0)
+        wsum = float(r["weighted_sum"] or 0)
+        if total > 0:
+            result.append({
+                "question": str(r["question"] or ""),
+                "avgMean": round(wsum / total, 2),
+            })
+
+    cache_set(cache_key, result)
+    resp = jsonify(result)
+    resp.headers["Cache-Control"] = "public, max-age=3600"
+    return resp
 
 
 if __name__ == "__main__":

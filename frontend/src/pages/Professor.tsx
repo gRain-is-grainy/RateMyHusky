@@ -7,8 +7,13 @@ import Dropdown from '../components/Dropdown';
 import StarRating from '../components/StarRating';
 import RatingBar from '../components/RatingBar';
 import Breadcrumbs from '../components/Breadcrumbs';
-import { fetchProfessorFull, fetchProfessorReviews } from '../api/api';
-import type { ProfessorProfile, ProfessorReview, TraceComment } from '../api/api';
+import {
+  RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
+  ResponsiveContainer, Legend, Tooltip as RechartsTooltip,
+} from 'recharts';
+import { fetchProfessorFull, fetchProfessorReviews, fetchTraceDeptAvg } from '../api/api';
+import type { ProfessorProfile, ProfessorReview, TraceComment, TraceDeptAvgItem } from '../api/api';
+import { termSortKey } from '../utils/termUtils';
 import { useAuth } from '../context/AuthContext';
 import SignInModal from '../components/SignInModal';
 import neuIcon from '../assets/neu-circle-icon.png';
@@ -231,6 +236,7 @@ const Professor = () => {
   const COURSES_COLLAPSED_LIMIT = 5;
   const MAX_VISIBLE_TERMS = 3;
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
+  const [deptAvg, setDeptAvg] = useState<TraceDeptAvgItem[]>([]);
 
   /* ── review pill ── */
   const updateReviewPill = useCallback(() => {
@@ -417,6 +423,132 @@ const Professor = () => {
     });
   }, [profile, selectedCourses]);
 
+  /* ── TRACE radar: most-recent-term aggregation ── */
+  const mostRecentTermData = useMemo(() => {
+    if (filteredTraceCourses.length === 0) return null;
+    // Sort unique term titles by proper chronological order (newest first)
+    const termTitles = [...new Set(filteredTraceCourses.map(c => c.termTitle))]
+      .sort((a, b) => termSortKey(b) - termSortKey(a));
+    // Pick the most recent term that actually has score data
+    for (const termTitle of termTitles) {
+      const termCourses = filteredTraceCourses.filter(c => c.termTitle === termTitle);
+      const scoreMap = new Map<string, { sum: number; weight: number }>();
+      for (const course of termCourses) {
+        for (const s of course.scores) {
+          if (!scoreMap.has(s.question)) scoreMap.set(s.question, { sum: 0, weight: 0 });
+          const w = (s.totalResponses != null ? s.totalResponses : s.completed) || 0;
+          if (w > 0) {
+            scoreMap.get(s.question)!.sum += s.mean * w;
+            scoreMap.get(s.question)!.weight += w;
+          }
+        }
+      }
+      const scores: { question: string; mean: number }[] = [];
+      for (const [question, { sum, weight }] of scoreMap.entries()) {
+        if (weight > 0) scores.push({ question, mean: sum / weight });
+      }
+      if (scores.length > 0) {
+        return {
+          termId: termCourses[0].termId,
+          termTitle,
+          deptName: termCourses[0].departmentName || '',
+          scores,
+        };
+      }
+    }
+    return null;
+  }, [filteredTraceCourses]);
+
+  // Fetch department averages whenever the most-recent-term context changes
+  useEffect(() => {
+    if (!mostRecentTermData?.deptName || !mostRecentTermData.termId) {
+      setDeptAvg([]);
+      return;
+    }
+    fetchTraceDeptAvg(mostRecentTermData.deptName, mostRecentTermData.termId)
+      .then(setDeptAvg)
+      .catch(() => setDeptAvg([]));
+  }, [mostRecentTermData?.deptName, mostRecentTermData?.termId]);
+
+  const RADAR_METRICS = useMemo(() => [
+    {
+      label: 'Teaching\nEffectiveness',
+      short: 'Teaching',
+      patterns: [
+        ['overall rating of teaching', 'overall rating', 'overall effectiveness', 'what is your overall rating'],
+        ['clearly communicated', 'clear communication', 'clearly'],
+      ],
+    },
+    {
+      label: 'Course\nOrganization',
+      short: 'Organization',
+      patterns: [
+        ['online course materials were organized', 'online course materials'],
+        ['syllabus was accurate', 'syllabus'],
+        ['used class time effectively', 'effective time'],
+      ],
+    },
+    {
+      label: 'Intellectual\nChallenge',
+      short: 'Rigor',
+      patterns: [
+        ['intellectually challenging', 'this course was intellectually', 'challenging'],
+        ['learned a lot', 'i learned a lot'],
+      ],
+    },
+    {
+      label: 'Grading &\nFeedback',
+      short: 'Grading',
+      patterns: [
+        ['fairly evaluated', 'fair evaluation', 'fair grades'],
+        ['sufficient feedback', 'provided sufficient feedback'],
+      ],
+    },
+    {
+      label: 'Accessibility\n& Support',
+      short: 'Accessibility',
+      patterns: [
+        ['available to assist students outside', 'outside assist'],
+        ['respectful and inclusive', 'facilitated a respectful', 'respect'],
+      ],
+    },
+  ], []);
+
+  const getMetricValue = useCallback(
+    (scores: { question: string; mean: number }[], patternGroups: string[][]): number | null => {
+      const values: number[] = [];
+      for (const group of patternGroups) {
+        const match = scores.find(s => {
+          const q = s.question.toLowerCase();
+          return group.some(p => q.includes(p));
+        });
+        if (match && match.mean > 0) values.push(match.mean);
+      }
+      return values.length > 0 ? values.reduce((a, b) => a + b, 0) / values.length : null;
+    },
+    []
+  );
+
+  const radarData = useMemo(() => {
+    if (!mostRecentTermData) return null;
+    const profScores = mostRecentTermData.scores;
+    const deptScores = deptAvg.map(d => ({ question: d.question, mean: d.avgMean }));
+    const points = RADAR_METRICS.map(m => {
+      const profVal = getMetricValue(profScores, m.patterns);
+      const deptVal = deptAvg.length > 0 ? getMetricValue(deptScores, m.patterns) : null;
+      return {
+        metric: m.short,
+        // Use 0 for missing values so the polygon closes; tooltip will show "N/A"
+        professor: profVal !== null ? +profVal.toFixed(2) : 0,
+        department: deptVal !== null ? +deptVal.toFixed(2) : 0,
+        profMissing: profVal === null,
+        deptMissing: deptVal === null,
+      };
+    });
+    const hasData = points.some(p => !p.profMissing);
+    return hasData ? points : null;
+  }, [mostRecentTermData, deptAvg, RADAR_METRICS, getMetricValue]);
+
   const stats = useMemo(() => {
     if (!profile) return null;
 
@@ -590,10 +722,11 @@ const Professor = () => {
     for (const q of Object.keys(groups)) {
       groups[q] = deduplicateByText(groups[q], c => c.comment);
     }
+    const termKey = (termId: number) => termSortKey(termIdMap.get(termId) || '');
     const searchLower = traceSearch.toLowerCase();
     return Object.entries(groups).map(([q, cs]) => ({
       question: q,
-      maxTermId: Math.max(...cs.map(c => c.termId || 0)),
+      maxTermSortKey: Math.max(...cs.map(c => termKey(c.termId || 0))),
       count: cs.length,
       comments: [...cs].sort((a, b) => {
         // If searching, boost comments containing the search term
@@ -603,11 +736,11 @@ const Professor = () => {
           if (aMatch && !bMatch) return -1;
           if (!aMatch && bMatch) return 1;
         }
-        if (traceSort === 'newest') return (b.termId || 0) - (a.termId || 0);
+        if (traceSort === 'newest') return termKey(b.termId || 0) - termKey(a.termId || 0);
         return b.comment.length - a.comment.length;
       }),
-    })).filter(g => 
-      !traceSearch || 
+    })).filter(g =>
+      !traceSearch ||
       g.question.toLowerCase().includes(searchLower) ||
       g.comments.some(c => c.comment.toLowerCase().includes(searchLower))
     ).sort((a, b) => {
@@ -617,11 +750,11 @@ const Professor = () => {
         if (aM && !bM) return -1;
         if (!aM && bM) return 1;
       }
-      if (traceSort === 'newest') return b.maxTermId - a.maxTermId;
+      if (traceSort === 'newest') return b.maxTermSortKey - a.maxTermSortKey;
       if (traceSort === 'popular') return b.count - a.count;
       return a.question.localeCompare(b.question);
     });
-  }, [traceComments, traceSearch, traceSort, filteredTraceCourses]);
+  }, [traceComments, traceSearch, traceSort, filteredTraceCourses, termIdMap]);
 
   const toggleCourse = (code: string) => {
     setSelectedCourses(prev => {
@@ -828,6 +961,93 @@ const Professor = () => {
         )}
       </section>
 
+      {radarData && (
+        <section className="prof-radar-section">
+          <div className="prof-radar-header">
+            <h2 className="prof-section-title">TRACE In-Depth Evaluation</h2>
+            {mostRecentTermData?.termTitle && (
+              <span className="prof-radar-term">{cleanTerm(mostRecentTermData.termTitle)}</span>
+            )}
+          </div>
+          <p className="prof-radar-subtitle">
+            How this professor scores across key teaching dimensions compared to their department.
+          </p>
+          <div className="prof-radar-charts">
+            <ResponsiveContainer width="100%" height={340}>
+              <RadarChart
+                data={radarData}
+                margin={{ top: 20, right: 40, bottom: 20, left: 40 }}
+              >
+                <PolarGrid stroke="var(--radar-grid, #e0e0e0)" />
+                <PolarAngleAxis
+                  dataKey="metric"
+                  tick={{ fill: 'var(--radar-label, #555)', fontSize: 12, fontWeight: 600, fontFamily: 'Nunito, sans-serif' }}
+                />
+                <PolarRadiusAxis
+                  domain={[0, 5]}
+                  tick={false}
+                  axisLine={false}
+                  tickCount={6}
+                />
+                <RechartsTooltip
+                  contentStyle={{
+                    background: 'var(--radar-tooltip-bg, #fff)',
+                    border: '1px solid var(--radar-tooltip-border, #e0e0e0)',
+                    borderRadius: 8,
+                    fontSize: 13,
+                    color: 'var(--radar-tooltip-text, #333)',
+                    fontFamily: 'Nunito, sans-serif',
+                  }}
+                  formatter={(value, name) =>
+                    typeof value === 'number' && value > 0 ? [`${value.toFixed(2)} / 5`, String(name)] : ['N/A', String(name)]
+                  }
+                />
+                <Legend
+                  wrapperStyle={{ fontFamily: 'Nunito, sans-serif', fontSize: 13, fontWeight: 700, paddingTop: 8 }}
+                />
+                {/* Professor — red, rendered first (behind) */}
+                <Radar
+                  name="This Professor"
+                  dataKey="professor"
+                  stroke="#d6394c"
+                  fill="#d6394c"
+                  fillOpacity={0.35}
+                  strokeWidth={2}
+                  dot={{ r: 3, fill: '#d6394c', strokeWidth: 0 }}
+                />
+                {/* Department average — gray, rendered on top */}
+                {deptAvg.length > 0 && (
+                  <Radar
+                    name="Dept. Average"
+                    dataKey="department"
+                    stroke="#888"
+                    fill="#888"
+                    fillOpacity={0.18}
+                    strokeWidth={2}
+                    strokeDasharray="5 3"
+                    dot={{ r: 3, fill: '#888', strokeWidth: 0 }}
+                  />
+                )}
+              </RadarChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="prof-radar-legend-labels">
+            {RADAR_METRICS.map(m => (
+              <div key={m.short} className="prof-radar-metric-info">
+                <span className="prof-radar-metric-name">{m.short}</span>
+                <span className="prof-radar-metric-desc">
+                  {m.short === 'Teaching' && 'Overall teaching effectiveness & clear communication'}
+                  {m.short === 'Organization' && 'Course materials, syllabus accuracy & time usage'}
+                  {m.short === 'Rigor' && 'Intellectual challenge & how much students learned'}
+                  {m.short === 'Grading' && 'Fair evaluation & quality of feedback'}
+                  {m.short === 'Accessibility' && 'Office hours availability & inclusive environment'}
+                </span>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
       {isImageModalOpen && profile.imageUrl && (
         <div className="prof-image-modal-overlay" onClick={() => setIsImageModalOpen(false)}>
           <div className="prof-image-modal" onClick={(e) => e.stopPropagation()}>
@@ -871,9 +1091,9 @@ const Professor = () => {
           const reviewA = recentReviewDate.get(a) || 0;
           const reviewB = recentReviewDate.get(b) || 0;
           if (reviewA !== reviewB) return reviewB - reviewA;
-          // Secondary: most recent termId from trace data (descending)
-          const termA = secA.length > 0 ? Math.max(...secA.map(s => s.termId)) : 0;
-          const termB = secB.length > 0 ? Math.max(...secB.map(s => s.termId)) : 0;
+          // Secondary: most recent term from trace data (descending by proper chronological order)
+          const termA = secA.length > 0 ? Math.max(...secA.map(s => termSortKey(s.termTitle))) : 0;
+          const termB = secB.length > 0 ? Math.max(...secB.map(s => termSortKey(s.termTitle))) : 0;
           if (termA !== termB) return termB - termA;
           // Tertiary: alphabetical
           return a.localeCompare(b);
@@ -891,15 +1111,7 @@ const Professor = () => {
               {sorted.slice(0, COURSES_COLLAPSED_LIMIT).map(([code, sections]) => {
                 const nameMatch = sections[0]?.displayName.match(/\((.+?)\)/);
                 const courseName = nameMatch ? nameMatch[1] : '';
-                const terms = [...new Set(sections.map(s => cleanTerm(s.termTitle)))].filter(t => /\b20\d{2}\b/.test(t)).sort((a, b) => {
-                  const yA = parseInt(a.match(/\d{4}/)?.[0] || '0');
-                  const yB = parseInt(b.match(/\d{4}/)?.[0] || '0');
-                  if (yA !== yB) return yB - yA;
-                  const order: Record<string, number> = { Spring: 1, Summer: 2, Fall: 3, Winter: 4 };
-                  const seasonA = a.split(' ')[0];
-                  const seasonB = b.split(' ')[0];
-                  return (order[seasonB] || 0) - (order[seasonA] || 0);
-                });
+                const terms = [...new Set(sections.map(s => cleanTerm(s.termTitle)))].filter(t => /\b20\d{2}\b/.test(t)).sort((a, b) => termSortKey(b) - termSortKey(a));
                 const termsExpanded = expandedTerms.has(code);
                 const hiddenTermCount = terms.length - MAX_VISIBLE_TERMS;
                 const isSelected = selectedCourses.has(code);
@@ -973,15 +1185,7 @@ const Professor = () => {
                     <div>{sorted.slice(COURSES_COLLAPSED_LIMIT).map(([code, sections]) => {
                       const nameMatch = sections[0]?.displayName.match(/\((.+?)\)/);
                       const courseName = nameMatch ? nameMatch[1] : '';
-                      const terms = [...new Set(sections.map(s => cleanTerm(s.termTitle)))].filter(t => /\b20\d{2}\b/.test(t)).sort((a, b) => {
-                        const yA = parseInt(a.match(/\d{4}/)?.[0] || '0');
-                        const yB = parseInt(b.match(/\d{4}/)?.[0] || '0');
-                        if (yA !== yB) return yB - yA;
-                        const order: Record<string, number> = { Spring: 1, Summer: 2, Fall: 3, Winter: 4 };
-                        const seasonA = a.split(' ')[0];
-                        const seasonB = b.split(' ')[0];
-                        return (order[seasonB] || 0) - (order[seasonA] || 0);
-                      });
+                      const terms = [...new Set(sections.map(s => cleanTerm(s.termTitle)))].filter(t => /\b20\d{2}\b/.test(t)).sort((a, b) => termSortKey(b) - termSortKey(a));
                       const termsExpanded = expandedTerms.has(code);
                             const hiddenTermCount = terms.length - MAX_VISIBLE_TERMS;
                       const isSelected = selectedCourses.has(code);

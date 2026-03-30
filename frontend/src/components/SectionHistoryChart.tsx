@@ -4,6 +4,7 @@ import {
 } from 'recharts';
 import type { CourseSection } from '../api/api';
 import Dropdown from './Dropdown';
+import { termSortKey } from '../utils/termUtils';
 import './SectionHistoryChart.css';
 
 type Mode = 'aggregate' | 'individual';
@@ -48,7 +49,7 @@ function buildChartData(sections: CourseSection[]): TermPoint[] {
 	}
 
 	return Array.from(termMap.entries())
-		.sort(([a], [b]) => a - b)
+		.sort(([, a], [, b]) => termSortKey(a.title) - termSortKey(b.title))
 		.map(([termId, d]) => {
 			const trace = d.traceCount > 0 ? +(d.traceSum / d.traceCount).toFixed(2) : null;
 			const rmp = d.rmpCount > 0 ? +(d.rmpSum / d.rmpCount).toFixed(2) : null;

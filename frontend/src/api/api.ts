@@ -164,6 +164,21 @@ export async function fetchProfessorReviews(slug: string): Promise<ProfessorRevi
   }
 }
 
+export interface TraceDeptAvgItem {
+  question: string;
+  avgMean: number;
+}
+
+export async function fetchTraceDeptAvg(department: string, termId: number): Promise<TraceDeptAvgItem[]> {
+  try {
+    return await get<TraceDeptAvgItem[]>(
+      `/api/trace-dept-avg?department=${encodeURIComponent(department)}&term_id=${termId}`
+    );
+  } catch {
+    return [];
+  }
+}
+
 /* ---- Search autocomplete ---- */
 export interface ProfessorSuggestion {
   type: "professor";

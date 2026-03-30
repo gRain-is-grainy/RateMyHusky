@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { fetchProfessorData, fetchProfessorsCatalog, fetchSearchSuggestions } from '../api/api';
+import { termSortKey } from '../utils/termUtils';
 import type { CatalogProfessor, ProfessorProfile, ProfessorSuggestion } from '../api/api';
 import StarRating from '../components/StarRating';
 import Footer from '../components/Footer';
@@ -78,7 +79,9 @@ const getRecentTraceSnapshot = (profile: ProfessorProfile | null): TraceSnapshot
 	if (!profile?.traceCourses?.length) return null;
 
 	const sortedCourses = [...profile.traceCourses].sort((a, b) => {
-		if (a.termId !== b.termId) return b.termId - a.termId;
+		const ka = termSortKey(a.termTitle);
+		const kb = termSortKey(b.termTitle);
+		if (ka !== kb) return kb - ka;
 		return b.courseId - a.courseId;
 	});
 

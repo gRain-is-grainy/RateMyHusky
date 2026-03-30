@@ -1,5 +1,7 @@
 import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { Link, NavLink, useLocation } from 'react-router-dom';
+
 import { useAuth } from '../context/AuthContext';
 import SignInModal from './SignInModal';
 import './Navbar.css';
@@ -202,6 +204,10 @@ const Navbar = () => {
       </div>
 
     </nav>
+    {(showUserMenu || menuOpen) && createPortal(
+      <div className="safari-tint-sentinel" aria-hidden="true" />,
+      document.body
+    )}
     {/* Overlay behind mobile menu — outside nav so it covers everything */}
     {menuOpen && (
       <div

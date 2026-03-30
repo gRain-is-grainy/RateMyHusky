@@ -6,6 +6,7 @@ import { fetchCourseData } from '../api/api';
 import type { CourseDetail } from '../api/api';
 import Footer from '../components/Footer';
 import { getInitials } from '../utils/nameUtils';
+import { termSortKey } from '../utils/termUtils';
 import SectionHistoryChart from '../components/SectionHistoryChart';
 import Breadcrumbs from '../components/Breadcrumbs';
 import './Course.css';
@@ -68,7 +69,8 @@ const Course = () => {
 				if (yearMatch && parseInt(yearMatch[1]) >= cutoffYear) {
 					recentNames.add(section.instructor);
 					const prev = instructorLatestTermId.get(section.instructor) ?? 0;
-					if (section.termId > prev) instructorLatestTermId.set(section.instructor, section.termId);
+					const cur = termSortKey(section.termTitle);
+					if (cur > prev) instructorLatestTermId.set(section.instructor, cur);
 				}
 			}
 			return course.instructors.filter(inst => recentNames.has(inst.name));
@@ -83,7 +85,7 @@ const Course = () => {
 			result = getInstructorsWithinYears(yearsBack);
 		}
 
-		return result.sort((a, b) => {
+		const sorted = result.sort((a, b) => {
 			const aTermId = instructorLatestTermId.get(a.name) ?? 0;
 			const bTermId = instructorLatestTermId.get(b.name) ?? 0;
 			if (bTermId !== aTermId) return bTermId - aTermId;
@@ -91,6 +93,13 @@ const Course = () => {
 			const bRating = b.avgRating ?? -1;
 			return bRating - aRating;
 		});
+
+		if (sorted.length > 10) {
+			return sorted
+				.sort((a, b) => (b.avgRating ?? -1) - (a.avgRating ?? -1))
+				.slice(0, 10);
+		}
+		return sorted;
 	}, [course]);
 
 	const avgDifficulty = useMemo(() => {
