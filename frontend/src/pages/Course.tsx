@@ -208,9 +208,6 @@ const Course = () => {
 									</div>
 									<div className="course-top-prof-body">
 										<div className="course-top-prof-body-top">
-											<h3 className="course-top-prof-name">
-												{stripPrefix(prof.name)}
-											</h3>
 											<div className="course-top-prof-rating">
 												{prof.avgRating != null ? (
 													<>
@@ -221,6 +218,9 @@ const Course = () => {
 													<span className="course-top-prof-avg">N/A</span>
 												)}
 											</div>
+											<h3 className="course-top-prof-name">
+												{stripPrefix(prof.name)}
+											</h3>
 										</div>
 										<div className="course-top-prof-footer">
 											<span>{prof.totalReviews.toLocaleString()} ratings</span>

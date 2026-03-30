@@ -278,10 +278,7 @@
 }
 
 .course-top-prof-body-top {
-	display: flex;
-	align-items: flex-start;
-	justify-content: space-between;
-	gap: 6px;
+	overflow: hidden;
 }
 
 .course-top-prof-name {
@@ -290,19 +287,15 @@
 	font-weight: 800;
 	color: #1b1b1b;
 	line-height: 1.3;
-	flex: 1;
-	min-width: 0;
-	display: -webkit-box;
-	-webkit-line-clamp: 2;
-	-webkit-box-orient: vertical;
-	overflow: hidden;
 }
 
 .course-top-prof-rating {
+	float: right;
 	display: flex;
 	align-items: center;
 	gap: 4px;
-	flex-shrink: 0;
+	margin-left: 6px;
+	margin-bottom: 2px;
 }
 
 .course-top-prof-avg {
@@ -384,6 +377,7 @@
 .instructor-row {
 	display: grid;
 	grid-template-columns: 2fr 1fr 1fr 1fr;
+	column-gap: 8px;
 	align-items: center;
 	padding: 0 8px;
 	border-bottom: 1px solid #efefef;
@@ -396,6 +390,7 @@
 	text-transform: uppercase;
 	letter-spacing: 0.04em;
 	color: #7c7c7c;
+	white-space: nowrap;
 }
 
 .instructor-row {
@@ -406,6 +401,11 @@
 
 .instructor-row:last-child {
 	border-bottom: none;
+}
+
+.instructor-header-row span,
+.instructor-row span {
+	text-align: left;
 }
 
 .course-expand-controls {
@@ -801,3 +801,10 @@
   box-shadow: 0 6px 24px rgba(214,57,76,0.45);
 }
 .back-to-top svg { width: 20px; height: 20px; }
+
+/* Top prof cards: 1 column on very narrow phones */
+@media (max-width: 420px) {
+	.course-top-prof-grid {
+		grid-template-columns: 1fr;
+	}
+}

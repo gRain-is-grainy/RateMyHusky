@@ -1234,6 +1234,13 @@ def course_profile(code):
     if not code_norm:
         return jsonify({"error": "Course not found"}), 404
 
+    cache_key = f"course:{code_norm}"
+    cached = cache_get(cache_key)
+    if cached:
+        resp = jsonify(cached)
+        resp.headers["Cache-Control"] = "public, max-age=3600"
+        return resp
+
     # Look up course in catalog
     course = query_one("SELECT code, name, department FROM course_catalog WHERE code = %s", (code_norm,))
     if not course:
@@ -1471,12 +1478,16 @@ def course_profile(code):
         })
     question_rows.sort(key=lambda r: (-r["totalResponses"], r["question"].lower()))
 
-    return jsonify({
+    result = {
         "summary": summary,
         "instructors": instructor_rows,
         "sections": section_rows,
         "questionScores": question_rows,
-    })
+    }
+    cache_set(cache_key, result)
+    resp = jsonify(result)
+    resp.headers["Cache-Control"] = "public, max-age=3600"
+    return resp
 
 
 # ──────────────────────────────────────────────
