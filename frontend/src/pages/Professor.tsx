@@ -990,7 +990,19 @@ const Professor = () => {
                 <PolarGrid stroke="var(--radar-grid, #e0e0e0)" />
                 <PolarAngleAxis
                   dataKey="metric"
-                  tick={{ fill: 'var(--radar-label, #555)', fontSize: 12, fontWeight: 600, fontFamily: 'Nunito, sans-serif' }}
+                  tick={(props: any) => {
+                    const { x, y, payload, textAnchor } = props;
+                    const point = radarData?.find(p => p.metric === payload.value);
+                    const rating = point && !point.profMissing ? point.professor.toFixed(2) : null;
+                    return (
+                      <text x={x} y={y} textAnchor={textAnchor} fill="var(--radar-label, #555)" fontFamily="Nunito, sans-serif">
+                        <tspan x={x} fontSize={12} fontWeight={600}>{payload.value}</tspan>
+                        {rating && (
+                          <tspan x={x} dy={15} fontSize={11} fontWeight={400} fill="var(--radar-label, #777)">{rating} / 5.0</tspan>
+                        )}
+                      </text>
+                    );
+                  }}
                 />
                 <PolarRadiusAxis
                   domain={[0, 5]}
@@ -1031,9 +1043,8 @@ const Professor = () => {
                     dataKey="department"
                     stroke="#888"
                     fill="#888"
-                    fillOpacity={0.18}
+                    fillOpacity={0.45}
                     strokeWidth={2}
-                    strokeDasharray="5 3"
                     dot={{ r: 3, fill: '#888', strokeWidth: 0 }}
                   />
                 )}
