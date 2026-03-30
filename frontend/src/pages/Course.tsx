@@ -209,11 +209,8 @@ const Course = () => {
 									<div className="course-top-prof-body">
 										<div className="course-top-prof-body-top">
 											<h3 className="course-top-prof-name">
-											{(() => {
-												const [first, rest] = splitProfName(stripPrefix(prof.name));
-												return rest ? <>{first}<br />{rest}</> : first;
-											})()}
-										</h3>
+												{stripPrefix(prof.name)}
+											</h3>
 											<div className="course-top-prof-rating">
 												{prof.avgRating != null ? (
 													<>
@@ -227,8 +224,8 @@ const Course = () => {
 										</div>
 										<div className="course-top-prof-footer">
 											<span>{prof.totalReviews.toLocaleString()} ratings</span>
-											<span>{prof.totalComments.toLocaleString()} comments</span>
-											<span>{prof.wouldTakeAgainPct != null ? `${Math.round(prof.wouldTakeAgainPct)}% again` : '—'}</span>
+											<span className="course-top-prof-footer--center">{prof.totalComments.toLocaleString()} comments</span>
+											<span className="course-top-prof-footer--right">{prof.wouldTakeAgainPct != null ? `${Math.round(prof.wouldTakeAgainPct)}% again` : '—'}</span>
 										</div>
 									</div>
 								</Link>

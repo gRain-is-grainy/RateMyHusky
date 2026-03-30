@@ -207,7 +207,7 @@
 
 .course-top-prof-grid {
 	display: grid;
-	grid-template-columns: repeat(auto-fill, minmax(175px, 1fr));
+	grid-template-columns: repeat(auto-fill, minmax(215px, 1fr));
 	gap: 12px;
 }
 
@@ -292,6 +292,10 @@
 	line-height: 1.3;
 	flex: 1;
 	min-width: 0;
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
 }
 
 .course-top-prof-rating {
@@ -321,10 +325,18 @@
 	font-size: 0.62rem;
 	font-weight: 600;
 	color: #bbb;
+	flex: 1;
+	word-break: break-word;
+}
+
+.course-top-prof-footer--center {
+	flex: 0 0 auto !important;
+	margin: 0 auto;
 	text-align: center;
-	white-space: nowrap;
-	overflow: hidden;
-	text-overflow: ellipsis;
+}
+
+.course-top-prof-footer--right {
+	text-align: right;
 }
 
 .course-top-prof-card.disabled {
