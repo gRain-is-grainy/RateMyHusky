@@ -49,10 +49,6 @@ const Course = () => {
 	}, [code]);
 
 	useEffect(() => {
-		setVisibleInstructorCount(INITIAL_INSTRUCTORS_VISIBLE);
-	}, [course?.summary.code]);
-
-	useEffect(() => {
 		const handler = () => setShowBackToTop(window.scrollY > 300);
 		window.addEventListener('scroll', handler, { passive: true });
 		handler();
@@ -261,32 +257,22 @@ const Course = () => {
 						</table>
 					</div>
 					{hasExpandableInstructors && (
-						<div className="course-expand-controls" aria-label="Instructor table controls">
+						<div className="course-expand-controls">
 							<button
 								type="button"
 								className="course-expand-btn"
-								aria-label="Collapse instructors"
-								title="Collapse instructors"
 								disabled={!canCollapseInstructors}
 								onClick={() => setVisibleInstructorCount(INITIAL_INSTRUCTORS_VISIBLE)}
 							>
-								<span className="visually-hidden">Collapse instructors</span>
-								<span className="course-expand-chevron up" aria-hidden="true" />
+								<span className="course-expand-chevron up" />
 							</button>
 							<button
 								type="button"
 								className="course-expand-btn"
-								aria-label="Show more instructors"
-								title="Show more instructors"
 								disabled={!hasMoreInstructors}
-								onClick={() =>
-									setVisibleInstructorCount((prev) =>
-										Math.min(prev + INSTRUCTORS_VISIBLE_STEP, course.instructors.length)
-									)
-								}
+								onClick={() => setVisibleInstructorCount((prev) => Math.min(prev + INSTRUCTORS_VISIBLE_STEP, course.instructors.length))}
 							>
-								<span className="visually-hidden">Show more instructors</span>
-								<span className="course-expand-chevron down" aria-hidden="true" />
+								<span className="course-expand-chevron down" />
 							</button>
 						</div>
 					)}

@@ -323,31 +323,26 @@
 }
 
 .course-table-wrap.scroll-start.scroll-end {
+	overflow-x: hidden;
 	-webkit-mask-image: none;
 	mask-image: none;
 }
 
 .course-table {
-	width: 100%;
 	border-collapse: collapse;
-	min-width: 500px;
+	table-layout: fixed;
+	width: 100%;
+	min-width: 400px;
 }
 
-.course-table th,
-.course-table td {
-	border-bottom: 1px solid #efefef;
-	padding: 10px 8px;
-	text-align: left;
-	font-size: 0.88rem;
-}
-
-.course-table th {
-	color: #7c7c7c;
-	font-weight: 700;
-	text-transform: uppercase;
-	font-size: 0.75rem;
-	letter-spacing: 0.04em;
-}
+.instructor-table th:nth-child(1),
+.instructor-table td:nth-child(1) { width: 42%; }
+.instructor-table th:nth-child(2),
+.instructor-table td:nth-child(2) { width: 19%; }
+.instructor-table th:nth-child(3),
+.instructor-table td:nth-child(3) { width: 19%; }
+.instructor-table th:nth-child(4),
+.instructor-table td:nth-child(4) { width: 20%; }
 
 .course-expand-controls {
 	margin-top: 12px;
@@ -368,19 +363,17 @@
 	align-items: center;
 	justify-content: center;
 	cursor: pointer;
-	transition: border-color 0.2s, background 0.2s, transform 0.2s;
+	transition: border-color 0.2s, background 0.2s;
 }
 
 .course-expand-btn:hover {
 	border-color: #d6394c;
 	background: #fff6f7;
-	transform: translateY(-1px);
 }
 
 .course-expand-btn:disabled {
 	opacity: 0.42;
 	cursor: default;
-	transform: none;
 }
 
 .course-expand-btn:disabled:hover {
@@ -389,16 +382,15 @@
 }
 
 .course-expand-chevron {
+	display: block;
 	width: 7px;
 	height: 7px;
 	border-right: 2px solid #a0a0a0;
 	border-bottom: 2px solid #a0a0a0;
-	line-height: 1;
 }
 
 .course-expand-chevron.down {
 	transform: rotate(45deg) translate(-1px, -1px);
-	animation: course-chevron-bounce 1.2s ease-in-out infinite;
 }
 
 .course-expand-chevron.up {
@@ -409,9 +401,25 @@
 	border-color: #d6394c;
 }
 
-.course-expand-btn:disabled .course-expand-chevron {
-	animation: none;
+.course-table th,
+.course-table td {
+	border-bottom: 1px solid #efefef;
+	padding: 10px 8px;
+	text-align: left;
+	font-size: 0.88rem;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
+
+.course-table th {
+	color: #7c7c7c;
+	font-weight: 700;
+	text-transform: uppercase;
+	font-size: 0.75rem;
+	letter-spacing: 0.04em;
+}
+
 
 .visually-hidden {
 	position: absolute;
@@ -425,15 +433,6 @@
 	border: 0;
 }
 
-@keyframes course-chevron-bounce {
-	0%,
-	100% {
-		transform: rotate(45deg) translate(-1px, -1px);
-	}
-	50% {
-		transform: rotate(45deg) translate(1px, 1px);
-	}
-}
 
 @keyframes courseFadeIn {
 	from { opacity: 0; }
@@ -549,19 +548,7 @@
 		text-overflow: unset;
 	}
 
-	/* Tables: drop Enrollment & Responses columns, reduce min-width */
-	.course-table {
-		min-width: 0;
-		width: 100%;
-	}
-
-	.instructor-table th:nth-child(4),
-	.instructor-table td:nth-child(4),
-	.instructor-table th:nth-child(5),
-	.instructor-table td:nth-child(5) {
-		display: none;
-	}
-
+	/* Tables: drop Enrollment & Responses columns */
 	.section-table th:nth-child(5),
 	.section-table td:nth-child(5),
 	.section-table th:nth-child(6),
@@ -632,6 +619,29 @@
 	color: #d0d0d0;
 }
 
+.dark .course-expand-btn {
+	background: #252525;
+	border-color: #3a3a3a;
+}
+
+.dark .course-expand-btn:hover {
+	border-color: #d6394c;
+	background: #332128;
+}
+
+.dark .course-expand-btn:disabled:hover {
+	border-color: #3a3a3a;
+	background: #252525;
+}
+
+.dark .course-expand-chevron {
+	border-color: #8f8f8f;
+}
+
+.dark .course-expand-btn:hover .course-expand-chevron {
+	border-color: #f06d7d;
+}
+
 .dark .course-stat-breakdown {
 	background: #444;
 	color: #e0e0e0;
@@ -685,28 +695,6 @@
 	color: #8a8a8a;
 }
 
-.dark .course-expand-btn {
-	background: #252525;
-	border-color: #3a3a3a;
-}
-
-.dark .course-expand-btn:hover {
-	border-color: #d6394c;
-	background: #332128;
-}
-
-.dark .course-expand-btn:disabled:hover {
-	border-color: #3a3a3a;
-	background: #252525;
-}
-
-.dark .course-expand-chevron {
-	border-color: #8f8f8f;
-}
-
-.dark .course-expand-btn:hover .course-expand-chevron {
-	border-color: #f06d7d;
-}
 
 /* ── back to top ── */
 .back-to-top {
