@@ -290,7 +290,7 @@
 
 .goat-header-row {
   display: grid;
-  grid-template-columns: 36px 1.6fr 2fr 1.5fr 0.8fr;
+  grid-template-columns: 36px 1.2fr 2.8fr 1.4fr 0.7fr;
   align-items: center;
   padding: 0 24px;
   height: 48px;
@@ -311,7 +311,7 @@
 
 .goat-row {
   display: grid;
-  grid-template-columns: 36px 1.6fr 2fr 1.5fr 0.8fr;
+  grid-template-columns: 36px 1.2fr 2.8fr 1.4fr 0.7fr;
   align-items: center;
   padding: 0 24px;
   height: 56px;
@@ -982,7 +982,7 @@
 
   .goat-header-row,
   .goat-row {
-    min-width: 600px;
+    min-width: 660px;
     padding: 0 16px;
     height: 50px;
   }
@@ -1074,7 +1074,7 @@
 
   .goat-header-row,
   .goat-row {
-    min-width: 560px;
+    min-width: 620px;
     padding: 0 12px;
     height: 48px;
   }
