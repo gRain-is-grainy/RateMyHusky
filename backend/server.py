@@ -1694,6 +1694,29 @@ def trace_dept_avg():
                 "avgMean": round(wsum / total, 2),
             })
 
+    # Fallback: if count columns are unpopulated for this term, use mean directly
+    if not result:
+        rows = query("""
+            SELECT ts.question,
+                   SUM(COALESCE(ts.mean, 0) * COALESCE(ts.completed, 1)::FLOAT) AS weighted_sum,
+                   SUM(COALESCE(ts.completed, 1))::FLOAT AS total_weight
+            FROM trace_scores ts
+            JOIN trace_courses tc
+                ON ts.course_id = tc.course_id
+               AND ts.instructor_id = tc.instructor_id
+               AND ts.term_id = tc.term_id
+            WHERE tc.department_name = %s AND tc.term_id = %s AND ts.mean IS NOT NULL
+            GROUP BY ts.question
+        """, (department, term_id))
+        for r in rows:
+            total_weight = float(r["total_weight"] or 0)
+            wsum = float(r["weighted_sum"] or 0)
+            if total_weight > 0:
+                result.append({
+                    "question": str(r["question"] or ""),
+                    "avgMean": round(wsum / total_weight, 2),
+                })
+
     cache_set(cache_key, result)
     resp = jsonify(result)
     resp.headers["Cache-Control"] = "public, max-age=3600"

@@ -455,22 +455,24 @@ const Professor = () => {
         return {
           termId: termCourses[0].termId,
           termTitle,
-          deptName: termCourses[0].departmentName || '',
+          deptName: termCourses[0].departmentName || profile?.department || '',
           scores,
         };
       }
     }
     return null;
-  }, [filteredTraceCourses]);
+  }, [filteredTraceCourses, profile]);
 
   // Fetch department averages whenever the most-recent-term context changes
   useEffect(() => {
     if (!mostRecentTermData?.deptName || !mostRecentTermData.termId) {
+      console.log('[radar] skipping fetch — deptName:', mostRecentTermData?.deptName, 'termId:', mostRecentTermData?.termId);
       setDeptAvg([]);
       return;
     }
+    console.log('[radar] fetching dept avg:', mostRecentTermData.deptName, mostRecentTermData.termId);
     fetchTraceDeptAvg(mostRecentTermData.deptName, mostRecentTermData.termId)
-      .then(setDeptAvg)
+      .then(data => { console.log('[radar] deptAvg result:', data); setDeptAvg(data); })
       .catch(() => setDeptAvg([]));
   }, [mostRecentTermData?.deptName, mostRecentTermData?.termId]);
 
@@ -538,6 +540,8 @@ const Professor = () => {
     const profScores = mostRecentTermData.scores;
     // For newer terms (901+) dept_mean is stored per score row; for older terms use fetched deptAvg
     const useDeptMeanFromScores = deptAvg.length === 0 && profScores.some(s => s.deptMean != null);
+    console.log('[radar] useDeptMeanFromScores:', useDeptMeanFromScores);
+    console.log('[radar] all score deptMeans:', profScores.map(s => ({ q: s.question, deptMean: s.deptMean })));
     const deptScores = useDeptMeanFromScores
       ? profScores.map(s => ({ question: s.question, mean: s.deptMean! }))
       : deptAvg.map(d => ({ question: d.question, mean: d.avgMean }));
@@ -991,11 +995,13 @@ const Professor = () => {
                 <PolarAngleAxis
                   dataKey="metric"
                   tick={(props: any) => {
-                    const { x, y, payload, textAnchor } = props;
+                    const { x, y, cy, payload, textAnchor } = props;
                     const point = radarData?.find(p => p.metric === payload.value);
                     const rating = point && !point.profMissing ? point.professor.toFixed(2) : null;
+                    // Shift the whole label up when it's above center so the rating line doesn't overlap the chart
+                    const adjustedY = rating && y < cy ? y - 10 : y;
                     return (
-                      <text x={x} y={y} textAnchor={textAnchor} fill="var(--radar-label, #555)" fontFamily="Nunito, sans-serif">
+                      <text x={x} y={adjustedY} textAnchor={textAnchor} fill="var(--radar-label, #555)" fontFamily="Nunito, sans-serif">
                         <tspan x={x} fontSize={12} fontWeight={600}>{payload.value}</tspan>
                         {rating && (
                           <tspan x={x} dy={15} fontSize={11} fontWeight={400} fill="var(--radar-label, #777)">{rating} / 5.0</tspan>

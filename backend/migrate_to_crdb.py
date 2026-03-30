@@ -344,8 +344,28 @@ def add_constraints(conn):
     cur.close()
 
 
+def purge_new_scraper_rows(conn):
+    """Delete rows added by transform_to_trace.py (courseId >= 500001) so they can be re-imported."""
+    cur = conn.cursor()
+    print("Purging new-scraper rows (course_id >= 500001) from trace_courses and trace_scores...")
+    cur.execute("DELETE FROM trace_scores WHERE course_id >= 500001")
+    print(f"  trace_scores: deleted {cur.rowcount:,} rows")
+    cur.execute("DELETE FROM trace_courses WHERE course_id >= 500001")
+    print(f"  trace_courses: deleted {cur.rowcount:,} rows")
+    conn.commit()
+    cur.close()
+
+
 def main():
     targets = sys.argv[1:] if len(sys.argv) > 1 else ["trace_comments"]
+
+    if targets == ["purge-new"]:
+        conn = get_connection()
+        print("Connected to CockroachDB!")
+        purge_new_scraper_rows(conn)
+        conn.close()
+        print("Done! Now run: python backend/migrate_to_crdb.py trace_courses trace_scores")
+        return
 
     if targets == ["add-constraints"]:
         conn = get_connection()

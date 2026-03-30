@@ -221,8 +221,10 @@
 }
 
 /* ═══════════ CHARTS ROW ═══════════ */
-.prof-charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-.prof-chart-card { background: #fff; border-radius: 16px; padding: 28px 32px; box-shadow: 0 4px 20px rgba(0,0,0,0.06); }
+.prof-charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; padding-left: clamp(12px, 2.5vw, 40px); padding-right: clamp(12px, 2.5vw, 40px); }
+.prof-chart-card { background: #fff; border-radius: 16px; padding: 28px 32px; box-shadow: 0 4px 20px rgba(0,0,0,0.06); outline: none; }
+.prof-chart-card:focus, .prof-chart-card *:focus { outline: none; }
+.prof-chart-card svg, .prof-chart-card svg * { outline: none; }
 .prof-chart-title { font-size: 1.1rem; font-weight: 800; color: #333; margin-bottom: 18px; }
 .prof-distribution { display: flex; flex-direction: column; gap: 12px; }
 
@@ -1061,9 +1063,12 @@
   background: #fff;
   border-radius: 16px;
   padding: 28px 32px 24px;
-  margin: 0 clamp(12px, 2.5vw, 40px) 24px;
+  margin: 20px clamp(12px, 2.5vw, 40px) 24px;
   box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  outline: none;
 }
+.prof-radar-section:focus, .prof-radar-section *:focus { outline: none; }
+.prof-radar-section svg, .prof-radar-section svg * { outline: none; }
 
 .prof-radar-header {
   display: flex;
