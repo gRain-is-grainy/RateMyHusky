@@ -1,6 +1,6 @@
 .course-page {
 	min-height: 100vh;
-	padding-top: 78px;
+	padding-top: calc(78px + env(safe-area-inset-top));
 	background: #f7f8fa;
 	font-family: 'Nunito', sans-serif;
 }

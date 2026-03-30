@@ -2,7 +2,7 @@
 
 .catalog-page {
   min-height: 100vh;
-  padding-top: 72px;
+  padding-top: calc(72px + env(safe-area-inset-top));
   background: #f7f8fa;
   font-family: 'Nunito', sans-serif;
 }

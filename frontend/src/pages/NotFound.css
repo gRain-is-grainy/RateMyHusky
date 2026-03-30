@@ -175,7 +175,7 @@
 
 @media (max-width: 980px) {
   .not-found-main {
-    padding-top: 96px;
+    padding-top: calc(96px + env(safe-area-inset-top));
   }
 
   .not-found-hero {
@@ -198,7 +198,7 @@
 
 @media (max-width: 640px) {
   .not-found-main {
-    padding: 88px 16px 56px;
+    padding: calc(88px + env(safe-area-inset-top)) 16px 56px;
   }
 
   .not-found-hero {

@@ -501,7 +501,7 @@ const Professor = () => {
       short: 'Grading',
       patterns: [
         ['fairly evaluated', 'fair evaluation', 'fair grades'],
-        ['sufficient feedback', 'provided sufficient feedback'],
+        ['sufficient feedback', 'provided sufficient feedback', 'feedback'],
       ],
     },
     {

@@ -8,6 +8,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 12px 28px;
+  padding-top: calc(12px + env(safe-area-inset-top));
   background: rgba(255, 255, 255, 0.85);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
@@ -311,6 +312,7 @@
 @media (max-width: 768px) {
   .navbar {
     padding: 10px 16px;
+    padding-top: calc(10px + env(safe-area-inset-top));
     background: #fff;
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
