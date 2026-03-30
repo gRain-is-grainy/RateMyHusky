@@ -322,7 +322,7 @@
 
 .goat-header-row {
   display: grid;
-  grid-template-columns: 36px 1.2fr 2.6fr 1.4fr 0.7fr;
+  grid-template-columns: 36px 1.6fr 2.2fr 1.4fr 0.7fr;
   align-items: center;
   padding: 0 24px;
   height: 48px;
@@ -343,7 +343,7 @@
 
 .goat-row {
   display: grid;
-  grid-template-columns: 36px 1.2fr 2.6fr 1.4fr 0.7fr;
+  grid-template-columns: 36px 1.6fr 2.2fr 1.4fr 0.7fr;
   align-items: center;
   padding: 0 24px;
   height: 56px;

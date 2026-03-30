@@ -39,8 +39,10 @@ const FeedbackTab = () => {
       setSubmitted(true);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : '';
-      if (msg.includes('429')) {
+      if (msg.includes('429') || msg.includes('limit')) {
         setError('Daily feedback limit reached. Please try again tomorrow.');
+      } else if (msg.includes('Invalid email')) {
+        setError('Please enter a valid email address.');
       } else {
         setError('Failed to send feedback. Please try again.');
       }

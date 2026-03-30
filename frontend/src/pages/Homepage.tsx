@@ -404,7 +404,7 @@ const Homepage = () => {
 
       const slug = prof.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 
-      const fixedPool = uniqueNames.slice(0, WHEEL_SLICES);
+      const fixedPool = [...uniqueNames].sort(() => Math.random() - 0.5).slice(0, WHEEL_SLICES);
       const shuffled = [...fixedPool].sort(() => Math.random() - 0.5);
       const winnerIndex = Math.max(0, shuffled.indexOf(prof.name));
       setWheelNames(shuffled);

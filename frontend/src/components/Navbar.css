@@ -398,6 +398,16 @@
   .navbar-right .navbar-user-btn {
     width: 100%;
     padding: 22px 0;
+    border-color: transparent !important;
+    background: transparent !important;
+  }
+
+  .navbar-right .navbar-user-btn:hover,
+  .navbar-right .navbar-user-btn:focus,
+  .navbar-right .navbar-user-btn:active {
+    border-color: transparent !important;
+    background: transparent !important;
+    outline: none;
   }
 
   .navbar-right .navbar-user-avatar {
@@ -414,15 +424,17 @@
     position: static;
     box-shadow: none;
     border: none;
-    border-top: 1px solid #f0f0f0;
-    border-radius: 0;
-    padding: 10px 0 0;
-    margin-top: 8px;
+    border-radius: 12px;
+    padding: 12px 14px;
+    margin-top: 0;
+    margin-bottom: 16px;
     min-width: 0;
     animation: none;
+    background: #f5f5f5;
   }
 
   .dark .navbar-right .navbar-user-dropdown {
+    background: #2a2a2a;
     border-top-color: #333;
   }
 
@@ -486,13 +498,16 @@
   }
 
   .dark .navbar-right .navbar-user-btn {
-    border-color: transparent;
-    background: transparent;
+    border-color: transparent !important;
+    background: transparent !important;
   }
 
-  .dark .navbar-right .navbar-user-btn:hover {
-    border-color: transparent;
-    background: transparent;
+  .dark .navbar-right .navbar-user-btn:hover,
+  .dark .navbar-right .navbar-user-btn:focus,
+  .dark .navbar-right .navbar-user-btn:active {
+    border-color: transparent !important;
+    background: transparent !important;
+    outline: none;
   }
 
   .dark .navbar-right .signin-btn {
@@ -502,7 +517,7 @@
   }
 
   .dark .navbar-right .navbar-user-dropdown {
-    background: transparent;
+    background: #2a2a2a;
     border-top-color: #333;
   }
 

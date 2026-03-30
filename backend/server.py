@@ -8,9 +8,6 @@ Run:           python server.py
 
 import os, re, unicodedata, json, hashlib, random
 import html as _html
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
 import psycopg2
 from psycopg2.pool import ThreadedConnectionPool
 from psycopg2.extras import RealDictCursor
@@ -170,6 +167,11 @@ _cache = {}
 _cache_lock = Lock()
 CACHE_TTL = 3600      # 1 hour
 CACHE_MAX_SIZE = 5000
+
+_feedback_lock = Lock()
+_feedback_count = 0
+_feedback_date = None   # "YYYY-MM-DD" UTC, resets counter each day
+FEEDBACK_DAILY_LIMIT = 300
 
 
 
@@ -1542,6 +1544,8 @@ def auth_logout():
 @app.route("/api/feedback", methods=["POST"])
 @limiter.limit("10 per day")
 def submit_feedback():
+    global _feedback_count, _feedback_date
+
     data = request.get_json(silent=True) or {}
     feedback_type = data.get("feedbackType", "").strip()
     description = data.get("description", "").strip()
@@ -1550,12 +1554,21 @@ def submit_feedback():
     if not feedback_type or not description:
         return jsonify({"error": "feedbackType and description are required"}), 400
 
-    smtp_host = os.getenv("SMTP_HOST")
-    smtp_port = int(os.getenv("SMTP_PORT", "587"))
-    smtp_user = os.getenv("SMTP_USER")
-    smtp_password = os.getenv("SMTP_PASSWORD")
+    if reply_email and not re.match(r'^[^@\s]+@[^@\s]+\.[^@\s]+$', reply_email):
+        return jsonify({"error": "Invalid email address"}), 400
 
-    if not smtp_host or not smtp_user or not smtp_password:
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    with _feedback_lock:
+        if _feedback_date != today:
+            _feedback_date = today
+            _feedback_count = 0
+        if _feedback_count >= FEEDBACK_DAILY_LIMIT:
+            return jsonify({"error": "Daily feedback limit reached. Please try again tomorrow."}), 429
+        _feedback_count += 1
+
+    resend_api_key = os.getenv("RESEND_API_KEY")
+    if not resend_api_key:
+        print("[feedback] RESEND_API_KEY not configured")
         return jsonify({"error": "Email service not configured"}), 500
 
     type_labels = {
@@ -1577,20 +1590,27 @@ def submit_feedback():
     lines += ["", "Description:", description]
     body = "\n".join(lines)
 
-    msg = MIMEMultipart()
-    msg["From"] = smtp_user
-    msg["To"] = "feedback@ratemyhusky.com"
-    msg["Subject"] = f"[RateMyHusky] {type_label}"
+    payload = {
+        "from": "RateMyHusky <feedback@ratemyhusky.com>",
+        "to": ["feedback@ratemyhusky.com"],
+        "subject": f"[RateMyHusky] {type_label}",
+        "text": body,
+    }
     if reply_email:
-        msg["Reply-To"] = reply_email
-    msg.attach(MIMEText(body, "plain"))
+        payload["reply_to"] = reply_email
 
     try:
-        with smtplib.SMTP(smtp_host, smtp_port) as server:
-            server.starttls()
-            server.login(smtp_user, smtp_password)
-            server.send_message(msg)
-    except Exception:
+        resp = http_requests.post(
+            "https://api.resend.com/emails",
+            headers={"Authorization": f"Bearer {resend_api_key}", "Content-Type": "application/json"},
+            json=payload,
+            timeout=10,
+        )
+        if not resp.ok:
+            print(f"[feedback] Resend error {resp.status_code}: {resp.text}")
+            return jsonify({"error": "Failed to send email"}), 500
+    except Exception as e:
+        print(f"[feedback] Resend request error: {e}")
         return jsonify({"error": "Failed to send email"}), 500
 
     return jsonify({"ok": True})

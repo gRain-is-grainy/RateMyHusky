@@ -133,6 +133,21 @@ export default function ProfessorCatalog() {
     return () => window.removeEventListener('close-filter-sidebar', close);
   }, []);
 
+  useEffect(() => {
+    document.body.style.overflow = sidebarOpen ? 'hidden' : '';
+    if (!sidebarOpen) return () => { document.body.style.overflow = ''; };
+    const handler = (e: TouchEvent) => {
+      if (sidebarRef.current && !sidebarRef.current.contains(e.target as Node)) {
+        setSidebarOpen(false);
+      }
+    };
+    document.addEventListener('touchmove', handler, { passive: true });
+    return () => {
+      document.body.style.overflow = '';
+      document.removeEventListener('touchmove', handler);
+    };
+  }, [sidebarOpen]);
+
 
   const [viewMode, setViewMode] = useState<'grid' | 'list'>(() => (localStorage.getItem('catalog-view') as 'grid' | 'list') || 'grid');
   const [minRatingDraft, setMinRatingDraft] = useState(() => getFiltersFromSearchParams(searchParams).minRating);
@@ -154,6 +169,7 @@ export default function ProfessorCatalog() {
   const searchWrapperRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const sidebarRef = useRef<HTMLElement>(null);
 
   const [numCols, setNumCols] = useState(4);
   const [isMeasured, setIsMeasured] = useState(false);
@@ -453,7 +469,7 @@ export default function ProfessorCatalog() {
 
       <div className="catalog-layout">
         {/* ── Sidebar ── */}
-        <aside className={`catalog-sidebar ${sidebarOpen ? 'open' : ''}`}>
+        <aside ref={sidebarRef} className={`catalog-sidebar ${sidebarOpen ? 'open' : ''}`}>
           <div className={`sidebar-inner ${deptOpen || collegeOpen ? 'dept-open' : ''}`}>
             <div className="sidebar-header">
               <span className="sidebar-title">Filters</span>

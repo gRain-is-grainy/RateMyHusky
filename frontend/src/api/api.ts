@@ -345,7 +345,10 @@ export async function submitFeedback(payload: {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
-  if (!res.ok) throw new Error(`API ${res.status}`);
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error ?? `API ${res.status}`);
+  }
 }
 
 export async function fetchCourseData(code: string): Promise<CourseDetail | null> {
