@@ -5,7 +5,7 @@ import NotFound from './NotFound';
 import { fetchCourseData } from '../api/api';
 import type { CourseDetail } from '../api/api';
 import Footer from '../components/Footer';
-import { getInitials, splitProfName, stripPrefix } from '../utils/nameUtils';
+import { getInitials, stripPrefix } from '../utils/nameUtils';
 import { termSortKey } from '../utils/termUtils';
 import SectionHistoryChart from '../components/SectionHistoryChart';
 import Breadcrumbs from '../components/Breadcrumbs';
