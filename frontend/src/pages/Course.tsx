@@ -57,27 +57,40 @@ const Course = () => {
 
 	const recentInstructors = useMemo(() => {
 		if (!course) return [];
-		const cutoffYear = new Date().getFullYear() - 2;
-		const recentNames = new Set<string>();
+		const currentYear = new Date().getFullYear();
 		const instructorLatestTermId = new Map<string, number>();
-		for (const section of course.sections) {
-			const yearMatch = section.termTitle.match(/\b(20\d{2})\b/);
-			if (yearMatch && parseInt(yearMatch[1]) >= cutoffYear) {
-				recentNames.add(section.instructor);
-				const prev = instructorLatestTermId.get(section.instructor) ?? 0;
-				if (section.termId > prev) instructorLatestTermId.set(section.instructor, section.termId);
+
+		const getInstructorsWithinYears = (yearsBack: number) => {
+			const cutoffYear = currentYear - yearsBack;
+			const recentNames = new Set<string>();
+			for (const section of course.sections) {
+				const yearMatch = section.termTitle.match(/\b(20\d{2})\b/);
+				if (yearMatch && parseInt(yearMatch[1]) >= cutoffYear) {
+					recentNames.add(section.instructor);
+					const prev = instructorLatestTermId.get(section.instructor) ?? 0;
+					if (section.termId > prev) instructorLatestTermId.set(section.instructor, section.termId);
+				}
 			}
+			return course.instructors.filter(inst => recentNames.has(inst.name));
+		};
+
+		// Start with 1 year, expand until at least 5 or no more data
+		let result = getInstructorsWithinYears(1);
+		let yearsBack = 1;
+		const maxYear = currentYear - 2000 + 1; // won't go past year 2000
+		while (result.length < 5 && yearsBack < maxYear) {
+			yearsBack++;
+			result = getInstructorsWithinYears(yearsBack);
 		}
-		return course.instructors
-			.filter(inst => recentNames.has(inst.name))
-			.sort((a, b) => {
-				const aTermId = instructorLatestTermId.get(a.name) ?? 0;
-				const bTermId = instructorLatestTermId.get(b.name) ?? 0;
-				if (bTermId !== aTermId) return bTermId - aTermId;
-				const aRating = a.avgRating ?? -1;
-				const bRating = b.avgRating ?? -1;
-				return bRating - aRating;
-			});
+
+		return result.sort((a, b) => {
+			const aTermId = instructorLatestTermId.get(a.name) ?? 0;
+			const bTermId = instructorLatestTermId.get(b.name) ?? 0;
+			if (bTermId !== aTermId) return bTermId - aTermId;
+			const aRating = a.avgRating ?? -1;
+			const bRating = b.avgRating ?? -1;
+			return bRating - aRating;
+		});
 	}, [course]);
 
 	const avgDifficulty = useMemo(() => {
@@ -141,7 +154,7 @@ const Course = () => {
 				{recentInstructors.length > 0 && (
 					<section className="course-panel">
 						<div className="course-panel-header">
-							<h2>Recent Professors <span className="course-panel-subheader">(Last 2 Years)</span></h2>
+							<h2>Recent Professors</h2>
 						</div>
 						<div className="course-top-prof-grid">
 							{recentInstructors.map((prof, index) => (
@@ -155,8 +168,7 @@ const Course = () => {
 										if (!prof.slug) e.preventDefault();
 									}}
 								>
-									{index === 0 && <div className="course-top-prof-rank">Most Recent</div>}
-									{prof.imageUrl ? (
+										{prof.imageUrl ? (
 										<img
 											className="course-top-prof-avatar course-top-prof-photo"
 											src={prof.imageUrl}

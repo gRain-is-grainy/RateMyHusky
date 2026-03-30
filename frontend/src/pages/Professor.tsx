@@ -7,7 +7,7 @@ import Dropdown from '../components/Dropdown';
 import StarRating from '../components/StarRating';
 import RatingBar from '../components/RatingBar';
 import Breadcrumbs from '../components/Breadcrumbs';
-import { fetchProfessorData, fetchProfessorReviews } from '../api/api';
+import { fetchProfessorFull, fetchProfessorReviews } from '../api/api';
 import type { ProfessorProfile, ProfessorReview, TraceComment } from '../api/api';
 import { useAuth } from '../context/AuthContext';
 import SignInModal from '../components/SignInModal';
@@ -272,6 +272,7 @@ const Professor = () => {
   }, [updateReviewPill, loading]);
 
   /* ── profile loading ── */
+  /* ── combined profile + reviews load (single round-trip) ── */
   useEffect(() => {
     if (!slug) {
       setLoading(false);
@@ -280,24 +281,28 @@ const Professor = () => {
     }
     let cancelled = false;
     async function load() {
-      setLoading(true); setError('');
+      setLoading(true); setReviewsLoading(true); setError('');
       try {
-        const data = await fetchProfessorData(slug!);
+        const data = await fetchProfessorFull(slug!);
         if (cancelled) return;
         if (!data) {
           setError('Professor not found.');
         } else {
           setProfile(data);
+          setReviews(data.reviews || []);
+          setTraceComments(data.traceComments || []);
         }
       } catch { if (!cancelled) setError('Failed to load professor data.'); }
-      finally { if (!cancelled) setLoading(false); }
+      finally { if (!cancelled) { setLoading(false); setReviewsLoading(false); } }
     }
     load();
     return () => { cancelled = true; };
   }, [slug]);
 
-  /* ── reviews loading (re-runs on auth change to pick up comment text) ── */
+  /* ── re-fetch reviews on auth change to pick up comment text ── */
+  const isInitialMount = useRef(true);
   useEffect(() => {
+    if (isInitialMount.current) { isInitialMount.current = false; return; }
     if (!slug) return;
     let cancelled = false;
     async function loadReviews() {

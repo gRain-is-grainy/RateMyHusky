@@ -99,6 +99,9 @@ const _profCache = new Map<string, ProfessorProfile>();
 const _profReviewsCache = new Map<string, ProfessorReviews>();
 const _courseCache = new Map<string, CourseDetail>();
 
+type ProfessorFull = ProfessorProfile & ProfessorReviews;
+const _profFullCache = new Map<string, ProfessorFull>();
+
 /* ---- Fetchers ---- */
 async function get<T>(path: string): Promise<T> {
   const headers: Record<string, string> = {};
@@ -121,6 +124,22 @@ export const fetchGoatProfessors = (college: string, limit = 10) =>
 export const fetchRandomProfessor = () => get<RandomProfessor>("/api/random-professor");
 
 /* ---- Professor page fetchers ---- */
+export async function fetchProfessorFull(slug: string): Promise<ProfessorFull | null> {
+  const token = localStorage.getItem('auth_token');
+  const key = `${slug}:${token ?? 'u'}`;
+  if (_profFullCache.has(key)) return _profFullCache.get(key)!;
+  try {
+    const data = await get<ProfessorFull>(`/api/professors/${encodeURIComponent(slug)}/full`);
+    _profFullCache.set(key, data);
+    // Also populate individual caches so Compare page hits don't re-fetch
+    _profCache.set(slug, data);
+    _profReviewsCache.set(key, data);
+    return data;
+  } catch {
+    return null;
+  }
+}
+
 export async function fetchProfessorData(slug: string): Promise<ProfessorProfile | null> {
   if (_profCache.has(slug)) return _profCache.get(slug)!;
   try {

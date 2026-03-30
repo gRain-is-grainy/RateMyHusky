@@ -159,7 +159,7 @@ const Navbar = () => {
         </div>
         {authLoading ? null : user ? (
           <div className="navbar-user" ref={userMenuRef}>
-            <button className="navbar-user-btn" onClick={() => setShowUserMenu(v => !v)}>
+            <button className="navbar-user-btn" onClick={() => setShowUserMenu(v => { if (!v) window.dispatchEvent(new CustomEvent('close-filter-sidebar')); return !v; })}>
               {user.picture && <img src={user.picture} alt="" className="navbar-user-avatar" referrerPolicy="no-referrer" />}
               <span className="navbar-user-name">{user.name.split(' ')[0]}</span>
             </button>

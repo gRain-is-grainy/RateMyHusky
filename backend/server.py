@@ -165,7 +165,7 @@ def _get_pool():
 # ──────────────────────────────────────────────
 _cache = {}
 _cache_lock = Lock()
-CACHE_TTL = 300       # 5 minutes
+CACHE_TTL = 3600      # 1 hour
 CACHE_MAX_SIZE = 5000
 
 
@@ -549,7 +549,7 @@ def professor_profile(slug):
     cached = cache_get(cache_key)
     if cached:
         resp = jsonify(cached)
-        resp.headers["Cache-Control"] = "public, max-age=300"
+        resp.headers["Cache-Control"] = "public, max-age=3600"
         return resp
 
     # Look up professor from catalog
@@ -591,18 +591,13 @@ def professor_profile(slug):
     # Batch-fetch all scores for this professor's courses in one query
     scores_by_key = {}
     if trace_course_rows:
-        keys = [(int(c["course_id"]), int(c["instructor_id"]), int(c["term_id"] or 0)) for c in trace_course_rows]
-        or_clauses = []
-        score_params = []
-        for cid, iid, tid in keys:
-            or_clauses.append("(course_id = %s AND instructor_id = %s AND term_id = %s)")
-            score_params.extend([cid, iid, tid])
+        keys = tuple((int(c["course_id"]), int(c["instructor_id"]), int(c["term_id"] or 0)) for c in trace_course_rows)
 
         all_scores = query(
-            f"SELECT course_id, instructor_id, term_id, question, mean, median, std_dev, "
-            f"enrollment, completed, count_1, count_2, count_3, count_4, count_5 "
-            f"FROM trace_scores WHERE {' OR '.join(or_clauses)}",
-            score_params
+            "SELECT course_id, instructor_id, term_id, question, mean, median, std_dev, "
+            "enrollment, completed, count_1, count_2, count_3, count_4, count_5 "
+            "FROM trace_scores WHERE (course_id, instructor_id, term_id) IN %s",
+            (keys,)
         )
         for s in all_scores:
             k = (int(s["course_id"]), int(s["instructor_id"]), int(s["term_id"] or 0))
@@ -656,7 +651,7 @@ def professor_profile(slug):
 
     cache_set(cache_key, profile)
     resp = jsonify(profile)
-    resp.headers["Cache-Control"] = "public, max-age=300"
+    resp.headers["Cache-Control"] = "public, max-age=3600"
     return resp
 
 
@@ -675,7 +670,7 @@ def professor_reviews(slug):
     cached = cache_get(cache_key)
     if cached:
         resp = jsonify(cached)
-        resp.headers["Cache-Control"] = "private, max-age=300" if is_authed else "public, max-age=300"
+        resp.headers["Cache-Control"] = "private, max-age=3600" if is_authed else "public, max-age=3600"
         resp.headers["Vary"] = "Authorization"
         return resp
 
@@ -726,16 +721,11 @@ def professor_reviews(slug):
         for c in trace_course_rows:
             keys.add((int(c["course_id"]), int(c["instructor_id"]), int(c["term_id"]) if c["term_id"] else 0))
 
-        or_conditions = []
-        or_params = []
-        for cid, iid, tid in keys:
-            or_conditions.append("(tc_course_id = %s AND tc_instructor_id = %s AND tc_term_id = %s)")
-            or_params.extend([cid, iid, tid])
-
-        if or_conditions:
+        if keys:
             comment_rows = query(
-                f"SELECT tc_term_id, tc_course_id, question, comment FROM trace_comments WHERE {' OR '.join(or_conditions)}",
-                or_params
+                "SELECT tc_term_id, tc_course_id, question, comment FROM trace_comments "
+                "WHERE (tc_course_id, tc_instructor_id, tc_term_id) IN %s",
+                (tuple(keys),)
             )
             for c in comment_rows:
                 comment_text = sanitize(c["comment"]) if c["comment"] else ""
@@ -751,7 +741,39 @@ def professor_reviews(slug):
     result = {"reviews": reviews, "traceComments": comments}
     cache_set(cache_key, result)
     resp = jsonify(result)
-    resp.headers["Cache-Control"] = "private, max-age=300" if is_authed else "public, max-age=300"
+    resp.headers["Cache-Control"] = "private, max-age=3600" if is_authed else "public, max-age=3600"
+    resp.headers["Vary"] = "Authorization"
+    return resp
+
+
+@app.route("/api/professors/<slug>/full")
+def professor_full(slug):
+    """Combined profile + reviews in one request to halve round-trips."""
+    profile_resp = professor_profile(slug)
+    if isinstance(profile_resp, tuple):
+        return profile_resp  # propagate 404/errors
+
+    reviews_resp = professor_reviews(slug)
+    if isinstance(reviews_resp, tuple):
+        reviews_data = {"reviews": [], "traceComments": []}
+    else:
+        reviews_data = reviews_resp.get_json()
+
+    profile_data = profile_resp.get_json()
+    profile_data["reviews"] = reviews_data.get("reviews", [])
+    profile_data["traceComments"] = reviews_data.get("traceComments", [])
+
+    is_authed = False
+    token = _get_auth_token()
+    if token:
+        try:
+            pyjwt.decode(token, JWT_SECRET, algorithms=["HS256"])
+            is_authed = True
+        except (pyjwt.ExpiredSignatureError, pyjwt.InvalidTokenError):
+            pass
+
+    resp = jsonify(profile_data)
+    resp.headers["Cache-Control"] = "private, max-age=3600" if is_authed else "public, max-age=3600"
     resp.headers["Vary"] = "Authorization"
     return resp
 
@@ -1180,41 +1202,32 @@ def course_profile(code):
     if not course:
         return jsonify({"error": "Course not found"}), 404
 
-    # Parse course code pattern to match trace_courses display_name
-    # display_name format: "CS2500:01 (Fundamentals ...)"
-    code_pattern = f"{code_norm}:%"
-
-    # Get all sections for this course from trace_courses
+    # Get all sections for this course from trace_courses using indexed course_code column
     sections = query("""
         SELECT DISTINCT ON (tc.course_id, tc.instructor_id, tc.term_id)
             tc.course_id, tc.instructor_id, tc.term_id, tc.term_title,
             tc.department_name, tc.display_name, tc.section, tc.enrollment,
             tc.instructor_first_name, tc.instructor_last_name
         FROM trace_courses tc
-        WHERE tc.display_name LIKE %s
+        WHERE tc.course_code = %s
         ORDER BY tc.course_id, tc.instructor_id, tc.term_id, tc.term_id DESC
-    """, (code_pattern,))
+    """, (code_norm,))
 
     if not sections:
         return jsonify({"error": "Course not found"}), 404
 
     # Get overall scores for these sections
     if sections:
-        or_clauses = []
-        score_params = []
-        for s in sections:
-            or_clauses.append("(course_id = %s AND instructor_id = %s AND term_id = %s)")
-            score_params.extend([s["course_id"], s["instructor_id"], s["term_id"]])
-
+        section_keys = tuple((s["course_id"], s["instructor_id"], s["term_id"]) for s in sections)
         overall_scores = query(
-            f"SELECT course_id, instructor_id, term_id, "
-            f"SUM(CAST(mean AS FLOAT) * CAST(total_responses AS FLOAT)) as weighted_sum, "
-            f"SUM(total_responses) as total_responses, "
-            f"SUM(completed) as completed "
-            f"FROM trace_scores "
-            f"WHERE ({' OR '.join(or_clauses)}) AND lower(question) LIKE '%%overall%%' "
-            f"GROUP BY course_id, instructor_id, term_id",
-            score_params
+            "SELECT course_id, instructor_id, term_id, "
+            "SUM(CAST(mean AS FLOAT) * CAST(total_responses AS FLOAT)) as weighted_sum, "
+            "SUM(total_responses) as total_responses, "
+            "SUM(completed) as completed "
+            "FROM trace_scores "
+            "WHERE (course_id, instructor_id, term_id) IN %s AND lower(question) LIKE '%%overall%%' "
+            "GROUP BY course_id, instructor_id, term_id",
+            (section_keys,)
         )
     else:
         overall_scores = []
@@ -1343,20 +1356,14 @@ def course_profile(code):
     # Get question-level scores
     question_rows = []
     if sections:
-        or_clauses = []
-        q_params = []
-        for s in sections:
-            or_clauses.append("(course_id = %s AND instructor_id = %s AND term_id = %s)")
-            q_params.extend([s["course_id"], s["instructor_id"], s["term_id"]])
-
         q_scores = query(
-            f"SELECT question, "
-            f"SUM(CAST(mean AS FLOAT) * CAST(total_responses AS FLOAT)) as weighted_sum, "
-            f"SUM(total_responses) as total_responses "
-            f"FROM trace_scores "
-            f"WHERE {' OR '.join(or_clauses)} "
-            f"GROUP BY question",
-            q_params
+            "SELECT question, "
+            "SUM(CAST(mean AS FLOAT) * CAST(total_responses AS FLOAT)) as weighted_sum, "
+            "SUM(total_responses) as total_responses "
+            "FROM trace_scores "
+            "WHERE (course_id, instructor_id, term_id) IN %s "
+            "GROUP BY question",
+            (section_keys,)
         )
         for qs in q_scores:
             resp = _safe_int(qs["total_responses"])
