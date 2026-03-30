@@ -99,6 +99,10 @@
 	transition: box-shadow 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
 }
 
+.compare-control-card:first-child {
+	z-index: 3;
+}
+
 .compare-control-card:hover {
 	border-color: #dfd6d7;
 	box-shadow: 0 10px 24px rgba(0, 0, 0, 0.07);
