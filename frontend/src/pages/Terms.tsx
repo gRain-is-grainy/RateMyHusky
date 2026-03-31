@@ -9,7 +9,7 @@ const Terms = () => {
           <header className="terms-header">
             <span className="terms-kicker">Legal</span>
             <h1>Terms &amp; Conditions</h1>
-            <p className="terms-meta">Effective March 31, 2025 &middot; RateMyHusky</p>
+            <p className="terms-meta">Effective March 31, 2026 &middot; RateMyHusky</p>
           </header>
 
           <div className="terms-body">
