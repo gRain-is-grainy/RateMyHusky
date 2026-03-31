@@ -36,11 +36,12 @@ It combines:
 
 ## Quick Start
 
-1. Install backend dependencies.
-2. Configure backend environment variables.
-3. Start backend API server.
-4. Install frontend dependencies.
-5. Start frontend dev server.
+1. Unzip `trace_comments.zip` into `backend/Better_Scraper/output_data/`.
+2. Install backend dependencies.
+3. Configure backend environment variables.
+4. Start backend API server.
+5. Install frontend dependencies.
+6. Start frontend dev server.
 
 Detailed commands are below.
 
@@ -87,12 +88,18 @@ Frontend default: http://localhost:5173
 
 The frontend calls the backend API on port 5001 in local development.
 
-## Data Notes
+## Data Setup
 
+**Required:** Unzip `trace_comments.zip` before running any scraper or migration workflows:
+
+```bash
+unzip trace_comments.zip -d backend/Better_Scraper/output_data/
+```
+
+Additional notes:
 - Scraper files are in backend/Better_Scraper.
 - CSV outputs are stored in backend/Better_Scraper/output_data.
 - The backend runtime serves data from CockroachDB, so CSV files are for ingestion/migration workflows.
-- If you are running scraper workflows that depend on TRACE comments, unzip trace_comments.zip into backend/Better_Scraper/output_data.
 
 ## Project Structure
 
