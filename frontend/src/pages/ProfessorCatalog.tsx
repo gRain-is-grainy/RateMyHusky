@@ -922,7 +922,10 @@ function CollegeFilter({
     const handler = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) toggle(false);
     };
-    const scrollHandler = () => toggle(false);
+    const scrollHandler = (e: Event) => {
+      if (ref.current && ref.current.contains(e.target as Node)) return;
+      toggle(false);
+    };
     const closeHandler = () => toggle(false);
     document.addEventListener('mousedown', handler);
     document.addEventListener('scroll', scrollHandler, { capture: true, passive: true });
@@ -1033,7 +1036,10 @@ function DepartmentFilter({
     const handler = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) toggle(false);
     };
-    const scrollHandler = () => toggle(false);
+    const scrollHandler = (e: Event) => {
+      if (ref.current && ref.current.contains(e.target as Node)) return;
+      toggle(false);
+    };
     const closeHandler = () => toggle(false);
     document.addEventListener('mousedown', handler);
     document.addEventListener('scroll', scrollHandler, { capture: true, passive: true });
