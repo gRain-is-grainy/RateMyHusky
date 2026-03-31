@@ -375,12 +375,23 @@
 
 .instructor-header-row,
 .instructor-row {
-	display: grid;
-	grid-template-columns: 2fr 1fr 1fr 1fr;
-	column-gap: 8px;
+	display: flex;
 	align-items: center;
+	gap: 8px;
 	padding: 0 8px;
 	border-bottom: 1px solid #efefef;
+}
+
+.instructor-header-row span,
+.instructor-row span {
+	flex: 1;
+	text-align: left;
+	min-width: 0;
+}
+
+.instructor-header-row span:first-child,
+.instructor-row span:first-child {
+	flex: 2;
 }
 
 .instructor-header-row {
@@ -401,11 +412,6 @@
 
 .instructor-row:last-child {
 	border-bottom: none;
-}
-
-.instructor-header-row span,
-.instructor-row span {
-	text-align: left !important;
 }
 
 .course-expand-controls {
