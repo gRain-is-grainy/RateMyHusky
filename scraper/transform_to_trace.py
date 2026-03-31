@@ -124,6 +124,27 @@ def safe_float(val):
         return None
 
 
+def build_prefix_dept_map(trace_courses_csv: str) -> dict:
+    """Build a course-code prefix → department name map from existing trace_courses.csv."""
+    prefix_map = {}
+    if not os.path.exists(trace_courses_csv):
+        return prefix_map
+    with open(trace_courses_csv, "r", encoding="utf-8", errors="replace") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            dept = row.get("departmentName", "").strip()
+            display = row.get("displayName", "").strip()
+            if not dept or not display:
+                continue
+            # Extract prefix like "CS" from "CS3000:01 (...)"
+            m = re.match(r'^([A-Z]{2,10})\d', display)
+            if m:
+                prefix = m.group(1)
+                if prefix not in prefix_map:
+                    prefix_map[prefix] = dept
+    return prefix_map
+
+
 def load_manifest():
     if os.path.exists(MANIFEST_PATH):
         with open(MANIFEST_PATH, "r") as f:
@@ -149,7 +170,7 @@ def load_existing_keys(csv_path, key_cols):
     return keys
 
 
-def process_csv(csv_path: str, term_override: str = None):
+def process_csv(csv_path: str, term_override: str = None, prefix_dept_map: dict = None):
     """
     Process a single raw TRACE CSV.
     Returns (courses_rows, scores_rows, comments_rows).
@@ -199,7 +220,7 @@ def process_csv(csv_path: str, term_override: str = None):
                     "termEndDate": row.get("created_date", ""),
                     "instructorFirstName": first_name,
                     "instructorLastName": last_name,
-                    "departmentName": "",  # not in raw CSVs
+                    "departmentName": (prefix_dept_map or {}).get(re.match(r'^([A-Z]{2,10})\d', course_code or "").group(1) if re.match(r'^([A-Z]{2,10})\d', course_code or "") else "", ""),
                     "enrollment": enrollment,
                     "displayName": display_name,
                     "section": section_num,
@@ -258,6 +279,7 @@ def process_csv(csv_path: str, term_override: str = None):
                                     "mean": mean_val,
                                     "median": "",
                                     "std_dev": "",
+                                    "dept_mean": "",
                                 })
                         except (json.JSONDecodeError, TypeError):
                             pass
@@ -282,6 +304,7 @@ def process_csv(csv_path: str, term_override: str = None):
                 )
 
             median_val = safe_float(row.get("Course Median"))
+            dept_mean_val = safe_float(row.get("Dept. Mean"))
 
             # Map section categories to shorter question labels matching existing data
             full_question = question
@@ -308,6 +331,7 @@ def process_csv(csv_path: str, term_override: str = None):
                 "mean": mean_val if mean_val is not None else "",
                 "median": median_val if median_val is not None else "",
                 "std_dev": "",
+                "dept_mean": dept_mean_val if dept_mean_val is not None else "",
             })
 
     return list(courses.values()), scores, comments
@@ -323,8 +347,44 @@ def append_rows(csv_path, fieldnames, rows):
         writer.writerows(rows)
 
 
+def purge_new_rows(csv_path: str, id_col: str, min_id: int, extra_fields: list = None):
+    """Remove rows where id_col >= min_id and ensure extra_fields exist in header."""
+    if not os.path.exists(csv_path):
+        return 0
+    with open(csv_path, "r", encoding="utf-8", errors="replace") as f:
+        reader = csv.DictReader(f)
+        fieldnames = list(reader.fieldnames or [])
+        rows = [r for r in reader if int(r.get(id_col, 0) or 0) < min_id]
+    # Add any missing fields to header
+    for field in (extra_fields or []):
+        if field not in fieldnames:
+            fieldnames.append(field)
+    with open(csv_path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction="ignore")
+        writer.writeheader()
+        writer.writerows(rows)
+    return len(rows)
+
+
 def main():
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--force", action="store_true",
+                        help="Re-process all files: purge existing 500000+/50000+/900+ rows and reset manifest")
+    args = parser.parse_args()
+
     manifest = load_manifest()
+
+    if args.force:
+        print("--force: purging existing new-scraper rows from output CSVs...")
+        purge_new_rows(os.path.join(OUTPUT_DIR, "trace_courses.csv"), "courseId", COURSE_ID_OFFSET + 1)
+        purge_new_rows(os.path.join(OUTPUT_DIR, "trace_scores.csv"), "courseId", COURSE_ID_OFFSET + 1, extra_fields=["dept_mean"])
+        manifest = {"processed_files": [], "source_tag": "scraper_v2"}
+        print("Manifest reset.")
+
+    # Build prefix → department map from existing trace_courses.csv
+    prefix_dept_map = build_prefix_dept_map(os.path.join(OUTPUT_DIR, "trace_courses.csv"))
+    print(f"Built prefix→dept map with {len(prefix_dept_map)} entries (e.g. {dict(list(prefix_dept_map.items())[:3])})")
 
     # Find raw CSVs to process
     raw_files = []
@@ -357,7 +417,7 @@ def main():
 
     for csv_path in raw_files:
         print(f"\nProcessing: {os.path.basename(csv_path)}")
-        courses, scores, comments = process_csv(csv_path)
+        courses, scores, comments = process_csv(csv_path, prefix_dept_map=prefix_dept_map)
         print(f"  Parsed: {len(courses)} sections, {len(scores)} scores, {len(comments)} comments")
         all_courses.extend(courses)
         all_scores.extend(scores)
@@ -403,7 +463,7 @@ def main():
     score_fields = [
         "courseId", "instructorId", "termId", "enrollment", "completed",
         "question", "count_5", "count_4", "count_3", "count_2", "count_1",
-        "mean", "median", "std_dev"
+        "mean", "median", "std_dev", "dept_mean"
     ]
     comment_fields = ["course_url", "question", "comment"]
 

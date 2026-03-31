@@ -37,6 +37,7 @@ export interface TraceCourseScore {
   count3?: number;
   count4?: number;
   count5?: number;
+  deptMean?: number;
 }
 
 export interface TraceCourse {
@@ -164,6 +165,21 @@ export async function fetchProfessorReviews(slug: string): Promise<ProfessorRevi
   }
 }
 
+export interface TraceDeptAvgItem {
+  question: string;
+  avgMean: number;
+}
+
+export async function fetchTraceDeptAvg(department: string, termId: number): Promise<TraceDeptAvgItem[]> {
+  try {
+    return await get<TraceDeptAvgItem[]>(
+      `/api/trace-dept-avg?department=${encodeURIComponent(department)}&term_id=${termId}`
+    );
+  } catch {
+    return [];
+  }
+}
+
 /* ---- Search autocomplete ---- */
 export interface ProfessorSuggestion {
   type: "professor";
@@ -252,6 +268,8 @@ export interface CourseInstructorBreakdown {
   totalEnrollment: number;
   totalResponses: number;
   avgRating: number | null;
+  courseAvgDifficulty: number | null;
+  courseAvgHoursPerWeek: number | null;
 }
 
 export interface CourseSection {

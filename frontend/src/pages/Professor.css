@@ -221,8 +221,10 @@
 }
 
 /* ═══════════ CHARTS ROW ═══════════ */
-.prof-charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-.prof-chart-card { background: #fff; border-radius: 16px; padding: 28px 32px; box-shadow: 0 4px 20px rgba(0,0,0,0.06); }
+.prof-charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; padding-left: clamp(12px, 2.5vw, 40px); padding-right: clamp(12px, 2.5vw, 40px); padding-bottom: 28px; }
+.prof-chart-card { background: #fff; border-radius: 16px; padding: 28px 32px; box-shadow: 0 4px 20px rgba(0,0,0,0.06); outline: none; }
+.prof-chart-card:focus, .prof-chart-card *:focus { outline: none; }
+.prof-chart-card svg, .prof-chart-card svg * { outline: none; }
 .prof-chart-title { font-size: 1.1rem; font-weight: 800; color: #333; margin-bottom: 18px; }
 .prof-distribution { display: flex; flex-direction: column; gap: 12px; }
 
@@ -824,6 +826,20 @@
 
 .dark .prof-chart-card { background: #242424; box-shadow: 0 4px 20px rgba(0,0,0,0.2); }
 .dark .prof-chart-title { color: #e0e0e0; }
+
+.dark .prof-radar-section {
+  background: #242424;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+  --radar-grid: #333;
+  --radar-label: #ccc;
+  --radar-tooltip-bg: #2a2a2a;
+  --radar-tooltip-border: #444;
+  --radar-tooltip-text: #e0e0e0;
+}
+.dark .prof-radar-subtitle { color: #777; }
+.dark .prof-radar-metric-name { color: #e0e0e0; }
+.dark .prof-radar-metric-desc { color: #666; }
+.dark .prof-radar-legend-labels { border-top-color: #333; }
 .dark .prof-grade-track { background: #333; }
 .dark .prof-grade-count { color: #777; }
 .dark .prof-distribution { background: transparent; box-shadow: none; }
@@ -888,7 +904,7 @@
   .prof-stats { grid-template-columns: repeat(3, 1fr); gap: 12px; }
   .prof-section { padding: 36px clamp(12px, 3vw, 20px) 0; }
 
-  .prof-charts-row { grid-template-columns: 1fr; }
+  .prof-charts-row { grid-template-columns: 1fr; padding-bottom: 8px; }
 
   .prof-reviews-header { flex-direction: row; align-items: center; gap: 10px; }
   .prof-review-top { flex-direction: row; }
@@ -1037,4 +1053,96 @@
   align-items: center;
   justify-content: center;
   width: 100%; height: 100%;
+}
+
+/* ═══════════════════════════════════════
+   TRACE RADAR CHART SECTION
+   ═══════════════════════════════════════ */
+
+.prof-radar-section {
+  background: #fff;
+  border-radius: 16px;
+  padding: 28px 32px 24px;
+  margin: 20px clamp(12px, 2.5vw, 40px) 24px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  outline: none;
+}
+.prof-radar-section:focus, .prof-radar-section *:focus { outline: none; }
+.prof-radar-section svg, .prof-radar-section svg * { outline: none; }
+
+.prof-radar-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 4px;
+  flex-wrap: wrap;
+}
+
+.prof-radar-term {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #fff;
+  background: #d6394c;
+  border-radius: 20px;
+  padding: 3px 10px;
+  letter-spacing: 0.02em;
+  flex-shrink: 0;
+}
+
+.prof-radar-subtitle {
+  color: #888;
+  font-size: 0.88rem;
+  margin: 0 0 20px;
+  line-height: 1.5;
+}
+
+.prof-radar-charts {
+  width: 100%;
+}
+
+/* ── Metric description grid ── */
+.prof-radar-legend-labels {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px 20px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #f0f0f0;
+}
+
+.prof-radar-metric-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.prof-radar-metric-name {
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: #333;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.prof-radar-metric-desc {
+  font-size: 0.78rem;
+  color: #999;
+  line-height: 1.4;
+}
+
+@media (max-width: 600px) {
+  .prof-radar-section {
+    padding: 20px 16px 18px;
+    margin: 0 12px 20px;
+  }
+  .prof-radar-legend-labels {
+    grid-template-columns: 1fr 1fr;
+  }
+  .prof-radar-metric-info:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+    width: fit-content;
+    margin: 0 auto;
+    text-align: center;
+    align-items: center;
+  }
 }

@@ -31,6 +31,36 @@ load_dotenv()
 # ──────────────────────────────────────────────
 #  Helpers
 # ──────────────────────────────────────────────
+def term_sort_key(title: str) -> int:
+    """Returns a numeric sort key where higher = more recent term.
+    Order within a year: Fall(7) > Fall A(6) > Full Summer(5) > Summer 2(4) > Summer 1(3) > Spring(2) > Spring A(1)
+    """
+    if not title:
+        return 0
+    lower = title.lower()
+    # Try word-bounded year first, then 4-digit prefix of 6-digit code (e.g. "202510")
+    m = re.search(r'\b(20\d{2})\b', lower) or re.search(r'(20\d{2})\d{2}', lower)
+    if not m:
+        return 0
+    year = int(m.group(1))
+    if re.search(r'\bfall\b', lower):
+        sub = 6 if re.search(r'\bfall\s+a\b', lower) else 7
+    elif re.search(r'\bfull\s+summer\b', lower):
+        sub = 5
+    elif re.search(r'\bsummer\b', lower):
+        if re.search(r'\bsummer\s+2\b', lower):
+            sub = 4
+        elif re.search(r'\bsummer\s+1\b', lower):
+            sub = 3
+        else:
+            sub = 4
+    elif re.search(r'\bspring\b', lower):
+        sub = 1 if re.search(r'\bspring\s+a\b', lower) else 2
+    else:
+        sub = 0
+    return year * 10 + sub
+
+
 def normalize_name(name):
     s = str(name).strip().lower()
     s = unicodedata.normalize('NFKD', s).encode('ascii', 'ignore').decode('ascii')
@@ -601,7 +631,7 @@ def professor_profile(slug):
 
         all_scores = query(
             "SELECT course_id, instructor_id, term_id, question, mean, median, std_dev, "
-            "enrollment, completed, count_1, count_2, count_3, count_4, count_5 "
+            "enrollment, completed, count_1, count_2, count_3, count_4, count_5, dept_mean "
             "FROM trace_scores WHERE (course_id, instructor_id, term_id) IN %s",
             (keys,)
         )
@@ -640,6 +670,7 @@ def professor_profile(slug):
                 "count3": c3,
                 "count4": c4,
                 "count5": c5,
+                "deptMean": round(float(s["dept_mean"]), 2) if s["dept_mean"] else None,
             })
 
         trace_course_list.append({
@@ -1203,6 +1234,13 @@ def course_profile(code):
     if not code_norm:
         return jsonify({"error": "Course not found"}), 404
 
+    cache_key = f"course:{code_norm}"
+    cached = cache_get(cache_key)
+    if cached:
+        resp = jsonify(cached)
+        resp.headers["Cache-Control"] = "public, max-age=3600"
+        return resp
+
     # Look up course in catalog
     course = query_one("SELECT code, name, department FROM course_catalog WHERE code = %s", (code_norm,))
     if not course:
@@ -1222,27 +1260,46 @@ def course_profile(code):
     if not sections:
         return jsonify({"error": "Course not found"}), 404
 
-    # Get overall scores for these sections
-    if sections:
-        section_keys = tuple((s["course_id"], s["instructor_id"], s["term_id"]) for s in sections)
-        overall_scores = query(
-            "SELECT course_id, instructor_id, term_id, "
-            "SUM(CAST(mean AS FLOAT) * CAST(total_responses AS FLOAT)) as weighted_sum, "
-            "SUM(total_responses) as total_responses, "
-            "SUM(completed) as completed "
-            "FROM trace_scores "
-            "WHERE (course_id, instructor_id, term_id) IN %s AND lower(question) LIKE '%%overall%%' "
-            "GROUP BY course_id, instructor_id, term_id",
-            (section_keys,)
-        )
-    else:
-        overall_scores = []
+    # Single query for all score types using conditional aggregation (replaces 3 separate queries)
+    section_keys = tuple((s["course_id"], s["instructor_id"], s["term_id"]) for s in sections)
+    combined_scores = query(
+        "SELECT course_id, instructor_id, term_id, "
+        "SUM(CASE WHEN lower(question) LIKE '%%overall%%' THEN CAST(mean AS FLOAT) * CAST(total_responses AS FLOAT) ELSE 0 END) as overall_weighted, "
+        "SUM(CASE WHEN lower(question) LIKE '%%overall%%' THEN CAST(total_responses AS INT) ELSE 0 END) as overall_responses, "
+        "SUM(CASE WHEN lower(question) LIKE '%%overall%%' THEN completed ELSE 0 END) as overall_completed, "
+        "SUM(CASE WHEN lower(question) LIKE '%%challeng%%' THEN CAST(mean AS FLOAT) * CAST(total_responses AS FLOAT) ELSE 0 END) as challeng_weighted, "
+        "SUM(CASE WHEN lower(question) LIKE '%%challeng%%' THEN CAST(total_responses AS INT) ELSE 0 END) as challeng_responses, "
+        "SUM(CASE WHEN lower(question) LIKE '%%hours%%' THEN CAST(mean AS FLOAT) * CAST(total_responses AS FLOAT) ELSE 0 END) as hours_weighted, "
+        "SUM(CASE WHEN lower(question) LIKE '%%hours%%' THEN CAST(total_responses AS INT) ELSE 0 END) as hours_responses "
+        "FROM trace_scores "
+        "WHERE (course_id, instructor_id, term_id) IN %s "
+        "AND (lower(question) LIKE '%%overall%%' OR lower(question) LIKE '%%challeng%%' OR lower(question) LIKE '%%hours%%') "
+        "GROUP BY course_id, instructor_id, term_id",
+        (section_keys,)
+    )
 
-    # Build score lookup
+    # Build score maps from combined result
     score_map = {}
-    for os_row in overall_scores:
-        key = (os_row["course_id"], os_row["instructor_id"], os_row["term_id"])
-        score_map[key] = os_row
+    challenging_map = {}
+    hours_map = {}
+    for row in combined_scores:
+        key = (row["course_id"], row["instructor_id"], row["term_id"])
+        if row["overall_responses"]:
+            score_map[key] = {
+                "weighted_sum": row["overall_weighted"],
+                "total_responses": row["overall_responses"],
+                "completed": row["overall_completed"],
+            }
+        if row["challeng_responses"]:
+            challenging_map[key] = {
+                "weighted_sum": row["challeng_weighted"],
+                "total_responses": row["challeng_responses"],
+            }
+        if row["hours_responses"]:
+            hours_map[key] = {
+                "weighted_sum": row["hours_weighted"],
+                "total_responses": row["hours_responses"],
+            }
 
     # Compute summary
     total_weighted = 0.0
@@ -1251,12 +1308,15 @@ def course_profile(code):
     instructor_ids = set()
     latest_term_id = 0
     latest_term_title = ""
+    latest_term_sort = -1
 
     for s in sections:
         total_enrollment += _safe_int(s["enrollment"])
         instructor_ids.add(s["instructor_id"])
         tid = _safe_int(s["term_id"])
-        if tid > latest_term_id:
+        tsort = term_sort_key(s["term_title"] or "")
+        if tsort > latest_term_sort:
+            latest_term_sort = tsort
             latest_term_id = tid
             latest_term_title = s["term_title"] or ""
         key = (s["course_id"], s["instructor_id"], s["term_id"])
@@ -1288,13 +1348,24 @@ def course_profile(code):
         if not name:
             continue
         if name not in instructor_data:
-            instructor_data[name] = {"sections": 0, "enrollment": 0, "weighted": 0.0, "responses": 0}
+            instructor_data[name] = {
+                "sections": 0, "enrollment": 0,
+                "weighted": 0.0, "responses": 0,
+                "challeng_weighted": 0.0, "challeng_responses": 0,
+                "hours_weighted": 0.0, "hours_responses": 0,
+            }
         instructor_data[name]["sections"] += 1
         instructor_data[name]["enrollment"] += _safe_int(s["enrollment"])
         key = (s["course_id"], s["instructor_id"], s["term_id"])
         if key in score_map:
             instructor_data[name]["weighted"] += _safe_float(score_map[key]["weighted_sum"])
             instructor_data[name]["responses"] += _safe_int(score_map[key]["total_responses"])
+        if key in challenging_map:
+            instructor_data[name]["challeng_weighted"] += _safe_float(challenging_map[key]["weighted_sum"])
+            instructor_data[name]["challeng_responses"] += _safe_int(challenging_map[key]["total_responses"])
+        if key in hours_map:
+            instructor_data[name]["hours_weighted"] += _safe_float(hours_map[key]["weighted_sum"])
+            instructor_data[name]["hours_responses"] += _safe_int(hours_map[key]["total_responses"])
 
     # Look up instructor metadata from professors_catalog (batched)
     name_key_map = {normalize_name(name): name for name in instructor_data}
@@ -1340,6 +1411,9 @@ def course_profile(code):
         meta_comments = comment_counts.get(nk, 0)
 
         resp = data["responses"]
+        challeng_resp = data["challeng_responses"]
+        hours_resp = data["hours_responses"]
+        course_diff = round(data["challeng_weighted"] / challeng_resp, 2) if challeng_resp > 0 else meta_diff
         instructor_rows.append({
             "name": name,
             "slug": meta_slug,
@@ -1352,6 +1426,8 @@ def course_profile(code):
             "totalEnrollment": data["enrollment"],
             "totalResponses": resp,
             "avgRating": round(data["weighted"] / resp, 2) if resp > 0 else None,
+            "courseAvgDifficulty": course_diff,
+            "courseAvgHoursPerWeek": round(data["hours_weighted"] / hours_resp, 2) if hours_resp > 0 else None,
         })
     instructor_rows.sort(key=lambda r: (r["avgRating"] is None, -(r["avgRating"] or 0), -r["sections"]))
 
@@ -1384,31 +1460,34 @@ def course_profile(code):
 
     # Get question-level scores
     question_rows = []
-    if sections:
-        q_scores = query(
-            "SELECT question, "
-            "SUM(CAST(mean AS FLOAT) * CAST(total_responses AS FLOAT)) as weighted_sum, "
-            "SUM(total_responses) as total_responses "
-            "FROM trace_scores "
-            "WHERE (course_id, instructor_id, term_id) IN %s "
-            "GROUP BY question",
-            (section_keys,)
-        )
-        for qs in q_scores:
-            resp = _safe_int(qs["total_responses"])
-            question_rows.append({
-                "question": qs["question"],
-                "avgRating": round(_safe_float(qs["weighted_sum"]) / resp, 2) if resp > 0 else None,
-                "totalResponses": resp,
-            })
+    q_scores = query(
+        "SELECT question, "
+        "SUM(CAST(mean AS FLOAT) * CAST(total_responses AS FLOAT)) as weighted_sum, "
+        "SUM(total_responses) as total_responses "
+        "FROM trace_scores "
+        "WHERE (course_id, instructor_id, term_id) IN %s "
+        "GROUP BY question",
+        (section_keys,)
+    )
+    for qs in q_scores:
+        resp = _safe_int(qs["total_responses"])
+        question_rows.append({
+            "question": qs["question"],
+            "avgRating": round(_safe_float(qs["weighted_sum"]) / resp, 2) if resp > 0 else None,
+            "totalResponses": resp,
+        })
     question_rows.sort(key=lambda r: (-r["totalResponses"], r["question"].lower()))
 
-    return jsonify({
+    result = {
         "summary": summary,
         "instructors": instructor_rows,
         "sections": section_rows,
         "questionScores": question_rows,
-    })
+    }
+    cache_set(cache_key, result)
+    resp = jsonify(result)
+    resp.headers["Cache-Control"] = "public, max-age=3600"
+    return resp
 
 
 # ──────────────────────────────────────────────
@@ -1614,6 +1693,79 @@ def submit_feedback():
         return jsonify({"error": "Failed to send email"}), 500
 
     return jsonify({"ok": True})
+
+
+@app.route("/api/trace-dept-avg")
+def trace_dept_avg():
+    department = request.args.get("department", "").strip()
+    try:
+        term_id = int(request.args.get("term_id", "0"))
+    except (ValueError, TypeError):
+        term_id = 0
+
+    if not department or not term_id:
+        return jsonify([])
+
+    cache_key = f"trace_dept_avg:{department}:{term_id}"
+    cached = cache_get(cache_key)
+    if cached:
+        resp = jsonify(cached)
+        resp.headers["Cache-Control"] = "public, max-age=3600"
+        return resp
+
+    rows = query("""
+        SELECT ts.question,
+               SUM(COALESCE(ts.count_1, 0) + COALESCE(ts.count_2, 0) + COALESCE(ts.count_3, 0)
+                   + COALESCE(ts.count_4, 0) + COALESCE(ts.count_5, 0)) AS total_responses,
+               SUM(1 * COALESCE(ts.count_1, 0) + 2 * COALESCE(ts.count_2, 0)
+                   + 3 * COALESCE(ts.count_3, 0) + 4 * COALESCE(ts.count_4, 0)
+                   + 5 * COALESCE(ts.count_5, 0)) AS weighted_sum
+        FROM trace_scores ts
+        JOIN trace_courses tc
+            ON ts.course_id = tc.course_id
+           AND ts.instructor_id = tc.instructor_id
+           AND ts.term_id = tc.term_id
+        WHERE tc.department_name = %s AND tc.term_id = %s
+        GROUP BY ts.question
+    """, (department, term_id))
+
+    result = []
+    for r in rows:
+        total = int(r["total_responses"] or 0)
+        wsum = float(r["weighted_sum"] or 0)
+        if total > 0:
+            result.append({
+                "question": str(r["question"] or ""),
+                "avgMean": round(wsum / total, 2),
+            })
+
+    # Fallback: if count columns are unpopulated for this term, use mean directly
+    if not result:
+        rows = query("""
+            SELECT ts.question,
+                   SUM(COALESCE(ts.mean, 0) * COALESCE(ts.completed, 1)::FLOAT) AS weighted_sum,
+                   SUM(COALESCE(ts.completed, 1))::FLOAT AS total_weight
+            FROM trace_scores ts
+            JOIN trace_courses tc
+                ON ts.course_id = tc.course_id
+               AND ts.instructor_id = tc.instructor_id
+               AND ts.term_id = tc.term_id
+            WHERE tc.department_name = %s AND tc.term_id = %s AND ts.mean IS NOT NULL
+            GROUP BY ts.question
+        """, (department, term_id))
+        for r in rows:
+            total_weight = float(r["total_weight"] or 0)
+            wsum = float(r["weighted_sum"] or 0)
+            if total_weight > 0:
+                result.append({
+                    "question": str(r["question"] or ""),
+                    "avgMean": round(wsum / total_weight, 2),
+                })
+
+    cache_set(cache_key, result)
+    resp = jsonify(result)
+    resp.headers["Cache-Control"] = "public, max-age=3600"
+    return resp
 
 
 if __name__ == "__main__":

@@ -28,11 +28,6 @@ html.dark body {
   background-color: #1a1a1a;
 }
 
-/* Safari iOS 26: force compositing refresh on navbar */
-.ios26-tint-refresh .navbar {
-  transform: translateZ(0);
-}
-
 .safari-tint-sentinel {
   position: fixed;
   left: 0;

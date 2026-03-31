@@ -1000,6 +1000,7 @@
   overflow: hidden;
   margin: 0 0 2px;
   line-height: 1.3;
+  min-height: calc(0.97rem * 1.3 * 2);
   flex: 1;
   min-width: 0;
 }
@@ -1038,7 +1039,13 @@
 }
 
 .prof-rating-count--center {
+  flex: 0 0 auto;
+  margin: 0 auto;
   text-align: center;
+}
+
+.prof-rating-count:last-child {
+  text-align: right;
 }
 
 .prof-sub-ratings {

@@ -305,19 +305,28 @@
 }
 
 .goat-view-all {
-  display: block;
-  text-align: center;
-  margin-top: 16px;
-  font-size: 0.88rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  margin: 16px auto 0;
+  padding: 8px 22px;
+  font-family: 'Nunito', sans-serif;
+  font-size: 0.84rem;
   font-weight: 700;
   color: #d6394c;
   text-decoration: none;
-  transition: color 0.15s;
+  border: 1.5px solid rgba(214, 57, 76, 0.35);
+  border-radius: 999px;
+  background: transparent;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
 
 .goat-view-all:hover {
+  background: #fff2f4;
+  border-color: #d6394c;
   color: #b82e3f;
-  text-decoration: underline;
+  text-decoration: none;
 }
 
 .goat-header-row {
@@ -819,10 +828,13 @@
 
 .dark .goat-view-all {
   color: #e06070;
+  border-color: rgba(224, 96, 112, 0.35);
 }
 
 .dark .goat-view-all:hover {
-  color: #d6394c;
+  color: #e06070;
+  background: #3a2328;
+  border-color: #e06070;
 }
 
 .dark .goat-leaderboard {
@@ -1018,6 +1030,7 @@
   .goat-leaderboard {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
+    min-height: 548px; /* header (48px) + 10 rows (50px each) */
   }
 
   .goat-scroll-wrap::before,
@@ -1115,6 +1128,10 @@
 
   .section-title {
     font-size: 1.1rem;
+  }
+
+  .goat-leaderboard {
+    min-height: 528px; /* header (48px) + 10 rows (48px each) */
   }
 
   .goat-header-row,

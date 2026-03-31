@@ -17,16 +17,6 @@
   </head>
   <body>
     <div id="root"></div>
-    <!-- Safari iOS 26 fix: forces correct rendering of position:fixed elements -->
-    <div class="safari-tint-sentinel" aria-hidden="true"></div>
-    <script>
-      window.addEventListener("load", () => {
-        document.documentElement.classList.add("ios26-tint-refresh");
-        requestAnimationFrame(() => {
-          document.documentElement.classList.remove("ios26-tint-refresh");
-        });
-      });
-    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

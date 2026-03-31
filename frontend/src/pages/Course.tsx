@@ -1,11 +1,12 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import StarRating from '../components/StarRating';
 import NotFound from './NotFound';
 import { fetchCourseData } from '../api/api';
 import type { CourseDetail } from '../api/api';
 import Footer from '../components/Footer';
-import { getInitials } from '../utils/nameUtils';
+import { getInitials, stripPrefix } from '../utils/nameUtils';
+import { termSortKey } from '../utils/termUtils';
 import SectionHistoryChart from '../components/SectionHistoryChart';
 import Breadcrumbs from '../components/Breadcrumbs';
 import './Course.css';
@@ -20,6 +21,9 @@ const Course = () => {
 	const [notFound, setNotFound] = useState(false);
 	const [visibleInstructorCount, setVisibleInstructorCount] = useState(INITIAL_INSTRUCTORS_VISIBLE);
 	const [showBackToTop, setShowBackToTop] = useState(false);
+	const tableWrapRef = useRef<HTMLDivElement>(null);
+	const [tableAtStart, setTableAtStart] = useState(true);
+	const [tableAtEnd, setTableAtEnd] = useState(false);
 
 	useEffect(() => {
 		let cancelled = false;
@@ -45,15 +49,27 @@ const Course = () => {
 	}, [code]);
 
 	useEffect(() => {
-		setVisibleInstructorCount(INITIAL_INSTRUCTORS_VISIBLE);
-	}, [course?.summary.code]);
-
-	useEffect(() => {
 		const handler = () => setShowBackToTop(window.scrollY > 300);
 		window.addEventListener('scroll', handler, { passive: true });
 		handler();
 		return () => window.removeEventListener('scroll', handler);
 	}, []);
+
+	useEffect(() => {
+		const el = tableWrapRef.current;
+		if (!el) return;
+		const check = () => {
+			setTableAtStart(el.scrollLeft <= 10);
+			setTableAtEnd(el.scrollLeft + el.clientWidth >= el.scrollWidth - 10);
+		};
+		check();
+		el.addEventListener('scroll', check, { passive: true });
+		window.addEventListener('resize', check);
+		return () => {
+			el.removeEventListener('scroll', check);
+			window.removeEventListener('resize', check);
+		};
+	}, [course]);
 
 	const recentInstructors = useMemo(() => {
 		if (!course) return [];
@@ -68,7 +84,8 @@ const Course = () => {
 				if (yearMatch && parseInt(yearMatch[1]) >= cutoffYear) {
 					recentNames.add(section.instructor);
 					const prev = instructorLatestTermId.get(section.instructor) ?? 0;
-					if (section.termId > prev) instructorLatestTermId.set(section.instructor, section.termId);
+					const cur = termSortKey(section.termTitle);
+					if (cur > prev) instructorLatestTermId.set(section.instructor, cur);
 				}
 			}
 			return course.instructors.filter(inst => recentNames.has(inst.name));
@@ -83,7 +100,7 @@ const Course = () => {
 			result = getInstructorsWithinYears(yearsBack);
 		}
 
-		return result.sort((a, b) => {
+		const sorted = result.sort((a, b) => {
 			const aTermId = instructorLatestTermId.get(a.name) ?? 0;
 			const bTermId = instructorLatestTermId.get(b.name) ?? 0;
 			if (bTermId !== aTermId) return bTermId - aTermId;
@@ -91,6 +108,13 @@ const Course = () => {
 			const bRating = b.avgRating ?? -1;
 			return bRating - aRating;
 		});
+
+		if (sorted.length > 10) {
+			return sorted
+				.sort((a, b) => (b.avgRating ?? -1) - (a.avgRating ?? -1))
+				.slice(0, 10);
+		}
+		return sorted;
 	}, [course]);
 
 	const avgDifficulty = useMemo(() => {
@@ -168,33 +192,40 @@ const Course = () => {
 										if (!prof.slug) e.preventDefault();
 									}}
 								>
+									<div className="course-top-prof-photo">
 										{prof.imageUrl ? (
-										<img
-											className="course-top-prof-avatar course-top-prof-photo"
-											src={prof.imageUrl}
-											alt={prof.name}
-										/>
-									) : (
-										<div className="course-top-prof-avatar" aria-hidden="true">
-											{getInitials(prof.name)}
-										</div>
-									)}
+											<img
+												className="course-top-prof-img"
+												src={prof.imageUrl}
+												alt={prof.name}
+											/>
+										) : (
+											<div className="course-top-prof-avatar" aria-hidden="true">
+												{getInitials(prof.name)}
+											</div>
+										)}
+										<span className="course-top-prof-rank">#{index + 1}</span>
+									</div>
 									<div className="course-top-prof-body">
-										<h3 className="course-top-prof-name">{prof.name}</h3>
-										<div className="course-top-prof-rating">
-											{prof.avgRating != null ? (
-												<>
-													<span className="prof-avg-num">{prof.avgRating.toFixed(2)}</span>
-													<StarRating rating={prof.avgRating} size="sm" />
-												</>
-											) : (
-												<span>N/A</span>
-											)}
+										<div className="course-top-prof-body-top">
+											<div className="course-top-prof-rating">
+												{prof.avgRating != null ? (
+													<>
+														<span className="course-top-prof-avg">{prof.avgRating.toFixed(1)}</span>
+														<StarRating rating={prof.avgRating} size="sm" />
+													</>
+												) : (
+													<span className="course-top-prof-avg">N/A</span>
+												)}
+											</div>
+											<h3 className="course-top-prof-name">
+												{stripPrefix(prof.name)}
+											</h3>
 										</div>
-										<div className="course-top-prof-meta">
+										<div className="course-top-prof-footer">
 											<span>{prof.totalReviews.toLocaleString()} ratings</span>
-											<span>{prof.totalComments.toLocaleString()} comments</span>
-											<span>{prof.wouldTakeAgainPct != null ? `${Math.round(prof.wouldTakeAgainPct)}% would take again` : '—'}</span>
+											<span className="course-top-prof-footer--center">{prof.totalComments.toLocaleString()} comments</span>
+											<span className="course-top-prof-footer--right">{prof.wouldTakeAgainPct != null ? `${Math.round(prof.wouldTakeAgainPct)}% again` : '—'}</span>
 										</div>
 									</div>
 								</Link>
@@ -207,57 +238,41 @@ const Course = () => {
 					<div className="course-panel-header">
 						<h2>Instructor Breakdown</h2>
 					</div>
-					<div className="course-table-wrap">
-						<table className="course-table instructor-table">
-							<thead>
-								<tr>
-									<th>Instructor</th>
-									<th>Avg Rating</th>
-									<th>Sections</th>
-									<th>Enrollment</th>
-									<th>Responses</th>
-								</tr>
-							</thead>
-							<tbody>
-								{visibleInstructors.map((row) => (
-									<tr key={row.name}>
-										<td>{row.name}</td>
-										<td>{row.avgRating != null ? row.avgRating.toFixed(2) : 'N/A'}</td>
-										<td>{row.sections}</td>
-										<td>{row.totalEnrollment}</td>
-										<td>{row.totalResponses}</td>
-									</tr>
-								))}
-							</tbody>
-						</table>
+					<div className={`instructor-scroll-wrap${!tableAtStart ? ' fade-left' : ''}${!tableAtEnd ? ' fade-right' : ''}`}>
+						<div className="instructor-scroll-inner" ref={tableWrapRef}>
+							<div className="instructor-header-row">
+								<span>Professor Name</span>
+								<span>Rating</span>
+								<span>Difficulty</span>
+								<span>Hrs / Week</span>
+							</div>
+							{visibleInstructors.map((row) => (
+								<div key={row.name} className="instructor-row">
+									<span>{row.name}</span>
+									<span>{row.avgRating != null ? row.avgRating.toFixed(2) : 'N/A'}</span>
+									<span>{row.courseAvgDifficulty != null ? row.courseAvgDifficulty.toFixed(2) : 'N/A'}</span>
+									<span>{row.courseAvgHoursPerWeek != null ? `${row.courseAvgHoursPerWeek.toFixed(1)}h` : 'N/A'}</span>
+								</div>
+							))}
+						</div>
 					</div>
 					{hasExpandableInstructors && (
-						<div className="course-expand-controls" aria-label="Instructor table controls">
+						<div className="course-expand-controls">
 							<button
 								type="button"
 								className="course-expand-btn"
-								aria-label="Collapse instructors"
-								title="Collapse instructors"
 								disabled={!canCollapseInstructors}
 								onClick={() => setVisibleInstructorCount(INITIAL_INSTRUCTORS_VISIBLE)}
 							>
-								<span className="visually-hidden">Collapse instructors</span>
-								<span className="course-expand-chevron up" aria-hidden="true" />
+								<span className="course-expand-chevron up" />
 							</button>
 							<button
 								type="button"
 								className="course-expand-btn"
-								aria-label="Show more instructors"
-								title="Show more instructors"
 								disabled={!hasMoreInstructors}
-								onClick={() =>
-									setVisibleInstructorCount((prev) =>
-										Math.min(prev + INSTRUCTORS_VISIBLE_STEP, course.instructors.length)
-									)
-								}
+								onClick={() => setVisibleInstructorCount((prev) => Math.min(prev + INSTRUCTORS_VISIBLE_STEP, course.instructors.length))}
 							>
-								<span className="visually-hidden">Show more instructors</span>
-								<span className="course-expand-chevron down" aria-hidden="true" />
+								<span className="course-expand-chevron down" />
 							</button>
 						</div>
 					)}

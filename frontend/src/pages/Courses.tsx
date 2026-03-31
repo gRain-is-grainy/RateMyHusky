@@ -16,7 +16,6 @@ import './Courses.css';
 const SORT_OPTIONS = [
 	{ value: 'alpha', label: 'A - Z' },
 	{ value: 'rating', label: 'Highest Rating' },
-	{ value: 'sections', label: 'Most Sections' },
 	{ value: 'recent', label: 'Most Recent' },
 ];
 
@@ -25,7 +24,7 @@ interface Filters {
 	dept: string;
 	minRating: number;
 	maxRating: number;
-	sort: 'alpha' | 'rating' | 'sections' | 'recent';
+	sort: 'alpha' | 'rating' | 'recent';
 	page: number;
 }
 
@@ -41,7 +40,7 @@ const DEFAULT_FILTERS: Filters = {
 function getFiltersFromSearchParams(sp: URLSearchParams): Filters {
 	const sortValue = sp.get('sort');
 	const sort =
-		sortValue === 'rating' || sortValue === 'sections' || sortValue === 'recent' || sortValue === 'alpha'
+		sortValue === 'rating' || sortValue === 'recent' || sortValue === 'alpha'
 			? sortValue
 			: 'alpha';
 

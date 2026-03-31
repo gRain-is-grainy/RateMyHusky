@@ -265,10 +265,11 @@ TABLES = {
                 mean REAL,
                 median REAL,
                 std_dev REAL,
+                dept_mean REAL,
                 UNIQUE (course_id, instructor_id, term_id, question)
             );
         """,
-        "columns": ["course_id", "instructor_id", "term_id", "enrollment", "completed", "question", "count_5", "count_4", "count_3", "count_2", "count_1", "mean", "median", "std_dev"],
+        "columns": ["course_id", "instructor_id", "term_id", "enrollment", "completed", "question", "count_5", "count_4", "count_3", "count_2", "count_1", "mean", "median", "std_dev", "dept_mean"],
         # Lightweight proxy: skip by section-level key, avoids fetching question text
         "key_columns": ["course_id", "instructor_id", "term_id"],
         "key_query": "SELECT DISTINCT course_id, instructor_id, term_id FROM trace_scores",
@@ -289,6 +290,7 @@ TABLES = {
             "mean": float(row["mean"]) if row.get("mean") else None,
             "median": float(row["median"]) if row.get("median") else None,
             "std_dev": float(row["std_dev"]) if row.get("std_dev") else None,
+            "dept_mean": float(row["dept_mean"]) if row.get("dept_mean") else None,
         },
     },
     "professor_photos": {
@@ -342,8 +344,28 @@ def add_constraints(conn):
     cur.close()
 
 
+def purge_new_scraper_rows(conn):
+    """Delete rows added by transform_to_trace.py (courseId >= 500001) so they can be re-imported."""
+    cur = conn.cursor()
+    print("Purging new-scraper rows (course_id >= 500001) from trace_courses and trace_scores...")
+    cur.execute("DELETE FROM trace_scores WHERE course_id >= 500001")
+    print(f"  trace_scores: deleted {cur.rowcount:,} rows")
+    cur.execute("DELETE FROM trace_courses WHERE course_id >= 500001")
+    print(f"  trace_courses: deleted {cur.rowcount:,} rows")
+    conn.commit()
+    cur.close()
+
+
 def main():
     targets = sys.argv[1:] if len(sys.argv) > 1 else ["trace_comments"]
+
+    if targets == ["purge-new"]:
+        conn = get_connection()
+        print("Connected to CockroachDB!")
+        purge_new_scraper_rows(conn)
+        conn.close()
+        print("Done! Now run: python backend/migrate_to_crdb.py trace_courses trace_scores")
+        return
 
     if targets == ["add-constraints"]:
         conn = get_connection()
