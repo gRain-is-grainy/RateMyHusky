@@ -320,13 +320,13 @@ function RatingStatCard({ avgRating }: { avgRating: number | null }) {
 	return (
 		<article className="course-stat-card">
 			<strong className="course-stat-value">{avgRating != null ? avgRating.toFixed(2) : '—'}</strong>
+			<StarRating rating={avgRating ?? 0} size="lg" />
 			<span className="course-stat-label" style={{ display: 'block', textAlign: 'center', position: 'relative' }}>
 				Overall Rating
 				{avgRating != null && (
 					<svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ position: 'absolute', top: '50%', transform: 'translateY(-50%)', marginLeft: '4px', opacity: 0.6 }}><circle cx="12" cy="12" r="10" /><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg>
 				)}
 			</span>
-			<StarRating rating={avgRating ?? 0} size="lg" />
 			{avgRating != null && (
 				<div className="course-stat-breakdown">
 					<span>TRACE: {avgRating.toFixed(2)}</span>
@@ -356,10 +356,10 @@ function DifficultyStatCard({ value }: { value: number | null }) {
 	return (
 		<article className="course-stat-card">
 			<strong className="course-stat-value">{value != null ? value.toFixed(2) : '—'}</strong>
-			<span className="course-stat-label">Avg Difficulty</span>
 			<div className="course-difficulty-bar">
 				<div className="course-difficulty-fill" style={{ width: `${((value ?? 0) / 5) * 100}%`, background: color }} />
 			</div>
+			<span className="course-stat-label">Avg Difficulty</span>
 		</article>
 	);
 }
