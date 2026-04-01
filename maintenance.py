@@ -23,9 +23,9 @@ def set_routing(on: bool):
     with open(VERCEL_JSON) as f:
         data = json.load(f)
     dest = "/maintenance.html" if on else "/index.html"
-    for rw in data.get("rewrites", []):
-        if rw.get("source") == "/(.*)":
-            rw["destination"] = dest
+    for route in data.get("routes", []):
+        if route.get("src") == "/(.*)":
+            route["dest"] = dest
     with open(VERCEL_JSON, "w") as f:
         json.dump(data, f, indent=2)
         f.write("\n")
