@@ -161,10 +161,14 @@
 }
 
 .course-stat-last-taught .course-stat-value {
-	white-space: normal;
-	overflow-wrap: break-word;
+	display: block;
+	width: 100%;
+	max-width: 100%;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
 	text-align: center;
-	font-size: clamp(0.9rem, 2.5vw, 1.8rem);
+	font-size: clamp(1rem, 2.3vw, 2.3rem);
 }
 
 .course-difficulty-bar {
