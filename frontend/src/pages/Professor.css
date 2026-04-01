@@ -1151,6 +1151,17 @@
   padding: 28px clamp(16px, 3vw, 48px) 0;
 }
 
+@media (max-width: 768px) {
+  .prof-course-tip-wrapper {
+    padding: 24px 20px 0;
+  }
+}
+
+@media (max-width: 480px) {
+  .prof-course-tip-wrapper {
+    padding: 20px 16px 0;
+  }
+}
 .prof-course-tip {
   display: flex;
   align-items: flex-start;
