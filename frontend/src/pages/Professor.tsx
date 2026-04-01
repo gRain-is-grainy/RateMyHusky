@@ -463,18 +463,16 @@ const Professor = () => {
     return null;
   }, [filteredTraceCourses, profile]);
 
-  // Fetch department averages whenever the most-recent-term context changes
+  // Fetch department averages whenever the most-recent-term context changes (auth-gated)
   useEffect(() => {
-    if (!mostRecentTermData?.deptName || !mostRecentTermData.termId) {
-      console.log('[radar] skipping fetch — deptName:', mostRecentTermData?.deptName, 'termId:', mostRecentTermData?.termId);
+    if (!user || !mostRecentTermData?.deptName || !mostRecentTermData.termId) {
       setDeptAvg([]);
       return;
     }
-    console.log('[radar] fetching dept avg:', mostRecentTermData.deptName, mostRecentTermData.termId);
     fetchTraceDeptAvg(mostRecentTermData.deptName, mostRecentTermData.termId)
-      .then(data => { console.log('[radar] deptAvg result:', data); setDeptAvg(data); })
+      .then(data => { setDeptAvg(data); })
       .catch(() => setDeptAvg([]));
-  }, [mostRecentTermData?.deptName, mostRecentTermData?.termId]);
+  }, [user, mostRecentTermData?.deptName, mostRecentTermData?.termId]);
 
   const RADAR_METRICS = useMemo(() => [
     {
@@ -540,8 +538,6 @@ const Professor = () => {
     const profScores = mostRecentTermData.scores;
     // For newer terms (901+) dept_mean is stored per score row; for older terms use fetched deptAvg
     const useDeptMeanFromScores = deptAvg.length === 0 && profScores.some(s => s.deptMean != null);
-    console.log('[radar] useDeptMeanFromScores:', useDeptMeanFromScores);
-    console.log('[radar] all score deptMeans:', profScores.map(s => ({ q: s.question, deptMean: s.deptMean })));
     const deptScores = useDeptMeanFromScores
       ? profScores.map(s => ({ question: s.question, mean: s.deptMean! }))
       : deptAvg.map(d => ({ question: d.question, mean: d.avgMean }));
