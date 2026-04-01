@@ -61,6 +61,7 @@ export interface ProfessorProfile {
   wouldTakeAgainPct: number | null;
   difficulty: number | null;
   totalRatings: number;
+  totalComments: number;
   professorUrl: string | null;
   traceCourses: TraceCourse[];
   imageUrl: string | null;
