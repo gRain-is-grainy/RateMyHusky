@@ -11,7 +11,7 @@ import {
   RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
   ResponsiveContainer, Legend, Tooltip as RechartsTooltip,
 } from 'recharts';
-import { fetchProfessorFull, fetchProfessorReviews, fetchTraceDeptAvg } from '../api/api';
+import { fetchProfessorFull, fetchTraceDeptAvg } from '../api/api';
 import type { ProfessorProfile, ProfessorReview, TraceComment, TraceDeptAvgItem } from '../api/api';
 import { termSortKey } from '../utils/termUtils';
 import { useAuth } from '../context/AuthContext';
@@ -306,25 +306,26 @@ const Professor = () => {
     return () => { cancelled = true; };
   }, [slug]);
 
-  /* ── re-fetch reviews on auth change to pick up comment text ── */
+  /* ── re-fetch profile + reviews on auth change ── */
   const isInitialMount = useRef(true);
   useEffect(() => {
     if (isInitialMount.current) { isInitialMount.current = false; return; }
     if (!slug) return;
     let cancelled = false;
-    async function loadReviews() {
+    async function loadOnAuthChange() {
       setReviewsLoading(true);
       try {
-        const data = await fetchProfessorReviews(slug!);
+        const data = await fetchProfessorFull(slug!);
         if (cancelled) return;
         if (data) {
+          setProfile(data);
           setReviews(data.reviews || []);
           setTraceComments(data.traceComments || []);
         }
-      } catch { /* reviews are non-critical */ }
+      } catch { /* non-critical */ }
       finally { if (!cancelled) setReviewsLoading(false); }
     }
-    loadReviews();
+    loadOnAuthChange();
     return () => { cancelled = true; };
   }, [slug, user]);
 

@@ -4,6 +4,7 @@ import { fetchProfessorData, fetchProfessorsCatalog, fetchSearchSuggestions } fr
 import { termSortKey } from '../utils/termUtils';
 import type { CatalogProfessor, ProfessorProfile, ProfessorSuggestion } from '../api/api';
 import StarRating from '../components/StarRating';
+import Breadcrumbs from '../components/Breadcrumbs';
 import Footer from '../components/Footer';
 
 import './Compare.css';
@@ -608,6 +609,10 @@ function Compare() {
 		<>
 			<main className="compare-page">
 			<section className="compare-hero">
+				<Breadcrumbs items={[
+					{ label: 'Professors', to: '/professors' },
+					{ label: 'Compare' },
+				]} />
 				<div className="compare-hero-inner">
 					<p className="compare-kicker">Professor Compare</p>
 					<h1>Side-by-side comparison</h1>
