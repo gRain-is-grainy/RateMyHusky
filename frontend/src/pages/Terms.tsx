@@ -94,9 +94,10 @@ const Terms = () => {
               <h2>5. Feedback Form</h2>
               <p>
                 RateMyHusky includes a feedback form that accepts a message type, description,
-                and an optional email address. At this time, submissions from this form are
-                not transmitted to or stored on our servers. If this changes, these Terms will
-                be updated accordingly.
+                and an optional email address. Submissions from this form are transmitted to
+                the RateMyHusky team via email and are not stored in our database. Submitted
+                information is used solely to improve the service and will not be shared with
+                third parties.
               </p>
             </section>
 
