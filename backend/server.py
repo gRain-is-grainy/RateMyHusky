@@ -1536,14 +1536,16 @@ def course_profile(code):
     total_weighted = 0.0
     total_responses = 0
     total_enrollment = 0
-    instructor_ids = set()
+    total_sections_with_enrollment = 0
     latest_term_id = 0
     latest_term_title = ""
     latest_term_sort = -1
 
     for s in sections:
-        total_enrollment += _safe_int(s["enrollment"])
-        instructor_ids.add(s["instructor_id"])
+        enrollment = _safe_int(s["enrollment"])
+        if enrollment > 0:
+            total_enrollment += enrollment
+            total_sections_with_enrollment += 1
         tid = _safe_int(s["term_id"])
         tsort = term_sort_key(s["term_title"] or "")
         if tsort > latest_term_sort:
@@ -1562,9 +1564,7 @@ def course_profile(code):
         "name": course["name"],
         "department": course["department"] or "",
         "avgRating": round(avg_rating, 2) if avg_rating is not None else None,
-        "totalSections": len(sections),
-        "totalInstructors": len(instructor_ids),
-        "totalEnrollment": total_enrollment,
+        "avgEnrollment": round(total_enrollment / total_sections_with_enrollment) if total_sections_with_enrollment > 0 else None,
         "latestTermTitle": latest_term_title,
     }
 
@@ -1642,7 +1642,13 @@ def course_profile(code):
         resp = data["responses"]
         challeng_resp = data["challeng_responses"]
         hours_resp = data["hours_responses"]
-        course_diff = round(data["challeng_weighted"] / challeng_resp, 2) if challeng_resp > 0 else meta_diff
+        trace_diff = round(data["challeng_weighted"] / challeng_resp, 2) if challeng_resp > 0 else None
+        if trace_diff is not None and meta_diff is not None:
+            course_diff = round((trace_diff + meta_diff) / 2, 2)
+        elif trace_diff is not None:
+            course_diff = trace_diff
+        else:
+            course_diff = meta_diff
         instructor_rows.append({
             "name": name,
             "slug": meta_slug,

@@ -223,9 +223,7 @@ export interface CourseSummary {
   name: string;
   department: string;
   avgRating: number | null;
-  totalSections: number;
-  totalInstructors: number;
-  totalEnrollment: number;
+  avgEnrollment: number | null;
   latestTermTitle: string;
 }
 

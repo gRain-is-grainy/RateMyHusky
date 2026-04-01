@@ -123,9 +123,9 @@ const Course = () => {
 
 	const avgDifficulty = useMemo(() => {
 		if (!course) return null;
-		const valid = course.instructors.filter(i => i.difficulty != null);
+		const valid = course.instructors.filter(i => i.courseAvgDifficulty != null);
 		if (!valid.length) return null;
-		return valid.reduce((sum, i) => sum + i.difficulty!, 0) / valid.length;
+		return valid.reduce((sum, i) => sum + i.courseAvgDifficulty!, 0) / valid.length;
 	}, [course]);
 
 	const avgHoursPerWeek = useMemo(() => {
@@ -178,8 +178,7 @@ const Course = () => {
 					<RatingStatCard avgRating={summary.avgRating} />
 					<DifficultyStatCard value={avgDifficulty} />
 					<StatCard label="Avg Hrs / Week" value={avgHoursPerWeek != null ? `${avgHoursPerWeek.toFixed(1)}h` : '—'} />
-					<StatCard label="Instructors" value={summary.totalInstructors.toLocaleString()} />
-					<StatCard label="Avg Enrollment" value={summary.totalSections > 0 ? Math.round(summary.totalEnrollment / summary.totalSections).toLocaleString() : '—'} />
+					<StatCard label="Avg Enrollment" value={summary.avgEnrollment != null ? summary.avgEnrollment.toLocaleString() : '—'} />
 					<StatCard label="Last Taught" value={summary.latestTermTitle || 'Unknown'} className="course-stat-last-taught" />
 				</section>
 
