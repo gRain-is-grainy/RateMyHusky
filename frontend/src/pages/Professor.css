@@ -1133,7 +1133,7 @@
 @media (max-width: 600px) {
   .prof-radar-section {
     padding: 20px 16px 18px;
-    margin: 0 12px 20px;
+    margin: 20px 12px 20px;
   }
   .prof-radar-legend-labels {
     grid-template-columns: 1fr 1fr;
@@ -1145,4 +1145,121 @@
     text-align: center;
     align-items: center;
   }
+}
+/* ── Course filter tip ── */
+.prof-course-tip-wrapper {
+  padding: 28px clamp(16px, 3vw, 48px) 0;
+}
+
+@media (max-width: 768px) {
+  .prof-course-tip-wrapper {
+    padding: 24px 20px 0;
+  }
+}
+
+@media (max-width: 480px) {
+  .prof-course-tip-wrapper {
+    padding: 20px 16px 0;
+  }
+}
+.prof-course-tip {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  background: #fff;
+  border-radius: 16px;
+  border-left: 4px solid #d6394c;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+  padding: 18px 20px 18px 22px;
+  font-family: 'Nunito', sans-serif;
+}
+
+.prof-course-tip-icon {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #fef0f0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #d6394c;
+  margin-top: 1px;
+}
+
+.prof-course-tip-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.prof-course-tip-label {
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: #d6394c;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 5px;
+}
+
+.prof-course-tip-text {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #555;
+  line-height: 1.55;
+}
+
+.prof-course-tip-text strong {
+  color: #333;
+  font-weight: 800;
+}
+
+.prof-course-tip-close {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #bbb;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  border-radius: 6px;
+  transition: color 0.15s, background 0.15s;
+  align-self: center;
+}
+
+.prof-course-tip-close:hover {
+  color: #888;
+  background: #f0f0f0;
+}
+
+.dark .prof-course-tip {
+  background: #242424;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+  border-left-color: #d6394c;
+}
+
+.dark .prof-course-tip-icon {
+  background: #3a2020;
+  color: #e06070;
+}
+
+.dark .prof-course-tip-label {
+  color: #e06070;
+}
+
+.dark .prof-course-tip-text {
+  color: #aaa;
+}
+
+.dark .prof-course-tip-text strong {
+  color: #e0e0e0;
+}
+
+.dark .prof-course-tip-close {
+  color: #555;
+}
+
+.dark .prof-course-tip-close:hover {
+  color: #aaa;
+  background: #333;
 }

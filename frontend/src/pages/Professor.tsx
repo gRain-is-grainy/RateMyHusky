@@ -237,6 +237,7 @@ const Professor = () => {
   const MAX_VISIBLE_TERMS = 3;
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
   const [deptAvg, setDeptAvg] = useState<TraceDeptAvgItem[]>([]);
+  const [showCourseTip, setShowCourseTip] = useState(() => localStorage.getItem('prof_course_tip_dismissed') !== '1');
 
   /* ── review pill ── */
   const updateReviewPill = useCallback(() => {
@@ -1329,6 +1330,32 @@ const Professor = () => {
           </section>
         );
       })()}
+
+      {showCourseTip && allCourseCodes.length > 0 && (
+        <div className="prof-course-tip-wrapper">
+          <div className="prof-course-tip">
+            <div className="prof-course-tip-icon">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="8" x2="12" y2="12" />
+                <line x1="12" y1="16" x2="12.01" y2="16" />
+              </svg>
+            </div>
+            <div className="prof-course-tip-body">
+              <div className="prof-course-tip-label">Tip</div>
+              <p className="prof-course-tip-text">
+                To filter reviews by course, click <strong>Clear All</strong> in the Courses Taught section, then select the course you want to see reviews for.
+              </p>
+            </div>
+            <button className="prof-course-tip-close" onClick={() => { localStorage.setItem('prof_course_tip_dismissed', '1'); setShowCourseTip(false); }} aria-label="Dismiss tip">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
 
       <section className="prof-section prof-reviews-section" ref={reviewsRef}>
         <div className="prof-reviews-header">
