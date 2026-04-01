@@ -1300,7 +1300,7 @@ const Professor = () => {
         );
       })()}
 
-      {showCourseTip && (
+      {showCourseTip && allCourseCodes.length > 0 && (
         <div className="prof-course-tip-wrapper">
           <div className="prof-course-tip">
             <div className="prof-course-tip-icon">
