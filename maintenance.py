@@ -34,21 +34,9 @@ def set_routing(on: bool):
         )
 
     dest = "/maintenance.html" if on else "/index.html"
-    found_rule = False
-    for rw in rewrites:
-        if not isinstance(rw, dict):
-            raise RuntimeError(
-                "Invalid frontend/vercel.json: each rewrite must be an object. "
-                "Maintenance routing was not changed."
-            )
-        if rw.get("source") == "/(.*)":
-            rw["destination"] = dest
-            found_rule = True
-
-    if not found_rule:
-        # Add the expected catch-all rewrite if it was removed or renamed.
-        rewrites.append({"source": "/(.*)", "destination": dest})
-
+    for route in data.get("routes", []):
+        if route.get("src") == "/(.*)":
+            route["dest"] = dest
     with open(VERCEL_JSON, "w") as f:
         json.dump(data, f, indent=2)
         f.write("\n")
