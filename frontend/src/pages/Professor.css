@@ -1213,7 +1213,7 @@
   align-items: center;
   border-radius: 6px;
   transition: color 0.15s, background 0.15s;
-  margin-top: 1px;
+  align-self: center;
 }
 
 .prof-course-tip-close:hover {
