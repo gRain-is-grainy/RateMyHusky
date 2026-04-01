@@ -157,10 +157,6 @@
 	letter-spacing: 0.7px;
 	color: #aaa;
 	text-align: center;
-	margin-top: 2px;
-}
-
-.course-stats-grid > article:nth-child(n+4) .course-stat-label {
 	margin-top: auto;
 }
 
@@ -168,7 +164,7 @@
 	white-space: normal;
 	overflow-wrap: break-word;
 	text-align: center;
-	font-size: clamp(0.9rem, 2.5vw, 1.8rem);
+	line-height: 1.15;
 }
 
 .course-difficulty-bar {
