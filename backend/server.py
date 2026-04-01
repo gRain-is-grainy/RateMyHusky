@@ -715,6 +715,7 @@ def professor_profile(slug):
 
         # ── Precompute radar data for the most recent term with scores ──
         radar_data = None
+        radar_term_title = None
         seen_tids: list[int] = []
         seen_tid_set: set[int] = set()
         for c in trace_course_rows:
@@ -810,9 +811,15 @@ def professor_profile(slug):
 
             if has_data:
                 radar_data = points
+                radar_term_title = next(
+                    (str(tc["term_title"] or "") for tc in trace_course_rows
+                     if (int(tc["term_id"]) if tc["term_id"] else 0) == tid),
+                    ""
+                )
                 break
 
         profile["radarData"] = radar_data
+        profile["radarTermTitle"] = radar_term_title if radar_data else None
 
     else:
         # Lightweight query: only challenging scores to compute the professor-wide avg

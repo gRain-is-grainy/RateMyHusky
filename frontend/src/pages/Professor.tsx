@@ -855,6 +855,9 @@ const [showCourseTip, setShowCourseTip] = useState(() => localStorage.getItem('p
         <section className="prof-radar-section">
           <div className="prof-radar-header">
             <h2 className="prof-section-title">TRACE In-Depth Evaluation</h2>
+            {profile?.radarTermTitle && (
+              <span className="prof-radar-term">{cleanTerm(profile.radarTermTitle)}</span>
+            )}
           </div>
           <p className="prof-radar-subtitle">
             How this professor scores across key teaching dimensions compared to their department.

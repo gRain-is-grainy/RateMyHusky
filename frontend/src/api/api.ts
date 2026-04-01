@@ -62,6 +62,7 @@ export interface ProfessorProfile {
   hoursPerWeek: number | null;
   traceRatingCounts?: TraceRatingCounts;
   radarData?: RadarDataPoint[] | null;
+  radarTermTitle?: string | null;
 }
 
 export interface ProfessorReviews {
