@@ -78,21 +78,13 @@ const Course = () => {
 	const recentInstructors = useMemo(() => {
 		if (!course) return [];
 		const currentYear = new Date().getFullYear();
-		const instructorLatestTermId = new Map<string, number>();
 
 		const getInstructorsWithinYears = (yearsBack: number) => {
 			const cutoffYear = currentYear - yearsBack;
-			const recentNames = new Set<string>();
-			for (const section of course.sections) {
-				const yearMatch = section.termTitle.match(/\b(20\d{2})\b/);
-				if (yearMatch && parseInt(yearMatch[1]) >= cutoffYear) {
-					recentNames.add(section.instructor);
-					const prev = instructorLatestTermId.get(section.instructor) ?? 0;
-					const cur = termSortKey(section.termTitle);
-					if (cur > prev) instructorLatestTermId.set(section.instructor, cur);
-				}
-			}
-			return course.instructors.filter(inst => recentNames.has(inst.name));
+			return course.instructors.filter(inst => {
+				const yearMatch = inst.latestTermTitle.match(/\b(20\d{2})\b/);
+				return yearMatch && parseInt(yearMatch[1]) >= cutoffYear;
+			});
 		};
 
 		// Start with 1 year, expand until at least 5 or no more data
@@ -105,12 +97,10 @@ const Course = () => {
 		}
 
 		const sorted = result.sort((a, b) => {
-			const aTermId = instructorLatestTermId.get(a.name) ?? 0;
-			const bTermId = instructorLatestTermId.get(b.name) ?? 0;
-			if (bTermId !== aTermId) return bTermId - aTermId;
-			const aRating = a.avgRating ?? -1;
-			const bRating = b.avgRating ?? -1;
-			return bRating - aRating;
+			const aTermSort = termSortKey(a.latestTermTitle);
+			const bTermSort = termSortKey(b.latestTermTitle);
+			if (bTermSort !== aTermSort) return bTermSort - aTermSort;
+			return (b.avgRating ?? -1) - (a.avgRating ?? -1);
 		});
 
 		if (sorted.length > 10) {

@@ -235,6 +235,7 @@ export interface CourseInstructorBreakdown {
   wouldTakeAgainPct: number | null;
   totalReviews: number;
   totalComments: number;
+  latestTermTitle: string;
   avgRating: number | null;
   courseAvgDifficulty: number | null;
   courseAvgHoursPerWeek: number | null;

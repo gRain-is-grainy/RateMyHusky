@@ -1582,7 +1582,12 @@ def course_profile(code):
                 "weighted": 0.0, "responses": 0,
                 "challeng_weighted": 0.0, "challeng_responses": 0,
                 "hours_weighted": 0.0, "hours_responses": 0,
+                "latest_term_title": "", "latest_term_sort": -1,
             }
+        tsort = term_sort_key(s["term_title"] or "")
+        if tsort > instructor_data[name]["latest_term_sort"]:
+            instructor_data[name]["latest_term_sort"] = tsort
+            instructor_data[name]["latest_term_title"] = s["term_title"] or ""
         instructor_data[name]["sections"] += 1
         instructor_data[name]["enrollment"] += _safe_int(s["enrollment"])
         key = (s["course_id"], s["instructor_id"], s["term_id"])
@@ -1658,6 +1663,7 @@ def course_profile(code):
             "totalReviews": meta_reviews or 0,
             "totalComments": meta_comments,
             "_sections": data["sections"],
+            "latestTermTitle": data["latest_term_title"],
             "avgRating": round(data["weighted"] / resp, 2) if resp > 0 else None,
             "courseAvgDifficulty": course_diff,
             "courseAvgHoursPerWeek": round(data["hours_weighted"] / hours_resp, 2) if hours_resp > 0 else None,
@@ -1712,7 +1718,7 @@ def course_profile(code):
     result = {
         "summary": summary,
         "instructors": instructor_rows,
-        "sections": section_rows,
+        "sections": section_rows if is_authed else [],
         "questionScores": question_rows if is_authed else [],
     }
     cache_set(cache_key, result)
