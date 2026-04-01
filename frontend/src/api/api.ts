@@ -22,17 +22,12 @@ export interface RandomProfessor {
 }
 
 /* ---- Professor page types ---- */
-export interface TraceCourseScore {
-  question: string;
-  mean: number;
-  completed: number;
-  totalResponses?: number;
-  count1?: number;
-  count2?: number;
-  count3?: number;
-  count4?: number;
-  count5?: number;
-  deptMean?: number;
+export interface RadarDataPoint {
+  metric: string;
+  professor: number;
+  department: number;
+  profMissing: boolean;
+  deptMissing: boolean;
 }
 
 export interface TraceCourse {
@@ -41,7 +36,6 @@ export interface TraceCourse {
   termTitle: string;
   departmentName: string;
   displayName: string;
-  scores: TraceCourseScore[];
 }
 
 export interface TraceRatingCounts {
@@ -67,6 +61,7 @@ export interface ProfessorProfile {
   imageUrl: string | null;
   hoursPerWeek: number | null;
   traceRatingCounts?: TraceRatingCounts;
+  radarData?: RadarDataPoint[] | null;
 }
 
 export interface ProfessorReviews {
@@ -162,21 +157,6 @@ export async function fetchProfessorReviews(slug: string): Promise<ProfessorRevi
     return data;
   } catch {
     return null;
-  }
-}
-
-export interface TraceDeptAvgItem {
-  question: string;
-  avgMean: number;
-}
-
-export async function fetchTraceDeptAvg(department: string, termId: number): Promise<TraceDeptAvgItem[]> {
-  try {
-    return await get<TraceDeptAvgItem[]>(
-      `/api/trace-dept-avg?department=${encodeURIComponent(department)}&term_id=${termId}`
-    );
-  } catch {
-    return [];
   }
 }
 

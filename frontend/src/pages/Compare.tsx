@@ -77,27 +77,20 @@ const pickWinner = (
 const cleanTermTitle = (t: string): string => t.replace(/^\d{6}:\s*/, '').replace(/\s*\d{6}/g, '').trim();
 
 const getRecentTraceSnapshot = (profile: ProfessorProfile | null): TraceSnapshot | null => {
-	if (!profile?.traceCourses?.length) return null;
+	if (!profile?.traceCourses?.length || profile.traceRating == null) return null;
 
-	const sortedCourses = [...profile.traceCourses].sort((a, b) => {
+	const mostRecent = [...profile.traceCourses].sort((a, b) => {
 		const ka = termSortKey(a.termTitle);
 		const kb = termSortKey(b.termTitle);
 		if (ka !== kb) return kb - ka;
 		return b.courseId - a.courseId;
-	});
+	})[0];
 
-	for (const course of sortedCourses) {
-		const overallScore = course.scores.find((score) => /overall/i.test(score.question));
-		if (overallScore && typeof overallScore.mean === 'number') {
-			return {
-				term: cleanTermTitle(course.termTitle),
-				course: course.displayName,
-				score: overallScore.mean,
-			};
-		}
-	}
-
-	return null;
+	return {
+		term: cleanTermTitle(mostRecent.termTitle),
+		course: mostRecent.displayName,
+		score: profile.traceRating,
+	};
 };
 
 

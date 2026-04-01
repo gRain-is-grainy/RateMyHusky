@@ -566,6 +566,43 @@ def search():
 
 
 # ──────────────────────────────────────────────
+#  Radar chart metric definitions (professor profile)
+# ──────────────────────────────────────────────
+_RADAR_METRICS = [
+    {"metric": "Teaching", "patterns": [
+        ["overall rating of teaching", "overall rating", "overall effectiveness", "what is your overall rating"],
+        ["clearly communicated", "clear communication", "clearly"],
+    ]},
+    {"metric": "Organization", "patterns": [
+        ["online course materials were organized", "online course materials"],
+        ["syllabus was accurate", "syllabus"],
+        ["used class time effectively", "effective time"],
+    ]},
+    {"metric": "Rigor", "patterns": [
+        ["intellectually challenging", "this course was intellectually", "challenging"],
+        ["learned a lot", "i learned a lot"],
+    ]},
+    {"metric": "Grading", "patterns": [
+        ["fairly evaluated", "fair evaluation", "fair grades"],
+        ["sufficient feedback", "provided sufficient feedback", "feedback"],
+    ]},
+    {"metric": "Accessibility", "patterns": [
+        ["available to assist students outside", "outside assist"],
+        ["respectful and inclusive", "facilitated a respectful", "respect"],
+    ]},
+]
+
+
+def _get_radar_metric_value(scores, pattern_groups):
+    values = []
+    for group in pattern_groups:
+        match = next((s for s in scores if any(p in s["question"].lower() for p in group)), None)
+        if match and match["mean"] > 0:
+            values.append(match["mean"])
+    return round(sum(values) / len(values), 2) if values else None
+
+
+# ──────────────────────────────────────────────
 #  Professor profile page
 # ──────────────────────────────────────────────
 @app.route("/api/professors/<slug>")
@@ -630,7 +667,7 @@ def professor_profile(slug):
             keys = tuple((int(c["course_id"]), int(c["instructor_id"]), int(c["term_id"] or 0)) for c in trace_course_rows)
             all_scores = query(
                 "SELECT course_id, instructor_id, term_id, question, mean, "
-                "enrollment, completed, count_1, count_2, count_3, count_4, count_5, dept_mean "
+                "completed, count_1, count_2, count_3, count_4, count_5, dept_mean "
                 "FROM trace_scores WHERE (course_id, instructor_id, term_id) IN %s",
                 (keys,)
             )
@@ -644,7 +681,6 @@ def professor_profile(slug):
             cid = int(c["course_id"])
             iid = int(c["instructor_id"])
             tid = int(c["term_id"]) if c["term_id"] else 0
-            scores_list = []
             for s in scores_by_key.get((cid, iid, tid), []):
                 c1 = int(s["count_1"] or 0)
                 c2 = int(s["count_2"] or 0)
@@ -666,29 +702,117 @@ def professor_profile(slug):
                     rating_dist["count3"] += c3
                     rating_dist["count4"] += c4
                     rating_dist["count5"] += c5
-                scores_list.append({
-                    "question": str(s["question"] or ""),
-                    "mean": round(computed_mean, 2),
-                    "completed": int(s["completed"] or 0),
-                    "totalResponses": total_resp,
-                    "count1": c1,
-                    "count2": c2,
-                    "count3": c3,
-                    "count4": c4,
-                    "count5": c5,
-                    "deptMean": round(float(s["dept_mean"]), 2) if s["dept_mean"] else None,
-                })
             trace_course_list.append({
                 "courseId": cid,
                 "termId": tid,
                 "termTitle": str(c["term_title"] or ""),
                 "departmentName": str(c["department_name"] or ""),
                 "displayName": str(c["display_name"] or ""),
-                "scores": scores_list,
             })
 
         trace_avg_difficulty = round(challeng_sum / challeng_weight, 2) if challeng_weight > 0 else None
         profile["traceRatingCounts"] = rating_dist
+
+        # ── Precompute radar data for the most recent term with scores ──
+        radar_data = None
+        seen_tids: list[int] = []
+        seen_tid_set: set[int] = set()
+        for c in trace_course_rows:
+            tid = int(c["term_id"]) if c["term_id"] else 0
+            if tid not in seen_tid_set:
+                seen_tids.append(tid)
+                seen_tid_set.add(tid)
+
+        for tid in seen_tids:
+            term_courses = [
+                (int(tc["course_id"]), int(tc["instructor_id"]), tid)
+                for tc in trace_course_rows
+                if (int(tc["term_id"]) if tc["term_id"] else 0) == tid
+            ]
+            q_agg: dict = {}
+            for key in term_courses:
+                for s in scores_by_key.get(key, []):
+                    q = str(s["question"] or "").strip()
+                    c1 = int(s["count_1"] or 0); c2 = int(s["count_2"] or 0)
+                    c3 = int(s["count_3"] or 0); c4 = int(s["count_4"] or 0)
+                    c5 = int(s["count_5"] or 0)
+                    total_resp = c1 + c2 + c3 + c4 + c5
+                    if total_resp > 0:
+                        mean = (1*c1 + 2*c2 + 3*c3 + 4*c4 + 5*c5) / total_resp
+                    else:
+                        mean = float(s["mean"]) if s["mean"] else 0
+                    w = total_resp if total_resp > 0 else 1
+                    if q not in q_agg:
+                        q_agg[q] = {"prof_sum": 0.0, "prof_w": 0, "dept_sum": 0.0, "dept_w": 0}
+                    q_agg[q]["prof_sum"] += mean * w
+                    q_agg[q]["prof_w"] += w
+                    dm = float(s["dept_mean"]) if s["dept_mean"] else None
+                    if dm is not None:
+                        q_agg[q]["dept_sum"] += dm * w
+                        q_agg[q]["dept_w"] += w
+
+            if not q_agg:
+                continue
+
+            agg_scores = [
+                {"question": q, "mean": v["prof_sum"] / v["prof_w"]}
+                for q, v in q_agg.items() if v["prof_w"] > 0
+            ]
+            dept_scores = [
+                {"question": q, "mean": v["dept_sum"] / v["dept_w"]}
+                for q, v in q_agg.items() if v["dept_w"] > 0
+            ]
+
+            # Older terms may not have dept_mean in scores rows — fall back to dept avg query
+            if not dept_scores:
+                dept_name = next(
+                    (str(tc["department_name"] or "") for tc in trace_course_rows
+                     if (int(tc["term_id"]) if tc["term_id"] else 0) == tid),
+                    ""
+                )
+                if dept_name and tid:
+                    dept_rows = query("""
+                        SELECT ts.question,
+                               SUM(1*COALESCE(ts.count_1,0)+2*COALESCE(ts.count_2,0)
+                                   +3*COALESCE(ts.count_3,0)+4*COALESCE(ts.count_4,0)
+                                   +5*COALESCE(ts.count_5,0)) AS weighted_sum,
+                               SUM(COALESCE(ts.count_1,0)+COALESCE(ts.count_2,0)
+                                   +COALESCE(ts.count_3,0)+COALESCE(ts.count_4,0)
+                                   +COALESCE(ts.count_5,0)) AS total_responses
+                        FROM trace_scores ts
+                        JOIN trace_courses tc
+                            ON ts.course_id=tc.course_id
+                           AND ts.instructor_id=tc.instructor_id
+                           AND ts.term_id=tc.term_id
+                        WHERE tc.department_name=%s AND tc.term_id=%s
+                        GROUP BY ts.question
+                    """, (dept_name, tid))
+                    for r in dept_rows:
+                        total = int(r["total_responses"] or 0)
+                        wsum = float(r["weighted_sum"] or 0)
+                        if total > 0:
+                            dept_scores.append({"question": str(r["question"] or ""), "mean": wsum / total})
+
+            points = []
+            has_data = False
+            for m in _RADAR_METRICS:
+                prof_val = _get_radar_metric_value(agg_scores, m["patterns"])
+                dept_val = _get_radar_metric_value(dept_scores, m["patterns"]) if dept_scores else None
+                if prof_val is not None:
+                    has_data = True
+                points.append({
+                    "metric": m["metric"],
+                    "professor": prof_val if prof_val is not None else 0,
+                    "department": dept_val if dept_val is not None else 0,
+                    "profMissing": prof_val is None,
+                    "deptMissing": dept_val is None,
+                })
+
+            if has_data:
+                radar_data = points
+                break
+
+        profile["radarData"] = radar_data
 
     else:
         # Lightweight query: only challenging scores to compute the professor-wide avg
@@ -738,6 +862,7 @@ def professor_profile(slug):
             rating_dist["count4"] += int(s["count_4"] or 0)
             rating_dist["count5"] += int(s["count_5"] or 0)
         profile["traceRatingCounts"] = rating_dist
+        profile["radarData"] = None
 
         for c in trace_course_rows:
             trace_course_list.append({
@@ -746,7 +871,6 @@ def professor_profile(slug):
                 "termTitle": str(c["term_title"] or ""),
                 "departmentName": str(c["department_name"] or ""),
                 "displayName": str(c["display_name"] or ""),
-                "scores": [],
             })
 
     # Blend RMP difficulty with TRACE challenging avg into a single difficulty value
