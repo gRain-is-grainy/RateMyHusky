@@ -5,6 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="robots" content="noindex, nofollow" />
   <title>Maintenance — RateMyHusky</title>
+  <script>
+    // ── Maintenance Config ────────────────────────────────────
+    // Change EST_TIME to whatever fits (e.g. "~30 minutes", "a few hours")
+    // Leave it as an empty string "" to hide the ETA badge entirely.
+    var MAINTENANCE_EST_TIME = "a few minutes";
+    // ─────────────────────────────────────────────────────────
+  </script>
   <link rel="icon" href="/logo.jpg" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -239,16 +246,64 @@
       .visual-card { border-color: rgba(214, 57, 76, 0.18); }
     }
 
-    /* wrench + cog icon */
-    .tools-icon {
-      width: clamp(140px, 50%, 200px);
+
+    /* ── Visual card contents ──────────────────────────────── */
+    .maint-husky {
+      position: relative;
+      z-index: 1;
+      width: clamp(200px, 64%, 300px);
       filter: drop-shadow(0 14px 22px rgba(0, 0, 0, 0.12));
-      animation: float 4s ease-in-out infinite;
+      animation: float 5s ease-in-out infinite;
     }
 
     @keyframes float {
-      0%, 100% { transform: translateY(0px) rotate(0deg); }
-      50%       { transform: translateY(-10px) rotate(4deg); }
+      0%, 100% { transform: translateY(0px); }
+      50%       { transform: translateY(-12px); }
+    }
+
+    /* Spinning gear badge */
+    .gear-badge {
+      position: absolute;
+      bottom: 22px;
+      right: 22px;
+      width: 54px;
+      height: 54px;
+      border-radius: 50%;
+      background: var(--red);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 6px 20px rgba(214, 57, 76, 0.38);
+    }
+
+    .gear-spin {
+      animation: spin 4s linear infinite;
+      transform-origin: 35px 35px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* Wrench badge */
+    .wrench-badge {
+      position: absolute;
+      top: 22px;
+      right: 22px;
+      width: 46px;
+      height: 46px;
+      border-radius: 13px;
+      background: rgba(214, 57, 76, 0.1);
+      border: 1.5px solid rgba(214, 57, 76, 0.22);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      animation: wrench-rock 3.5s ease-in-out infinite;
+    }
+
+    @keyframes wrench-rock {
+      0%, 100% { transform: rotate(-12deg); }
+      50%       { transform: rotate(12deg); }
     }
 
     /* ── Footer ────────────────────────────────────────────── */
@@ -305,53 +360,63 @@
               maintenance. We're working quickly to get things back up — thanks
               for your patience.
             </p>
-            <div class="eta" aria-live="polite">
+            <div class="eta" id="eta-badge" aria-live="polite">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <circle cx="12" cy="12" r="10"/>
                 <polyline points="12 6 12 12 16 14"/>
               </svg>
-              Expected downtime: a few minutes
+              Expected downtime: <span id="eta-text">a few minutes</span>
             </div>
+            <script>
+              (function () {
+                var badge = document.getElementById('eta-badge');
+                var text  = document.getElementById('eta-text');
+                if (!MAINTENANCE_EST_TIME) {
+                  badge.style.display = 'none';
+                } else {
+                  text.textContent = MAINTENANCE_EST_TIME;
+                }
+              })();
+            </script>
           </div>
 
           <div class="visual" aria-hidden="true">
             <div class="visual-glow"></div>
             <div class="visual-card">
-              <!-- Wrench + cog SVG illustration -->
-              <svg class="tools-icon" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                <!-- Cog -->
-                <g transform="translate(105, 55)">
-                  <circle cx="0" cy="0" r="22" fill="rgba(214,57,76,0.15)" stroke="#d6394c" stroke-width="3"/>
-                  <circle cx="0" cy="0" r="10" fill="rgba(214,57,76,0.2)" stroke="#d6394c" stroke-width="2.5"/>
-                  <!-- Gear teeth -->
-                  <rect x="-4" y="-30" width="8" height="10" rx="2" fill="#d6394c"/>
-                  <rect x="-4" y="20"  width="8" height="10" rx="2" fill="#d6394c"/>
-                  <rect x="-30" y="-4" width="10" height="8" rx="2" fill="#d6394c"/>
-                  <rect x="20"  y="-4" width="10" height="8" rx="2" fill="#d6394c"/>
-                  <rect x="-23" y="-23" width="8" height="8" rx="2" fill="#d6394c" transform="rotate(45 -19 -19)"/>
-                  <rect x="15"  y="-23" width="8" height="8" rx="2" fill="#d6394c" transform="rotate(45 19 -19)"/>
-                  <rect x="-23" y="15"  width="8" height="8" rx="2" fill="#d6394c" transform="rotate(45 -19 19)"/>
-                  <rect x="15"  y="15"  width="8" height="8" rx="2" fill="#d6394c" transform="rotate(45 19 19)"/>
-                </g>
-                <!-- Wrench body -->
-                <g transform="translate(20, 60) rotate(-35)">
-                  <!-- Wrench head -->
-                  <path d="M10 0 C10 -14 30 -20 36 -10 L28 -4 L26 -12 C22 -16 14 -14 12 -8 C10 -2 14 4 20 4 L28 4 L36 10 C30 20 10 14 10 0Z" fill="#d6394c" opacity="0.9"/>
-                  <!-- Wrench handle -->
-                  <rect x="16" y="4" width="12" height="90" rx="6" fill="#d6394c" opacity="0.85"/>
-                  <!-- Handle grip lines -->
-                  <rect x="17" y="40" width="10" height="3" rx="1.5" fill="rgba(255,255,255,0.3)"/>
-                  <rect x="17" y="52" width="10" height="3" rx="1.5" fill="rgba(255,255,255,0.3)"/>
-                  <rect x="17" y="64" width="10" height="3" rx="1.5" fill="rgba(255,255,255,0.3)"/>
-                  <!-- Wrench bottom open end -->
-                  <path d="M16 94 C16 108 28 108 28 94" fill="none" stroke="#d6394c" stroke-width="3" opacity="0.85"/>
-                </g>
-                <!-- Small sparkles -->
-                <circle cx="60"  cy="40"  r="3" fill="rgba(214,57,76,0.5)"/>
-                <circle cx="155" cy="140" r="4" fill="rgba(214,57,76,0.35)"/>
-                <circle cx="40"  cy="150" r="2.5" fill="rgba(214,57,76,0.4)"/>
-                <circle cx="170" cy="80"  r="3" fill="rgba(214,57,76,0.3)"/>
-              </svg>
+
+              <!-- Husky (same asset as 404 page) -->
+              <img src="/neu-husky-icon.png" alt="" class="maint-husky" />
+
+              <!-- Spinning gear badge -->
+              <div class="gear-badge">
+                <svg width="38" height="38" viewBox="0 0 70 70" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <g class="gear-spin">
+                    <path d="M54.75,31.87 L62.85,32.07 L62.85,37.93 L54.75,38.13
+                      L53.67,42.17 L60.57,46.39 L57.65,51.46 L50.54,47.59
+                      L47.59,50.54 L51.46,57.65 L46.39,60.57 L42.17,53.67
+                      L38.13,54.75 L37.93,62.85 L32.07,62.85 L31.87,54.75
+                      L27.83,53.67 L23.61,60.57 L18.54,57.65 L22.41,50.54
+                      L19.46,47.59 L12.35,51.46 L9.43,46.39 L16.33,42.17
+                      L15.25,38.13 L7.15,37.93 L7.15,32.07 L15.25,31.87
+                      L16.33,27.83 L9.43,23.61 L12.35,18.54 L19.46,22.41
+                      L22.41,19.46 L18.54,12.35 L23.61,9.43 L27.83,16.33
+                      L31.87,15.25 L32.07,7.15 L37.93,7.15 L38.13,15.25
+                      L42.17,16.33 L46.39,9.43 L51.46,12.35 L47.59,19.46
+                      L50.54,22.41 L57.65,18.54 L60.57,23.61 L53.67,27.83 Z"
+                      fill="rgba(255,255,255,0.9)"/>
+                    <circle cx="35" cy="35" r="9" fill="rgba(214,57,76,0.6)"/>
+                    <circle cx="35" cy="35" r="4.5" fill="rgba(255,255,255,0.7)"/>
+                  </g>
+                </svg>
+              </div>
+
+              <!-- Wrench badge -->
+              <div class="wrench-badge">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#d6394c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+                </svg>
+              </div>
+
             </div>
           </div>
 
