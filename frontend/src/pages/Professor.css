@@ -1133,7 +1133,7 @@
 @media (max-width: 600px) {
   .prof-radar-section {
     padding: 20px 16px 18px;
-    margin: 0 12px 20px;
+    margin: 20px 12px 20px;
   }
   .prof-radar-legend-labels {
     grid-template-columns: 1fr 1fr;
