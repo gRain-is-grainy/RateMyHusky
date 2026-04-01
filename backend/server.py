@@ -614,70 +614,87 @@ def professor_profile(slug):
         "hoursPerWeek": round(prof["avg_hours"], 1) if prof["avg_hours"] else None,
     }
 
-    # ── TRACE courses + scores (batched into 2 queries instead of N+1) ──
-    trace_course_rows = query("""
-        SELECT course_id, term_id, term_title, department_name, display_name,
-               section, enrollment, instructor_id
-        FROM trace_courses WHERE name_key = %s
-        ORDER BY term_id DESC
-    """, (name_key,))
-
-    # Batch-fetch all scores for this professor's courses in one query
-    scores_by_key = {}
-    if trace_course_rows:
-        keys = tuple((int(c["course_id"]), int(c["instructor_id"]), int(c["term_id"] or 0)) for c in trace_course_rows)
-
-        all_scores = query(
-            "SELECT course_id, instructor_id, term_id, question, mean, median, std_dev, "
-            "enrollment, completed, count_1, count_2, count_3, count_4, count_5, dept_mean "
-            "FROM trace_scores WHERE (course_id, instructor_id, term_id) IN %s",
-            (keys,)
-        )
-        for s in all_scores:
-            k = (int(s["course_id"]), int(s["instructor_id"]), int(s["term_id"] or 0))
-            scores_by_key.setdefault(k, []).append(s)
-
+    # ── TRACE courses + scores ──
+    # Authenticated: full data with scores. Unauthenticated: names/terms only, no scores.
     trace_course_list = []
-    for c in trace_course_rows:
-        cid = int(c["course_id"])
-        iid = int(c["instructor_id"])
-        tid = int(c["term_id"]) if c["term_id"] else 0
+    if is_authed:
+        trace_course_rows = query("""
+            SELECT course_id, term_id, term_title, department_name, display_name,
+                   section, enrollment, instructor_id
+            FROM trace_courses WHERE name_key = %s
+            ORDER BY term_id DESC
+        """, (name_key,))
 
-        scores_list = []
-        for s in scores_by_key.get((cid, iid, tid), []):
-            c1 = int(s["count_1"] or 0)
-            c2 = int(s["count_2"] or 0)
-            c3 = int(s["count_3"] or 0)
-            c4 = int(s["count_4"] or 0)
-            c5 = int(s["count_5"] or 0)
-            total_resp = c1 + c2 + c3 + c4 + c5
-            if total_resp > 0:
-                computed_mean = (1*c1 + 2*c2 + 3*c3 + 4*c4 + 5*c5) / total_resp
-            else:
-                computed_mean = float(s["mean"]) if s["mean"] else 0
-            scores_list.append({
-                "question": str(s["question"] or ""),
-                "mean": round(computed_mean, 2),
-                "completed": int(s["completed"] or 0),
-                "totalResponses": total_resp,
-                "count1": c1,
-                "count2": c2,
-                "count3": c3,
-                "count4": c4,
-                "count5": c5,
-                "deptMean": round(float(s["dept_mean"]), 2) if s["dept_mean"] else None,
+        scores_by_key = {}
+        if trace_course_rows:
+            keys = tuple((int(c["course_id"]), int(c["instructor_id"]), int(c["term_id"] or 0)) for c in trace_course_rows)
+
+            all_scores = query(
+                "SELECT course_id, instructor_id, term_id, question, mean, median, std_dev, "
+                "enrollment, completed, count_1, count_2, count_3, count_4, count_5, dept_mean "
+                "FROM trace_scores WHERE (course_id, instructor_id, term_id) IN %s",
+                (keys,)
+            )
+            for s in all_scores:
+                k = (int(s["course_id"]), int(s["instructor_id"]), int(s["term_id"] or 0))
+                scores_by_key.setdefault(k, []).append(s)
+
+        for c in trace_course_rows:
+            cid = int(c["course_id"])
+            iid = int(c["instructor_id"])
+            tid = int(c["term_id"]) if c["term_id"] else 0
+
+            scores_list = []
+            for s in scores_by_key.get((cid, iid, tid), []):
+                c1 = int(s["count_1"] or 0)
+                c2 = int(s["count_2"] or 0)
+                c3 = int(s["count_3"] or 0)
+                c4 = int(s["count_4"] or 0)
+                c5 = int(s["count_5"] or 0)
+                total_resp = c1 + c2 + c3 + c4 + c5
+                if total_resp > 0:
+                    computed_mean = (1*c1 + 2*c2 + 3*c3 + 4*c4 + 5*c5) / total_resp
+                else:
+                    computed_mean = float(s["mean"]) if s["mean"] else 0
+                scores_list.append({
+                    "question": str(s["question"] or ""),
+                    "mean": round(computed_mean, 2),
+                    "completed": int(s["completed"] or 0),
+                    "totalResponses": total_resp,
+                    "count1": c1,
+                    "count2": c2,
+                    "count3": c3,
+                    "count4": c4,
+                    "count5": c5,
+                    "deptMean": round(float(s["dept_mean"]), 2) if s["dept_mean"] else None,
+                })
+
+            trace_course_list.append({
+                "courseId": cid,
+                "termId": tid,
+                "termTitle": str(c["term_title"] or ""),
+                "departmentName": str(c["department_name"] or ""),
+                "displayName": str(c["display_name"] or ""),
+                "scores": scores_list,
             })
 
-        trace_course_list.append({
-            "courseId": cid,
-            "termId": tid,
-            "termTitle": str(c["term_title"] or ""),
-            "departmentName": str(c["department_name"] or ""),
-            "displayName": str(c["display_name"] or ""),
-            "scores": scores_list,
-        })
+    else:
+        trace_course_rows = query("""
+            SELECT course_id, term_id, term_title, department_name, display_name
+            FROM trace_courses WHERE name_key = %s
+            ORDER BY term_id DESC
+        """, (name_key,))
+        for c in trace_course_rows:
+            trace_course_list.append({
+                "courseId": int(c["course_id"]),
+                "termId": int(c["term_id"]) if c["term_id"] else 0,
+                "termTitle": str(c["term_title"] or ""),
+                "departmentName": str(c["department_name"] or ""),
+                "displayName": str(c["display_name"] or ""),
+                "scores": [],
+            })
 
-    profile["traceCourses"] = trace_course_list if is_authed else []
+    profile["traceCourses"] = trace_course_list
 
     cache_set(cache_key, profile)
     resp = jsonify(profile)
@@ -1463,7 +1480,7 @@ def course_profile(code):
         "summary": summary,
         "instructors": instructor_rows,
         "sections": section_rows,
-        "questionScores": question_rows,
+        "questionScores": question_rows if is_authed else [],
     }
     cache_set(cache_key, result)
     resp = jsonify(result)
