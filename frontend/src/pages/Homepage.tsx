@@ -158,15 +158,17 @@ const Homepage = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Scroll to hash anchor (e.g. /#shuffle, /#goated) on navigation
+  // Scroll to hash anchor only when navigating via breadcrumb (has state), not on refresh
   useEffect(() => {
-    if (location.hash) {
+    if (location.hash && location.state) {
       const el = document.getElementById(location.hash.slice(1));
       if (el) {
         setTimeout(() => el.scrollIntoView({ behavior: 'smooth' }), 100);
       }
+    } else {
+      window.scrollTo(0, 0);
     }
-  }, [location.hash]);
+  }, [location.hash, location.state]);
   const [selectedCollege, setSelectedCollege] = useState<string>(() => {
     const state = location.state as { goatedCollege?: string } | null;
     const restored = state?.goatedCollege;
@@ -283,7 +285,7 @@ const Homepage = () => {
           observer.disconnect();
         }
       },
-      { rootMargin: '200px' }
+      { threshold: 0 }
     );
     observer.observe(el);
     return () => observer.disconnect();
@@ -375,7 +377,7 @@ const Homepage = () => {
           observer.disconnect();
         }
       },
-      { rootMargin: '200px' }
+      { threshold: 0 }
     );
     observer.observe(el);
     return () => observer.disconnect();
