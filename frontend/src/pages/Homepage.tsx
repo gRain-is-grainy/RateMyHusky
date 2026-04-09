@@ -5,8 +5,8 @@ import { useState, useEffect, useRef, useCallback, useLayoutEffect } from 'react
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import SearchBar from '../components/SearchBar';
 import Footer from '../components/Footer';
-import { fetchGoatProfessors, fetchRandomProfessor, fetchProfessorsCatalog } from '../api/api';
-import type { Professor } from '../api/api';
+import { fetchGoatProfessors, fetchProfessorsCatalog } from '../api/api';
+import type { CatalogProfessor, Professor } from '../api/api';
 import neuIcon from '../assets/neu-circle-icon.png';
 import './Homepage.css';
 
@@ -322,51 +322,10 @@ const Homepage = () => {
   const [wheelRotation, setWheelRotation] = useState(0);
   const [wheelDurationMs, setWheelDurationMs] = useState(0);
 
-  const realWheelNames = Array.from(new Set(profs.map((p) => p.name).filter(Boolean)));
+  // Fetch wheel pool once per session when shuffle section becomes visible
+  const wheelPoolRef = useRef<CatalogProfessor[]>([]);
+  const wheelPoolLoadedRef = useRef(false);
 
-  type PrefetchedProf = { prof: Awaited<ReturnType<typeof fetchRandomProfessor>>; names: string[] };
-  const prefetchedProfRef = useRef<PrefetchedProf | null>(null);
-  const prefetchingRef = useRef(false);
-
-  const prefetchNext = useCallback(async () => {
-    if (prefetchingRef.current) return;
-    prefetchingRef.current = true;
-    try {
-      const prof = await fetchRandomProfessor();
-      const uniqueNames: string[] = [];
-      const uniqueSet = new Set<string>();
-      const pushUnique = (name: string) => {
-        const trimmed = name.trim();
-        if (!trimmed || uniqueSet.has(trimmed)) return;
-        uniqueSet.add(trimmed);
-        uniqueNames.push(trimmed);
-      };
-      pushUnique(prof.name);
-      realWheelNames.forEach(pushUnique);
-      if (uniqueNames.length < WHEEL_SLICES) {
-        const collegeCatalog = await fetchProfessorsCatalog({
-          college: selectedCollege || undefined,
-          page: 1,
-          limit: 300,
-          sort: 'alpha',
-        });
-        collegeCatalog.professors.forEach((p) => pushUnique(p.name));
-      }
-      if (uniqueNames.length < WHEEL_SLICES) {
-        const globalCatalog = await fetchProfessorsCatalog({ page: 1, limit: 500, sort: 'alpha' });
-        globalCatalog.professors.forEach((p) => pushUnique(p.name));
-      }
-      if (uniqueNames.length >= WHEEL_SLICES) {
-        prefetchedProfRef.current = { prof, names: uniqueNames };
-      }
-    } catch {
-      // silently fail — handleShuffle will fall back to fetching itself
-    } finally {
-      prefetchingRef.current = false;
-    }
-  }, [realWheelNames, selectedCollege]);
-
-  // Trigger prefetch when shuffle section scrolls into view
   useEffect(() => {
     const el = shuffleSectionRef.current;
     if (!el) return;
@@ -383,62 +342,40 @@ const Homepage = () => {
     return () => observer.disconnect();
   }, []);
 
-  useEffect(() => { if (shuffleVisible) prefetchNext(); }, [shuffleVisible, prefetchNext]);
+  useEffect(() => {
+    if (!shuffleVisible || wheelPoolLoadedRef.current) return;
+    wheelPoolLoadedRef.current = true;
+    fetchProfessorsCatalog({ minRating: 3, limit: 100, sort: 'rating' })
+      .then((res) => { wheelPoolRef.current = res.professors; })
+      .catch((err) => console.error('Failed to load wheel pool:', err));
+  }, [shuffleVisible]);
 
   const handleShuffle = async () => {
     if (shuffling) return;
+    const pool = wheelPoolRef.current;
+    if (pool.length < WHEEL_SLICES) {
+      console.error('Not enough professors in wheel pool');
+      return;
+    }
+
     setShuffling(true);
     setSlotResult(null);
     setWheelState('spinning');
 
     try {
-      let prof: Awaited<ReturnType<typeof fetchRandomProfessor>>;
-      let uniqueNames: string[];
+      // Pick a random winner from the pool
+      const shuffledPool = [...pool].sort(() => Math.random() - 0.5);
+      const winner = shuffledPool[0];
+      const sliceProfs = shuffledPool.slice(0, WHEEL_SLICES);
+      const names = sliceProfs.map((p) => p.name);
 
-      if (prefetchedProfRef.current && prefetchedProfRef.current.names.length >= WHEEL_SLICES) {
-        ({ prof, names: uniqueNames } = prefetchedProfRef.current);
-        prefetchedProfRef.current = null;
-      } else {
-        // fallback: fetch now (first click before prefetch completes)
-        prof = await fetchRandomProfessor();
-        uniqueNames = [];
-        const uniqueSet = new Set<string>();
-        const pushUnique = (name: string) => {
-          const trimmed = name.trim();
-          if (!trimmed || uniqueSet.has(trimmed)) return;
-          uniqueSet.add(trimmed);
-          uniqueNames.push(trimmed);
-        };
-        pushUnique(prof.name);
-        realWheelNames.forEach(pushUnique);
-        if (uniqueNames.length < WHEEL_SLICES) {
-          const collegeCatalog = await fetchProfessorsCatalog({
-            college: selectedCollege || undefined,
-            page: 1,
-            limit: 300,
-            sort: 'alpha',
-          });
-          collegeCatalog.professors.forEach((p) => pushUnique(p.name));
-        }
-        if (uniqueNames.length < WHEEL_SLICES) {
-          const globalCatalog = await fetchProfessorsCatalog({ page: 1, limit: 500, sort: 'alpha' });
-          globalCatalog.professors.forEach((p) => pushUnique(p.name));
-        }
-        if (uniqueNames.length < WHEEL_SLICES) {
-          throw new Error('Not enough unique professor names to build a 16-slice wheel.');
-        }
-      }
+      const winnerIndex = 0; // winner is first after shuffle
+      setWheelNames(names);
 
-      const slug = prof.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-
-      const fixedPool = [...uniqueNames].sort(() => Math.random() - 0.5).slice(0, WHEEL_SLICES);
-      const shuffled = [...fixedPool].sort(() => Math.random() - 0.5);
-      const winnerIndex = Math.max(0, shuffled.indexOf(prof.name));
-      setWheelNames(shuffled);
+      const slug = winner.slug || winner.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 
       const currentNormalized = ((wheelRotation % 360) + 360) % 360;
       const winnerCenterAngle = (winnerIndex + 0.5) * SLICE_DEG;
-      // In our wheel transform system, 0deg is the top marker position.
       const pointerAngle = 0;
       const targetNormalized = (pointerAngle - winnerCenterAngle + 360) % 360;
       const delta = (targetNormalized - currentNormalized + 360) % 360;
@@ -450,15 +387,12 @@ const Homepage = () => {
       setWheelDurationMs(4800);
       setWheelRotation(finalRotation);
 
-      // Prefetch the next professor while the wheel is spinning
-      prefetchNext();
-
       await new Promise(r => setTimeout(r, 5000));
 
-      setSlotResult({ name: prof.name, dept: prof.dept ?? '', college: prof.college ?? '', slug });
+      setSlotResult({ name: winner.name, dept: winner.department ?? '', college: winner.college ?? '', slug });
       setWheelState('result');
     } catch (err) {
-      console.error('Failed to fetch random professor:', err);
+      console.error('Failed to spin wheel:', err);
       setWheelState('idle');
     } finally {
       setShuffling(false);
