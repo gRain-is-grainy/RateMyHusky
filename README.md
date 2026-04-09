@@ -21,7 +21,6 @@ It combines:
 - Breadcrumb navigation across pages
 - Google OAuth sign-in flow for gated functionality
 - Dark mode toggle and responsive UI
-- Terms of Service and Privacy Policy pages
 
 ## Tech Stack
 
@@ -123,13 +122,11 @@ Additional notes:
 ├── frontend/
 │   ├── package.json
 │   └── src/
-│       ├── api/              # API client and type definitions
-│       ├── components/       # Navbar, SearchBar, Breadcrumbs, Footer,
-│       │                     # ThemeToggle, SignInModal, FeedbackTab,
-│       │                     # RatingBadge, StarRating, etc.
-│       ├── context/          # AuthContext
-│       └── pages/            # Homepage, ProfessorCatalog, Professor,
-│                             # Courses, Course, Compare, Terms, Privacy
+│       ├── api/
+│       ├── components/
+│       ├── context/
+│       └── pages/
+│                             
 └── README.md
 ```
 
