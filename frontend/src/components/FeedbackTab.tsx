@@ -1,8 +1,20 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import logo from '../assets/logo.jpg';
 import Dropdown from './Dropdown';
 import { submitFeedback } from '../api/api';
 import './FeedbackTab.css';
+
+declare global {
+  interface Window {
+    turnstile?: {
+      render: (container: string | HTMLElement, options: Record<string, unknown>) => string;
+      remove: (widgetId: string) => void;
+      reset: (widgetId: string) => void;
+    };
+  }
+}
+
+const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY || '1x00000000000000000000AA'; // test key fallback
 
 const feedbackOptions = [
   { value: 'bug', label: 'Bug Report' },
@@ -20,6 +32,9 @@ const FeedbackTab = () => {
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [turnstileToken, setTurnstileToken] = useState('');
+  const turnstileRef = useRef<HTMLDivElement>(null);
+  const widgetIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     const handler = () => setIsOpen(true);
@@ -27,15 +42,53 @@ const FeedbackTab = () => {
     return () => window.removeEventListener('open-feedback', handler);
   }, []);
 
+  const renderTurnstile = useCallback(() => {
+    if (!turnstileRef.current || !window.turnstile) return;
+    if (widgetIdRef.current !== null) {
+      window.turnstile.remove(widgetIdRef.current);
+      widgetIdRef.current = null;
+    }
+    widgetIdRef.current = window.turnstile.render(turnstileRef.current, {
+      sitekey: TURNSTILE_SITE_KEY,
+      callback: (token: string) => setTurnstileToken(token),
+      'expired-callback': () => setTurnstileToken(''),
+      theme: document.documentElement.classList.contains('dark') ? 'dark' : 'light',
+      size: 'normal',
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!isOpen || submitted) return;
+    // Wait for Turnstile script to load
+    const interval = setInterval(() => {
+      if (window.turnstile) {
+        clearInterval(interval);
+        renderTurnstile();
+      }
+    }, 100);
+    return () => {
+      clearInterval(interval);
+      if (widgetIdRef.current !== null && window.turnstile) {
+        window.turnstile.remove(widgetIdRef.current);
+        widgetIdRef.current = null;
+      }
+      setTurnstileToken('');
+    };
+  }, [isOpen, submitted, renderTurnstile]);
+
   const handleSubmit = async () => {
     if (!feedbackType || !description.trim()) {
       setError('Please select a feedback type and enter a description.');
       return;
     }
+    if (!turnstileToken) {
+      setError('Please complete the CAPTCHA verification.');
+      return;
+    }
     setError('');
     setLoading(true);
     try {
-      await submitFeedback({ feedbackType, description, email: email || undefined });
+      await submitFeedback({ feedbackType, description, email: email || undefined, turnstileToken });
       setSubmitted(true);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : '';
@@ -43,6 +96,12 @@ const FeedbackTab = () => {
         setError('Daily feedback limit reached. Please try again tomorrow.');
       } else if (msg.includes('Invalid email')) {
         setError('Please enter a valid email address.');
+      } else if (msg.includes('CAPTCHA') || msg.includes('captcha')) {
+        setError('CAPTCHA verification failed. Please try again.');
+        if (widgetIdRef.current !== null && window.turnstile) {
+          window.turnstile.reset(widgetIdRef.current);
+        }
+        setTurnstileToken('');
       } else {
         setError('Failed to send feedback. Please try again.');
       }
@@ -60,6 +119,7 @@ const FeedbackTab = () => {
       setEmail('');
       setError('');
       setLoading(false);
+      setTurnstileToken('');
     }, 300);
   };
 
@@ -120,7 +180,7 @@ const FeedbackTab = () => {
 
                 <h2 className="feedback-title">Feedback Form</h2>
                 <p className="feedback-subtitle">
-                  Found a bug? RateMyHusky's #1 fan? Let our devs know through this form.
+                  Spotted something off? Got ideas? We'd love to hear from you.
                 </p>
 
                 {error && <p className="feedback-error">{error}</p>}
@@ -158,7 +218,9 @@ const FeedbackTab = () => {
                   onChange={(e) => setEmail(e.target.value)}
                 />
 
-                <button className="feedback-submit" onClick={handleSubmit} disabled={loading}>
+                <div ref={turnstileRef} className="feedback-turnstile" />
+
+                <button className="feedback-submit" onClick={handleSubmit} disabled={loading || !turnstileToken}>
                   {loading ? 'Sending...' : 'Submit'}
                 </button>
               </>

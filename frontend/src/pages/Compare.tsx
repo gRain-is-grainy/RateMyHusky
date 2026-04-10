@@ -21,6 +21,9 @@ type WinnerSide = 'left' | 'right' | null;
 
 const CATALOG_LIMIT = 10000;
 
+// Module-level cache so catalog survives component unmounts
+let cachedCatalog: CatalogProfessor[] | null = null;
+
 const slugify = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 
 const normalizeName = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -140,6 +143,11 @@ function Compare() {
 	}, [searchParams, setSearchParams]);
 
 	useEffect(() => {
+		if (cachedCatalog) {
+			setCatalog(cachedCatalog);
+			return;
+		}
+
 		let cancelled = false;
 
 		const loadCatalog = async () => {
@@ -148,6 +156,7 @@ function Compare() {
 				setCatalogError(null);
 				const result = await fetchProfessorsCatalog({ sort: 'alpha', limit: CATALOG_LIMIT, page: 1 });
 				if (!cancelled) {
+					cachedCatalog = result.professors;
 					setCatalog(result.professors);
 				}
 			} catch {

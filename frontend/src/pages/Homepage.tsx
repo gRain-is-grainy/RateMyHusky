@@ -22,11 +22,16 @@ const COLLEGES = [
   'Health Sciences', 'Khoury', 'Law', 'Professional Studies', 'Science',
 ];
 
+// Module-level caches so data survives component unmounts
+const goatCache = new Map<string, Professor[]>();
+let wheelPool: CatalogProfessor[] = [];
+let wheelPoolLoaded = false;
+
 /* ---- animated stat counter ---- */
 const AnimatedStat = ({ value, label }: { value: string; label: string }) => {
-  const ref = useRef<HTMLDivElement>(null);
-  const [display, setDisplay] = useState('0');
-  const [hasAnimated, setHasAnimated] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const valueRef = useRef<HTMLSpanElement>(null);
+  const hasAnimated = useRef(false);
 
   // Parse "7,600+" → { num: 7600, suffix: "+" }
   const parsed = useRef({ num: 0, suffix: '' });
@@ -38,50 +43,39 @@ const AnimatedStat = ({ value, label }: { value: string; label: string }) => {
     }
   }, [value]);
 
-  const animate = useCallback(() => {
-    if (hasAnimated) return;
-    setHasAnimated(true);
-
-    const { num, suffix } = parsed.current;
-    const duration = 2000;
-    const start = performance.now();
-
-    const step = (now: number) => {
-      const elapsed = now - start;
-      const progress = Math.min(elapsed / duration, 1);
-      // Ease out cubic
-      const eased = 1 - Math.pow(1 - progress, 3);
-      const current = Math.round(eased * num);
-      setDisplay(current.toLocaleString() + suffix);
-
-      if (progress < 1) {
-        requestAnimationFrame(step);
-      }
-    };
-
-    requestAnimationFrame(step);
-  }, [hasAnimated]);
-
   useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
+    const container = containerRef.current;
+    const el = valueRef.current;
+    if (!container || !el) return;
 
     const observer = new IntersectionObserver(
       ([entry]) => {
-        if (entry.isIntersecting) {
-          animate();
+        if (entry.isIntersecting && !hasAnimated.current) {
+          hasAnimated.current = true;
           observer.disconnect();
+
+          const { num, suffix } = parsed.current;
+          const duration = 2000;
+          const start = performance.now();
+
+          const step = (now: number) => {
+            const progress = Math.min((now - start) / duration, 1);
+            const eased = 1 - Math.pow(1 - progress, 3);
+            el.textContent = Math.round(eased * num).toLocaleString() + suffix;
+            if (progress < 1) requestAnimationFrame(step);
+          };
+          requestAnimationFrame(step);
         }
       },
       { threshold: 0.5 }
     );
-    observer.observe(el);
+    observer.observe(container);
     return () => observer.disconnect();
-  }, [animate]);
+  }, [value]);
 
   return (
-    <div className="stat-item" ref={ref}>
-      <span className="stat-value">{display}</span>
+    <div className="stat-item" ref={containerRef}>
+      <span className="stat-value" ref={valueRef}>0</span>
       <span className="stat-label">{label}</span>
     </div>
   );
@@ -294,9 +288,19 @@ const Homepage = () => {
     return () => observer.disconnect();
   }, []);
 
+  // goatCache is defined at module level so it survives unmounts
+
   // Load GOAT professors when section is visible and selected college changes
   useEffect(() => {
     if (!goatVisible || !selectedCollege) return;
+
+    const cached = goatCache.get(selectedCollege);
+    if (cached) {
+      setProfs(cached);
+      setOpenTooltip(null);
+      return;
+    }
+
     let cancelled = false;
 
     async function loadProfs() {
@@ -304,7 +308,10 @@ const Homepage = () => {
       setOpenTooltip(null);
       try {
         const data = await fetchGoatProfessors(selectedCollege);
-        if (!cancelled) setProfs(data);
+        if (!cancelled) {
+          goatCache.set(selectedCollege, data);
+          setProfs(data);
+        }
       } catch (err) {
         console.error('Failed to load professors:', err);
       } finally {
@@ -325,9 +332,7 @@ const Homepage = () => {
   const [wheelRotation, setWheelRotation] = useState(0);
   const [wheelDurationMs, setWheelDurationMs] = useState(0);
 
-  // Fetch wheel pool once per session when shuffle section becomes visible
-  const wheelPoolRef = useRef<CatalogProfessor[]>([]);
-  const wheelPoolLoadedRef = useRef(false);
+  // wheelPool is defined at module level so it survives unmounts
 
   useEffect(() => {
     const el = shuffleSectionRef.current;
@@ -346,16 +351,16 @@ const Homepage = () => {
   }, []);
 
   useEffect(() => {
-    if (!shuffleVisible || wheelPoolLoadedRef.current) return;
-    wheelPoolLoadedRef.current = true;
+    if (!shuffleVisible || wheelPoolLoaded) return;
+    wheelPoolLoaded = true;
     fetchProfessorsCatalog({ minRating: 3, limit: 100, sort: 'rating' })
-      .then((res) => { wheelPoolRef.current = res.professors; })
+      .then((res) => { wheelPool = res.professors; })
       .catch((err) => console.error('Failed to load wheel pool:', err));
   }, [shuffleVisible]);
 
   const handleShuffle = async () => {
     if (shuffling) return;
-    const pool = wheelPoolRef.current;
+    const pool = wheelPool;
     if (pool.length < WHEEL_SLICES) {
       console.error('Not enough professors in wheel pool');
       return;

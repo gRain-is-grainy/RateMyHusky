@@ -274,6 +274,14 @@
   color: #bbb;
 }
 
+/* ---------- turnstile ---------- */
+.feedback-turnstile {
+  margin: 12px 0 16px;
+  display: flex;
+  justify-content: center;
+  min-height: 70px;
+}
+
 /* ---------- submit ---------- */
 .feedback-submit {
   background: #d6394c;

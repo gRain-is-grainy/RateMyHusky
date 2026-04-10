@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   fetchProfessorsCatalog,
-  fetchColleges,
   fetchDepartments,
   fetchSearchSuggestions,
   type CatalogProfessor,
@@ -99,7 +98,10 @@ export default function ProfessorCatalog() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [filters, setFilters]       = useState<Filters>(() => getFiltersFromSearchParams(searchParams));
-  const [colleges, setColleges]     = useState<string[]>([]);
+  const [colleges]     = useState<string[]>([
+    'Business', 'CAMD', 'CSSH', 'Engineering',
+    'Health Sciences', 'Khoury', 'Law', 'Professional Studies', 'Science',
+  ]);
   const [departments, setDepts]     = useState<string[]>([]);
   const [professors, setProfessors] = useState<CatalogProfessor[]>([]);
   const [total, setTotal]           = useState(0);
@@ -175,11 +177,6 @@ export default function ProfessorCatalog() {
   // pageSize = cols × 4 rows: always even, always fills the grid completely.
   // List mode uses a fixed even count since it has no grid columns.
   const pageSize = viewMode === 'list' ? 10 : numCols * 4;
-
-  // Fetch colleges once
-  useEffect(() => {
-    fetchColleges().then(setColleges).catch(console.error);
-  }, []);
 
   // Re-fetch departments when college changes
   useEffect(() => {
