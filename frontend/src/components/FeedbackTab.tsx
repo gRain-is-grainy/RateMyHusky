@@ -180,7 +180,7 @@ const FeedbackTab = () => {
 
                 <h2 className="feedback-title">Feedback Form</h2>
                 <p className="feedback-subtitle">
-                  Found a bug? RateMyHusky's #1 fan? Let our devs know through this form.
+                  Spotted something off? Got ideas? We'd love to hear from you.
                 </p>
 
                 {error && <p className="feedback-error">{error}</p>}

@@ -276,9 +276,10 @@
 
 /* ---------- turnstile ---------- */
 .feedback-turnstile {
-  margin: 8px 0 4px;
+  margin: 12px 0 16px;
   display: flex;
   justify-content: center;
+  min-height: 70px;
 }
 
 /* ---------- submit ---------- */

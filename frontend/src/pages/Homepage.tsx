@@ -29,9 +29,9 @@ let wheelPoolLoaded = false;
 
 /* ---- animated stat counter ---- */
 const AnimatedStat = ({ value, label }: { value: string; label: string }) => {
-  const ref = useRef<HTMLDivElement>(null);
-  const [display, setDisplay] = useState('0');
-  const [hasAnimated, setHasAnimated] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const valueRef = useRef<HTMLSpanElement>(null);
+  const hasAnimated = useRef(false);
 
   // Parse "7,600+" → { num: 7600, suffix: "+" }
   const parsed = useRef({ num: 0, suffix: '' });
@@ -43,50 +43,39 @@ const AnimatedStat = ({ value, label }: { value: string; label: string }) => {
     }
   }, [value]);
 
-  const animate = useCallback(() => {
-    if (hasAnimated) return;
-    setHasAnimated(true);
-
-    const { num, suffix } = parsed.current;
-    const duration = 2000;
-    const start = performance.now();
-
-    const step = (now: number) => {
-      const elapsed = now - start;
-      const progress = Math.min(elapsed / duration, 1);
-      // Ease out cubic
-      const eased = 1 - Math.pow(1 - progress, 3);
-      const current = Math.round(eased * num);
-      setDisplay(current.toLocaleString() + suffix);
-
-      if (progress < 1) {
-        requestAnimationFrame(step);
-      }
-    };
-
-    requestAnimationFrame(step);
-  }, [hasAnimated]);
-
   useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
+    const container = containerRef.current;
+    const el = valueRef.current;
+    if (!container || !el) return;
 
     const observer = new IntersectionObserver(
       ([entry]) => {
-        if (entry.isIntersecting) {
-          animate();
+        if (entry.isIntersecting && !hasAnimated.current) {
+          hasAnimated.current = true;
           observer.disconnect();
+
+          const { num, suffix } = parsed.current;
+          const duration = 2000;
+          const start = performance.now();
+
+          const step = (now: number) => {
+            const progress = Math.min((now - start) / duration, 1);
+            const eased = 1 - Math.pow(1 - progress, 3);
+            el.textContent = Math.round(eased * num).toLocaleString() + suffix;
+            if (progress < 1) requestAnimationFrame(step);
+          };
+          requestAnimationFrame(step);
         }
       },
       { threshold: 0.5 }
     );
-    observer.observe(el);
+    observer.observe(container);
     return () => observer.disconnect();
-  }, [animate]);
+  }, [value]);
 
   return (
-    <div className="stat-item" ref={ref}>
-      <span className="stat-value">{display}</span>
+    <div className="stat-item" ref={containerRef}>
+      <span className="stat-value" ref={valueRef}>0</span>
       <span className="stat-label">{label}</span>
     </div>
   );

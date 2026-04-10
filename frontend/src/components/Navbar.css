@@ -244,7 +244,8 @@
   height: 2.5px;
   background: #333;
   border-radius: 2px;
-  transition: all 0.3s ease;
+  transition: transform 0.3s ease, opacity 0.3s ease;
+  will-change: transform, opacity;
 }
 
 .hamburger.open span:nth-child(1) {
@@ -327,7 +328,7 @@
   .navbar-right {
     position: fixed;
     top: 0;
-    right: -280px;
+    right: 0;
     width: 260px;
     height: 100dvh;
     flex-direction: column;
@@ -337,12 +338,14 @@
     overflow-y: auto;
     background: #fff;
     box-shadow: -4px 0 20px rgba(0,0,0,0.1);
-    transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transform: translateX(100%);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    will-change: transform;
     z-index: 110;
   }
 
   .navbar-right.show {
-    right: 0;
+    transform: translateX(0);
   }
 
   .nav-links-container {

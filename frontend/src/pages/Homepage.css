@@ -81,6 +81,7 @@
   padding: 48px 24px;
   background: #d6394c;
   color: #fff;
+  contain: content;
 }
 
 .stat-item {
@@ -93,6 +94,7 @@
 .stat-value {
   font-size: 2rem;
   font-weight: 900;
+  font-variant-numeric: tabular-nums;
 }
 
 .stat-label {
