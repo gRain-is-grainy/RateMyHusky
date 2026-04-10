@@ -2031,6 +2031,23 @@ def submit_feedback():
     feedback_type = data.get("feedbackType", "").strip()
     description = data.get("description", "").strip()
     reply_email = data.get("email", "").strip()
+    turnstile_token = data.get("turnstileToken", "").strip()
+
+    # Verify Cloudflare Turnstile CAPTCHA
+    turnstile_secret = os.getenv("TURNSTILE_SECRET_KEY")
+    if turnstile_secret:
+        if not turnstile_token:
+            return jsonify({"error": "CAPTCHA verification required"}), 400
+        try:
+            verify_resp = http_requests.post(
+                "https://challenges.cloudflare.com/turnstile/v0/siteverify",
+                data={"secret": turnstile_secret, "response": turnstile_token, "remoteip": get_remote_address()},
+                timeout=5,
+            )
+            if not verify_resp.ok or not verify_resp.json().get("success"):
+                return jsonify({"error": "CAPTCHA verification failed"}), 403
+        except Exception:
+            return jsonify({"error": "CAPTCHA verification failed"}), 500
 
     if not feedback_type or not description:
         return jsonify({"error": "feedbackType and description are required"}), 400

@@ -323,6 +323,7 @@ export async function submitFeedback(payload: {
   feedbackType: string;
   description: string;
   email?: string;
+  turnstileToken?: string;
 }): Promise<void> {
   const res = await fetch(`${API_BASE}/api/feedback`, {
     method: "POST",
