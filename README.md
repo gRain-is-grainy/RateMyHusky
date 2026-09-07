@@ -62,36 +62,25 @@ Choosing classes at Northeastern means juggling TRACE PDFs, RateMyProfessors tab
 
 ## Architecture
 
-```
-                        ┌────────────────────────────────────────┐
-                        │              Vercel (CDN)              │
-                        │   React 19 · TypeScript · Vite · SPA   │
-                        └───────────────────┬────────────────────┘
-                                            │ REST
-                        ┌───────────────────▼────────────────────┐
-                        │            Railway (Flask)             │
-                        │  catalog / profiles / compare / auth   │
-                        │  ┌──────────────────────────────────┐  │
-                        │  │           Ask pipeline           │  │
-                        │  │ gate → retrieve (FTS + vector    │  │
-                        │  │ RRF) → LLM synth → validate →    │  │
-                        │  │ cache · throttle · abuse strikes │  │
-                        │  └──────────────────────────────────┘  │
-                        └───────────────────┬────────────────────┘
-                                            │ psycopg2
-                        ┌───────────────────▼────────────────────┐
-                        │         CockroachDB Serverless         │
-                        │  professors · courses · reviews ·      │
-                        │  evidence + VECTOR(384) embeddings     │
-                        └────────────────────────────────────────┘
+```mermaid
+flowchart LR
+    U["Student"] --> SPA["React 19 SPA on Vercel"]
+    SPA --> API["Flask API on Railway"]
+    API --> CAT["Catalog, profiles, compare, bookmarks"]
+    API --> ASK["Ask pipeline: gate, hybrid retrieval, synthesis, validation"]
+    API -. "sign-in redirect" .-> OAUTH["Google OAuth 2.0"]
+    ASK --> AI["Groq LLMs and ONNX BGE-small embeddings"]
+    CAT --> DB[("CockroachDB Serverless")]
+    ASK --> DB
 
-     Offline pipeline:  scrapers (TRACE · RMP · Reddit) → professor matching →
-     sentiment scoring → evidence build & dedupe → ONNX embedding backfill
+    SCRAPE["TRACE, RMP, and Reddit scrapers"] --> MATCH["Professor matching and sentiment scoring"]
+    MATCH --> EVID["Evidence build, dedupe, and embedding backfill"]
+    EVID --> DB
 ```
 
 **AI stack:** Groq-hosted Llama 3.1 8B as the input gate/classifier, GPT-OSS-120B for answer synthesis, and BGE-small-en-v1.5 (INT8 ONNX, pure `onnxruntime` — no torch) for query/document embeddings.
 
-## Tech Stack
+### Main technologies
 
 | Layer | Technology |
 |---|---|
@@ -102,6 +91,32 @@ Choosing classes at Northeastern means juggling TRACE PDFs, RateMyProfessors tab
 | Auth | Google OAuth 2.0, JWT |
 | Data pipeline | Python scrapers, professor-mention matching, sentiment scoring, embedding backfill |
 | Hosting | Vercel (frontend) · Railway (backend) |
+
+### Repository layout
+
+```text
+.
+├── frontend/                  # React 19 + TypeScript SPA (Vercel)
+│   └── src/
+│       ├── pages/             #   Homepage, catalogs, profiles, compare,
+│       │                      #   Account + AccountBookmarks
+│       ├── components/        #   SearchBar (+ Ask mode), breadcrumbs,
+│       │                      #   BookmarkButton, Navbar, ...
+│       ├── context/           #   BookmarksContext (global bookmark state)
+│       ├── api/               #   Typed backend client
+│       └── utils/             #   Ask session persistence, citation pinning
+├── backend/                   # Flask API (Railway)
+│   ├── server.py              #   Routes, auth, connection pool
+│   ├── bookmarks.py           #   Bookmark add/remove/list (pure functions)
+│   ├── rag/                   #   Ask pipeline: gate, retrieve, answer,
+│   │   │                      #   validate, cache, throttle, abuse,
+│   │   │                      #   ONNX BGE-small query embeddings
+│   │   └── eval/              #   Retrieval eval sets + RAG metrics
+│   └── Better_Scraper/        #   TRACE/RMP scrapers + CSV outputs
+└── scraper/                   # Reddit corpus + evidence/embedding pipeline
+    ├── trace_pipeline/        #   Bluera TRACE per-term scrape → ingest → finalize
+    └── applyweb_pipeline/     #   ApplyWeb XLS scrape → parse → ingest → verify
+```
 
 ## Getting Started
 
@@ -143,30 +158,6 @@ npm run dev                  # → http://localhost:5173
 ```
 
 The dev frontend talks to the backend on port 5001 automatically.
-
-## Project Structure
-
-```text
-.
-├── frontend/                  # React 19 + TypeScript SPA (Vercel)
-│   └── src/
-│       ├── pages/             #   Homepage, catalogs, profiles, compare,
-│       │                      #   Account + AccountBookmarks
-│       ├── components/        #   SearchBar (+ Ask mode), breadcrumbs,
-│       │                      #   BookmarkButton, Navbar, ...
-│       ├── context/           #   BookmarksContext (global bookmark state)
-│       ├── api/               #   Typed backend client
-│       └── utils/             #   Ask session persistence, citation pinning
-├── backend/                   # Flask API (Railway)
-│   ├── server.py              #   Routes, auth, connection pool
-│   ├── bookmarks.py           #   Bookmark add/remove/list (pure functions)
-│   ├── rag/                   #   Ask pipeline: gate, retrieve, answer,
-│   │   │                      #   validate, cache, throttle, abuse,
-│   │   │                      #   ONNX BGE-small query embeddings
-│   │   └── eval/              #   Retrieval eval sets + RAG metrics
-│   └── Better_Scraper/        #   TRACE/RMP scrapers + CSV outputs
-└── scraper/                   # Reddit corpus + evidence/embedding pipeline
-```
 
 ---
 
