@@ -10,7 +10,7 @@ from eval_common import (connect, make_query_fns, unit_id, entity_args,
                          QUESTIONS_PATH, POOL_PATH)
 from rag.chat_retrieve import _entity_filter, _lexical_candidates, _vector_candidates, fetch_evidence
 
-EXPECTED_MODES = {"professor": 14, "course": 10, "compare": 6}
+EXPECTED_MODES = {"professor": 29, "course": 20, "compare": 6}
 MIN_EVIDENCE = 20
 WARN_EVIDENCE = 40
 POOL_DEPTH = 20
@@ -155,12 +155,12 @@ def selftest():
         return []
 
     good = ([{"id": f"p{i:02d}", "mode": "professor", "question": "Is X hard?",
-              "entities": [{"kind": "professor", "slug": "real-prof"}]} for i in range(14)]
+              "entities": [{"kind": "professor", "slug": "real-prof"}]} for i in range(EXPECTED_MODES["professor"])]
             + [{"id": f"c{i:02d}", "mode": "course", "question": "Is Y hard?",
-                "entities": [{"kind": "course", "code": "CS3500"}]} for i in range(10)]
+                "entities": [{"kind": "course", "code": "CS3500"}]} for i in range(EXPECTED_MODES["course"])]
             + [{"id": f"x{i:02d}", "mode": "compare", "question": "X or Y?",
                 "entities": [{"kind": "professor", "slug": "real-prof"},
-                             {"kind": "course", "code": "CS3500"}]} for i in range(6)])
+                             {"kind": "course", "code": "CS3500"}]} for i in range(EXPECTED_MODES["compare"])])
     check("valid set passes", validate_questions(good, fake_query) == [])
 
     bad = [dict(good[0], id=good[1]["id"])] + good[1:]
