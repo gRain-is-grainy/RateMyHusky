@@ -65,17 +65,18 @@ Choosing classes at Northeastern means juggling TRACE PDFs, RateMyProfessors tab
 ```mermaid
 flowchart LR
     U["Student"] --> SPA["React 19 SPA on Vercel"]
-    SPA --> API["Flask API on Railway"]
-    API --> CAT["Catalog, profiles, compare, bookmarks"]
+    SPA --> API["Flask API on Railway<br/>catalog, profiles, compare, bookmarks"]
     API --> ASK["Ask pipeline: gate, hybrid retrieval, synthesis, validation"]
     API -. "sign-in redirect" .-> OAUTH["Google OAuth 2.0"]
     ASK --> AI["Groq LLMs and ONNX BGE-small embeddings"]
-    CAT --> DB[("CockroachDB Serverless")]
+    API --> DB[("CockroachDB Serverless")]
     ASK --> DB
 
-    SCRAPE["TRACE, RMP, and Reddit scrapers"] --> MATCH["Professor matching and sentiment scoring"]
-    MATCH --> EVID["Evidence build, dedupe, and embedding backfill"]
-    EVID --> DB
+    SCRAPE["Scrapers: TRACE via Bluera + ApplyWeb (Law), RMP, Reddit"] --> INGEST["Match, score, dedupe"]
+    INGEST --> PRECOMP["precompute - rebuilds the catalog tables the API reads"]
+    PRECOMP --> EMBED["Evidence build + BGE-small embedding backfill"]
+    PRECOMP --> DB
+    EMBED --> DB
 ```
 
 **AI stack:** Groq-hosted Llama 3.1 8B as the input gate/classifier, GPT-OSS-120B for answer synthesis, and BGE-small-en-v1.5 (INT8 ONNX, pure `onnxruntime` — no torch) for query/document embeddings.
