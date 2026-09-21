@@ -230,6 +230,21 @@ TRACE_BACKFILL_PROBES = (
 )
 
 
+def _trace_tables_exist(conn):
+    """True when every TRACE table the probes need is present in the DB."""
+    cur = conn.cursor()
+    try:
+        tables = {t for t, _ in TRACE_BACKFILL_PROBES}
+        cur.execute("""
+            SELECT table_name FROM information_schema.tables
+            WHERE table_schema = 'public' AND table_name = ANY(%s)
+        """, (list(tables),))
+        found = {r[0] for r in cur.fetchall()}
+        return tables <= found
+    finally:
+        cur.close()
+
+
 def trace_needs_maintenance(conn):
     """Safety net for REFRESH_TRACE=false: detect un-processed TRACE rows.
 
@@ -238,7 +253,13 @@ def trace_needs_maintenance(conn):
     any of them means TRACE data landed but was never backfilled. If a column
     doesn't exist yet (first run), maintenance is obviously needed. Cheap: a few
     EXISTS probes, run only when the flag would otherwise skip.
+
+    If the TRACE tables are absent entirely (removed from the DB), there is
+    nothing to maintain — return False so the run proceeds RMP-only.
     """
+    if not _trace_tables_exist(conn):
+        print("  Safety net: TRACE tables absent — skipping TRACE maintenance.")
+        return False
     for table, col in TRACE_BACKFILL_PROBES:
         cur = conn.cursor()
         try:
