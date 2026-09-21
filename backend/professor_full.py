@@ -15,6 +15,7 @@ path (full scores + radar) stays in server.py.
 
 import re
 
+import moderation
 from prof_aliases import ALIAS_MAP
 
 
@@ -176,10 +177,10 @@ def build_reviews(slug, prof, trace_course_rows, query, sanitize,
     """
     name_key = prof["name_key"]
 
-    review_rows = query("""
+    review_rows = query(f"""
         SELECT course, quality, difficulty, date, tags, attendance, grade,
                textbook, online_class, comment
-        FROM rmp_reviews WHERE name_key = %s
+        FROM rmp_reviews WHERE name_key = %s{moderation.sql_filter()}
     """, (name_key,))
     reviews = []
     for r in review_rows:
@@ -244,7 +245,7 @@ def build_reviews(slug, prof, trace_course_rows, query, sanitize,
                         "courseId": item["courseId"],
                     })
 
-    reddit_mentions = fetch_reddit_mentions(slug, query)
+    reddit_mentions = fetch_reddit_mentions(slug, query, moderation.sql_filter("t"))
     for m in reddit_mentions:
         m["body"] = sanitize(m["body"]) if m["body"] else ""
 
@@ -270,7 +271,7 @@ def build_full(slug, query, query_one, sanitize,
     not exist (caller maps None to a 404).
     """
     if fetch_reddit_mentions is None:
-        def fetch_reddit_mentions(_slug, _q):
+        def fetch_reddit_mentions(_slug, _q, _mod_filter=""):
             return []
 
     prof = _resolve_professor(slug, query_one)
