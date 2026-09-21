@@ -70,11 +70,12 @@ class RecordingQuery:
         return sum(1 for c in self.calls if table.lower() in c.lower())
 
 
-def _fake_fetch_reddit_mentions(slug, query_fn):
-    # Mirror server's fetch_reddit_mentions: a real round-trip through query().
+def _fake_fetch_reddit_mentions(slug, query_fn, mod_filter=""):
+    # Mirror server's fetch_reddit_mentions: a real round-trip through query(),
+    # moderation predicate included, so the round-trip count stays honest.
     rows = query_fn("SELECT t.body, t.subreddit FROM reddit_mentions m "
                     "JOIN reddit_text t ON t.source_id = m.source_id "
-                    "WHERE m.professor_slug = %s", (slug,))
+                    f"WHERE m.professor_slug = %s{mod_filter}", (slug,))
     return [{"body": r.get("body") or "", "sentiment": r.get("sentiment"),
              "sentiment_score": r.get("sentiment_score"), "score": r.get("reddit_score"),
              "subreddit": r.get("subreddit"), "permalink": r.get("permalink"),
