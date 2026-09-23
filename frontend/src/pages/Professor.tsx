@@ -928,8 +928,8 @@ const [showCourseTip, setShowCourseTip] = useState(() => localStorage.getItem('p
   const seoDescription = profile.avgRating !== null
     ? `${profile.name} professor reviews and ratings: ${profile.avgRating.toFixed(1)}/5 from ${profile.totalRatings} student reviews at Northeastern` +
       (profile.wouldTakeAgainPct != null ? ` (${profile.wouldTakeAgainPct}% would take again)` : '') +
-      `. TRACE + RateMyProfessor + Reddit.`
-    : `${profile.name}, Northeastern ${profile.department} professor: no student ratings yet. TRACE + RateMyProfessor + Reddit.`;
+      `. Student reviews + RMP + Reddit.`
+    : `${profile.name}, Northeastern ${profile.department} professor: no student ratings yet. Student reviews + RMP + Reddit.`;
   const profCanonical = `https://ratemyhusky.com/professors/${slug}`;
   const profJsonLd = {
     '@context': 'https://schema.org',
@@ -1050,10 +1050,10 @@ const [showCourseTip, setShowCourseTip] = useState(() => localStorage.getItem('p
                     other units rather than a third source. */}
                 {stats.rmpAdjusted != null && (
                   <span className="prof-stat-breakdown-sub">
-                    on the TRACE scale: {stats.rmpAdjusted.toFixed(2)}
+                    on the student review scale: {stats.rmpAdjusted.toFixed(2)}
                   </span>
                 )}
-                {stats.traceRating !== null && <span>TRACE: {stats.traceRating.toFixed(2)}</span>}
+                {stats.traceRating !== null && <span>Student Reviews: {stats.traceRating.toFixed(2)}</span>}
               </div>
               {/* Why Overall is not simply one of the numbers above it. Both
                   cases need saying: this card, like the GOATED column, is on the
@@ -1068,14 +1068,14 @@ const [showCourseTip, setShowCourseTip] = useState(() => localStorage.getItem('p
                   the same arithmetic. */}
               {stats.rmpRating !== null && stats.traceRating !== null ? (
                 <div className="prof-stat-breakdown-note">
-                  RateMyProfessors scores run lower than TRACE scores, so the RMP
-                  score is converted to the TRACE scale first. The two are then
+                  RateMyProfessors scores run lower than student review scores, so
+                  the RMP score is converted to the student review scale first. The two are then
                   averaged, and the one with more responses counts for more.
                 </div>
               ) : stats.rmpRating !== null ? (
                 <div className="prof-stat-breakdown-note">
-                  No TRACE scores here, so the RMP score is converted to the TRACE
-                  scale to keep it comparable.
+                  No student review scores here, so the RMP score is converted to
+                  the student review scale to keep it comparable.
                 </div>
               ) : null}
             </div>
@@ -1167,7 +1167,7 @@ const [showCourseTip, setShowCourseTip] = useState(() => localStorage.getItem('p
       {!user && (profile?.traceCourses?.length ?? 0) > 0 && (
         <section className="prof-radar-section">
           <div className="prof-radar-header">
-            <h2 className="prof-section-title">TRACE In-Depth Evaluation</h2>
+            <h2 className="prof-section-title">In-Depth Student Evaluation</h2>
           </div>
           <div className="prof-trace-paywall">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="paywall-lock-icon">
@@ -1183,7 +1183,7 @@ const [showCourseTip, setShowCourseTip] = useState(() => localStorage.getItem('p
       {radarData && user && (
         <section className="prof-radar-section">
           <div className="prof-radar-header">
-            <h2 className="prof-section-title">TRACE In-Depth Evaluation</h2>
+            <h2 className="prof-section-title">In-Depth Student Evaluation</h2>
             {profile?.radarTermTitle && (
               <span className="prof-radar-term">{cleanTerm(profile.radarTermTitle)}</span>
             )}
@@ -1556,8 +1556,8 @@ const [showCourseTip, setShowCourseTip] = useState(() => localStorage.getItem('p
               <span className="prof-review-tab-short">RMP ({filteredRmpReviews.length})</span>
             </button>
             <button className={`prof-review-tab ${reviewTab === 'trace' ? 'active' : ''}`} onClick={() => setReviewTab('trace')}>
-              <span className="prof-review-tab-full">TRACE ({groupedTrace.reduce((acc, g) => acc + g.count, 0)})</span>
-              <span className="prof-review-tab-short">TRACE ({groupedTrace.reduce((acc, g) => acc + g.count, 0)})</span>
+              <span className="prof-review-tab-full">Student Reviews ({groupedTrace.reduce((acc, g) => acc + g.count, 0)})</span>
+              <span className="prof-review-tab-short">Students ({groupedTrace.reduce((acc, g) => acc + g.count, 0)})</span>
             </button>
             <button className={`prof-review-tab ${reviewTab === 'reddit' ? 'active' : ''}`} onClick={() => setReviewTab('reddit')}>
               <span className="prof-review-tab-full">Reddit ({redditMentions.length})</span>
