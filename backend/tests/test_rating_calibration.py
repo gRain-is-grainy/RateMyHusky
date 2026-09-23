@@ -177,8 +177,17 @@ def test_calibration_matches_a_direct_fit_of_the_same_rows():
     assert got == pytest.approx(want, abs=1e-9)
 
 
-def test_calibration_falls_back_on_an_empty_catalog():
+def test_calibration_is_identity_when_the_catalog_has_no_trace():
+    # TRACE removed from the DB: there is no TRACE scale to project RMP onto.
     got = server.rating_calibration(lambda sql, params: [])
+    assert got == rating_scale.NO_TRACE_CALIBRATION
+    assert rating_scale.project_rmp(1.0, got) == 1.0
+
+
+def test_calibration_falls_back_when_trace_exists_but_is_thin():
+    # No well-evidenced pair, but some TRACE rating is in the catalog.
+    got = server.rating_calibration(
+        lambda sql, params: [{"one": 1}] if "LIMIT 1" in sql else [])
     assert got == rating_scale.FALLBACK_CALIBRATION
 
 

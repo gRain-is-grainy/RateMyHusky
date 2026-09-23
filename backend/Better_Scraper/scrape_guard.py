@@ -90,6 +90,10 @@ STALE_FLOOR_RATIO = 1.45
 
 RELATIVE_FLOOR_PCT = 98
 
+# Not required: precompute.py only reads these while the matching DB tables
+# exist. Floor-checked when present, but left out of the printed listing.
+OPTIONAL = {"trace_scores", "trace_comments"}
+
 # csv's default 128KB field cap is smaller than some TRACE comment blobs.
 csv.field_size_limit(min(sys.maxsize, 2**31 - 1))
 
@@ -162,9 +166,11 @@ def check(counts, baseline=None, accept_lower=False):
     for name in FILES:
         count = counts.get(name)
         if count is None:
+            if name in OPTIONAL:
+                continue
             problems.append(
                 f"Missing required data file: {name}. "
-                "precompute.py reads all six; aborting before DB writes."
+                "precompute.py reads it; aborting before DB writes."
             )
             continue
 
@@ -202,7 +208,8 @@ def _cmd_baseline(args):
     with open(args.out, "w", encoding="utf-8") as fh:
         json.dump(present, fh, indent=2, sort_keys=True)
     for name in FILES:
-        print(f"  {name}: {counts[name] if counts[name] is not None else 'absent'}")
+        if name not in OPTIONAL:
+            print(f"  {name}: {counts[name] if counts[name] is not None else 'absent'}")
     print(f"Baseline written to {args.out}")
     return 0
 
@@ -248,6 +255,8 @@ def _cmd_check(args):
 
     counts = collect_counts(args.data_dir)
     for name in FILES:
+        if name in OPTIONAL:
+            continue
         current = counts[name]
         was = (baseline or {}).get(name)
         print(f"  {name}: {current if current is not None else 'absent'}"

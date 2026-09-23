@@ -245,6 +245,26 @@ def _trace_tables_exist(conn):
         cur.close()
 
 
+def empty_trace_scores():
+    """A zero-row trace_scores frame, typed so the joins on trace_courses work.
+
+    Typed rather than bare columns because pandas refuses to merge an object
+    column against trace_courses' int64 ids, even with no rows on one side.
+    """
+    ints = ["course_id", "instructor_id", "term_id", "completed",
+            "count_1", "count_2", "count_3", "count_4", "count_5"]
+    frame = {c: pd.Series(dtype="int64") for c in ints}
+    frame["question"] = pd.Series(dtype=object)
+    frame["mean"] = pd.Series(dtype=float)
+    return pd.DataFrame(frame)
+
+
+def empty_trace_comments():
+    """A zero-row trace_comments frame with the columns the build reads."""
+    return pd.DataFrame({"course_url": pd.Series(dtype=object),
+                         "comment": pd.Series(dtype=object)})
+
+
 def trace_needs_maintenance(conn):
     """Safety net for REFRESH_TRACE=false: detect un-processed TRACE rows.
 
@@ -695,6 +715,7 @@ def apply_counted_rmp_rating(rmp_profs, review_keys, review_quality):
 # measure_calibration and test_rating_blend read them where they always did.
 from rating_scale import (                                        # noqa: E402
     FALLBACK_CALIBRATION,      # rmp ~ slope * trace + intercept
+    NO_TRACE_CALIBRATION,      # identity, for when there is no TRACE at all
     FALLBACK_VARIANCES,        # per-response variance: RMP, TRACE
     CALIBRATION_MIN_RMP,       # what counts as well-evidenced for the fit
     CALIBRATION_MIN_TRACE,
@@ -832,7 +853,13 @@ def measure_calibration(rmp_profs):
     Only well-evidenced professors are used: thin samples on either side are
     mostly noise, and including them flattens the slope toward zero, which would
     understate how much wider the RMP scale is.
+
+    With no TRACE data at all there is no scale to project onto, so RMP stays on
+    its own (NO_TRACE_CALIBRATION) rather than going through the fallback fit.
     """
+    if not has_trace_data(rmp_profs).any():
+        print("No TRACE ratings: RMP stays on its own scale (identity calibration)")
+        return NO_TRACE_CALIBRATION
     fit_rows = (has_rmp_data(rmp_profs) & has_trace_data(rmp_profs)
                 & (rmp_profs["num_ratings"] >= CALIBRATION_MIN_RMP)
                 & (rmp_profs["trace_reviews"] >= CALIBRATION_MIN_TRACE))
@@ -920,8 +947,18 @@ def main():
     # Effective TRACE decision: honor REFRESH_TRACE, but never skip when there is
     # un-backfilled TRACE data in the DB (self-heals a forgotten full run after a
     # manual TRACE re-scrape). The DB probe runs only when the flag says skip.
-    do_trace = REFRESH_TRACE or trace_needs_maintenance(conn)
-    if not REFRESH_TRACE:
+    #
+    # TRACE scores and comments are no longer served (Sept 2026: the TRACE tables
+    # were removed from the DB). With the tables gone the build reads no TRACE
+    # scores or comments from any source, so a routine refresh cannot republish
+    # the ratings and comment counts the removal took down. trace_courses is
+    # still read: it is the course/instructor listing behind the TRACE-only
+    # professors and course_catalog, and holds no evaluations.
+    trace_in_db = _trace_tables_exist(conn)
+    do_trace = trace_in_db and (REFRESH_TRACE or trace_needs_maintenance(conn))
+    if not trace_in_db:
+        print("TRACE tables absent: building without TRACE scores/comments; TRACE maintenance skipped")
+    elif not REFRESH_TRACE:
         print(f"REFRESH_TRACE=false; TRACE maintenance {'forced by safety net' if do_trace else 'skipped'}")
 
     # Read from local CSVs (much faster than downloading from CRDB)
@@ -935,10 +972,13 @@ def main():
     print(f"  trace_courses: {len(tc)}")
     # The big TRACE exports may arrive zipped — see csv_store. pandas reads a
     # .zip straight from the path, so resolving it is the whole job.
-    ts = pd.read_csv(csv_store.resolve(csv_dir, "trace_scores.csv"))
-    print(f"  trace_scores: {len(ts)}")
-    tcomments = pd.read_csv(csv_store.resolve(csv_dir, "trace_comments.csv"))
-    print(f"  trace_comments: {len(tcomments)}")
+    if trace_in_db:
+        ts = pd.read_csv(csv_store.resolve(csv_dir, "trace_scores.csv"))
+        tcomments = pd.read_csv(csv_store.resolve(csv_dir, "trace_comments.csv"))
+    else:
+        ts, tcomments = empty_trace_scores(), empty_trace_comments()
+        print(f"  trace_scores: {len(ts)}")
+        print(f"  trace_comments: {len(tcomments)}")
     photos = pd.read_csv(os.path.join(csv_dir, "professor_photos.csv"))
     print(f"  professor_photos: {len(photos)}")
 
@@ -1124,8 +1164,10 @@ def main():
         total_w = w.sum()
         return (v * w).sum() / total_w if total_w > 0 else np.nan
 
-    trace_avg = merged.groupby("name_key").apply(weighted_avg, include_groups=False).reset_index().rename(columns={0: "trace_overall"})
-    trace_lookup = dict(zip(trace_avg["name_key"], trace_avg["trace_overall"]))
+    trace_lookup = {}
+    if not merged.empty:  # apply() on no groups returns no value column
+        trace_avg = merged.groupby("name_key").apply(weighted_avg, include_groups=False).reset_index().rename(columns={0: "trace_overall"})
+        trace_lookup = dict(zip(trace_avg["name_key"], trace_avg["trace_overall"]))
     print(f"Matched {len(trace_lookup)} instructors to TRACE overall scores")
 
     # ── TRACE hours per week (weighted avg of hours question) ──
@@ -1188,13 +1230,17 @@ def main():
     # TRACE comments
     tc_id_cols = tc[["course_id", "instructor_id", "term_id", "name_key"]].drop_duplicates()
     tcomments_parsed = tcomments[tcomments["comment"].notna() & (tcomments["comment"].astype(str).str.strip() != "")].copy()
-    tcomments_parsed[["_cid", "_iid", "_tid"]] = tcomments_parsed["course_url"].str.extractall(r"sp=(\d+)").unstack().droplevel(0, axis=1)[[0, 1, 2]].astype(float)
-    tcomments_parsed = tcomments_parsed.dropna(subset=["_cid", "_iid", "_tid"])
-    tcomments_parsed[["_cid", "_iid", "_tid"]] = tcomments_parsed[["_cid", "_iid", "_tid"]].astype(int)
-    trace_with_nk = tcomments_parsed.merge(
-        tc_id_cols, left_on=["_cid", "_iid", "_tid"], right_on=["course_id", "instructor_id", "term_id"], how="inner"
-    )
-    trace_comment_counts = trace_with_nk.groupby("name_key").size()
+    if tcomments_parsed.empty:
+        # extractall on no rows yields no 0/1/2 columns to select.
+        trace_comment_counts = pd.Series(dtype="int64")
+    else:
+        tcomments_parsed[["_cid", "_iid", "_tid"]] = tcomments_parsed["course_url"].str.extractall(r"sp=(\d+)").unstack().droplevel(0, axis=1)[[0, 1, 2]].astype(float)
+        tcomments_parsed = tcomments_parsed.dropna(subset=["_cid", "_iid", "_tid"])
+        tcomments_parsed[["_cid", "_iid", "_tid"]] = tcomments_parsed[["_cid", "_iid", "_tid"]].astype(int)
+        trace_with_nk = tcomments_parsed.merge(
+            tc_id_cols, left_on=["_cid", "_iid", "_tid"], right_on=["course_id", "instructor_id", "term_id"], how="inner"
+        )
+        trace_comment_counts = trace_with_nk.groupby("name_key").size()
 
     # Kept apart rather than combined into one per-name total: a fuzzy-matched
     # professor's two halves are filed under two different names, so they can

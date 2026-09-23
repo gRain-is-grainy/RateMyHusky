@@ -24,6 +24,12 @@ import math
 # there is no neutral choice, since identity would assert the scales match.
 FALLBACK_CALIBRATION = (2.38, -6.83)
 
+# Used instead when there is no TRACE data at all (removed from the DB): with no
+# TRACE scale to project onto, RMP's own scale is the only one, so the identity
+# is the honest mapping. Projecting through the fallback would show an RMP 1.00
+# as 3.29 against nothing.
+NO_TRACE_CALIBRATION = (1.0, 0.0)
+
 # Per-response variance: (RMP, TRACE). Measured on each source's own scale, so
 # they are not comparable as a ratio until slope^2 converts RMP's — see
 # rmp_weight_per_rating. Used when precompute could not measure them, and as the

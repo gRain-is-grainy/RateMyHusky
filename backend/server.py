@@ -36,7 +36,8 @@ from rag.chat_answer import generate, generate_course_list, generate_course_rank
 from professor_full import build_full, trace_key
 from rating_scale import (
     CALIBRATION_MIN_RMP, CALIBRATION_MIN_TRACE, FALLBACK_CALIBRATION,
-    FALLBACK_VARIANCES, fit_rma, project_rmp, rmp_weight_per_rating)
+    FALLBACK_VARIANCES, NO_TRACE_CALIBRATION, fit_rma, project_rmp,
+    rmp_weight_per_rating)
 import bookmarks
 import usage_alert
 
@@ -683,6 +684,12 @@ def rating_calibration(query_fn):
     pairs = [(r["trace_rating"], r["rmp_rating"]) for r in rows
              if r["rmp_rating"] is not None and r["trace_rating"] is not None]
     if not pairs:
+        # No well-evidenced pair: either TRACE is thin (keep the fallback) or it
+        # is gone from the catalog entirely, and then there is no TRACE scale to
+        # project onto — see NO_TRACE_CALIBRATION.
+        if not query_fn("SELECT 1 FROM professors_catalog "
+                        "WHERE trace_rating IS NOT NULL LIMIT 1", ()):
+            return NO_TRACE_CALIBRATION
         return FALLBACK_CALIBRATION
     fit = fit_rma([t for t, _ in pairs], [r for _, r in pairs])
     return FALLBACK_CALIBRATION if fit is None else fit

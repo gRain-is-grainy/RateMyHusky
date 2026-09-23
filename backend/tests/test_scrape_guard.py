@@ -131,12 +131,24 @@ def test_file_exactly_at_its_absolute_floor_passes():
 
 
 def test_missing_file_is_a_problem_even_when_every_other_file_is_healthy():
-    # precompute.py reads all six files; a missing one crashes it mid-run,
+    # precompute.py reads every required file; a missing one crashes it mid-run,
     # after the RMP load has already written to the DB.
-    problems = check(dict(HEALTHY, trace_scores=None), baseline=HEALTHY)
+    problems = check(dict(HEALTHY, trace_courses=None), baseline=HEALTHY)
     assert len(problems) == 1
-    assert "trace_scores" in problems[0]
+    assert "trace_courses" in problems[0]
     assert "issing" in problems[0]
+
+
+def test_trace_scores_and_comments_may_be_absent():
+    # precompute skips them once the DB tables are gone, so they are optional.
+    counts = dict(HEALTHY, trace_scores=None, trace_comments=None)
+    assert check(counts, baseline=HEALTHY) == []
+
+
+def test_optional_file_still_has_its_floor_when_present():
+    problems = check(dict(HEALTHY, trace_comments=10), baseline=HEALTHY)
+    assert len(problems) == 1
+    assert "trace_comments" in problems[0]
 
 
 def test_absolute_floors_track_the_healthy_counts():
@@ -250,5 +262,5 @@ def test_accept_lower_still_enforces_absolute_floors():
 
 
 def test_all_problems_are_reported_not_just_the_first():
-    counts = dict(HEALTHY, rmp_professors=10, rmp_reviews=10, trace_scores=None)
+    counts = dict(HEALTHY, rmp_professors=10, rmp_reviews=10, trace_courses=None)
     assert len(check(counts, baseline=HEALTHY)) == 3

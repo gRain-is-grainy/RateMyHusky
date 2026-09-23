@@ -22,6 +22,7 @@ from precompute import (
     CALIBRATION_MIN_TRACE,
     FALLBACK_CALIBRATION,
     FALLBACK_VARIANCES,
+    NO_TRACE_CALIBRATION,
     apply_blended_rating,
     blend_ratings,
     calibrate_rmp,
@@ -395,6 +396,13 @@ def test_measure_calibration_uses_only_well_evidenced_rows():
     slope, intercept = measure_calibration(_profs(rows))
     assert slope == pytest.approx(1.9, abs=0.01)
     assert intercept == pytest.approx(-4.71, abs=0.05)
+
+
+def test_measure_calibration_is_identity_without_any_trace():
+    profs = _profs([(4.0, 30, np.nan, 0), (1.0, 12, np.nan, 0)])
+    assert measure_calibration(profs) == NO_TRACE_CALIBRATION
+    apply_blended_rating(profs, NO_TRACE_CALIBRATION, VARS)
+    assert list(profs["avg_rating"]) == [4.0, 1.0]
 
 
 def test_measure_calibration_falls_back_on_a_thin_corpus():

@@ -39,8 +39,8 @@ jobs:
         working-directory: backend
         run: pip install -r requirements-data.txt
 
-      # Pull the CSV data store (TRACE data, photos, previous RMP data) into
-      # output_data. precompute.py reads all six CSVs from here; the RMP scrape
+      # Pull the CSV data store (photos, course listings, previous RMP data) into
+      # output_data. precompute.py reads its CSVs from here; the RMP scrape
       # below overwrites rmp_professors.csv / rmp_reviews.csv with fresh data.
       - name: Fetch data store
         env:
@@ -74,13 +74,13 @@ jobs:
             --file_path Better_Scraper/output_data/rmp_professors.csv
 
       # Guardrail: a broken/rate-limited scrape must not overwrite good data.
-      # scrape_guard enforces both layers over all six files — absolute floors
+      # scrape_guard enforces both layers over every file — absolute floors
       # (~80% of healthy, covering the first run) and a 98% floor against the
       # baseline above, which catches degraded scrapes that clear the absolute
-      # floor anyway. It also fails on a missing TRACE/photo file, since
-      # precompute.py reads all six and would otherwise crash mid-run with the
-      # RMP load already written. Logic and tests live in
-      # backend/tests/test_scrape_guard.py, so ci.yml exercises it on every push.
+      # floor anyway. It also fails on a missing file precompute.py reads, which
+      # would otherwise crash it mid-run with the RMP load already written.
+      # Logic and tests live in backend/tests/test_scrape_guard.py, so ci.yml
+      # exercises it on every push.
       - name: Sanity check scrape
         working-directory: backend
         env:
