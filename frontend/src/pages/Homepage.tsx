@@ -182,12 +182,12 @@ const RatingCell = ({ prof, isOpen, onToggle }: {
               is the same measurement in different units, not a third source. */}
           {prof.rmpAdjusted != null && (
             <div className="tooltip-row tooltip-row-sub">
-              <span className="tooltip-label">on the TRACE scale</span>
+              <span className="tooltip-label">on the student review scale</span>
               <span className="tooltip-value">{prof.rmpAdjusted.toFixed(2)}</span>
             </div>
           )}
           <div className="tooltip-row">
-            <span className="tooltip-label">TRACE</span>
+            <span className="tooltip-label">Student Reviews</span>
             <span className="tooltip-value">
               {prof.traceRating !== null ? prof.traceRating.toFixed(2) : '—'}
             </span>
@@ -227,14 +227,14 @@ const RatingCell = ({ prof, isOpen, onToggle }: {
               bug, so that case says outright that there is no TRACE score. */}
           {prof.rmpRating !== null && prof.traceRating !== null ? (
             <div className="tooltip-note">
-              RateMyProfessors scores run lower than TRACE scores, so the RMP score
-              is converted to the TRACE scale first. The two are then averaged, and
+              RateMyProfessors scores run lower than student review scores, so the
+              RMP score is converted to the student review scale first. The two are then averaged, and
               the one with more responses counts for more.
             </div>
           ) : prof.rmpRating !== null ? (
             <div className="tooltip-note">
-              This professor has no TRACE scores, so the RMP score is converted to
-              the TRACE scale to keep it comparable.
+              This professor has no student review scores, so the RMP score is
+              converted to the student review scale to keep it comparable.
             </div>
           ) : null}
         </div>
@@ -508,14 +508,14 @@ const Homepage = () => {
     <div className="homepage">
       <Seo
         title="RateMyHusky — Northeastern University Professor Reviews & Ratings"
-        description="Find the right Northeastern professor every semester. RateMyHusky combines TRACE evaluations and RateMyProfessor ratings and reviews in one place."
+        description="Find the right Northeastern professor every semester. RateMyHusky combines student reviews and RateMyProfessor ratings and reviews in one place."
         canonical="https://ratemyhusky.com/"
         jsonLd={{
           '@context': 'https://schema.org',
           '@type': 'WebSite',
           name: 'RateMyHusky',
           url: 'https://ratemyhusky.com/',
-          description: 'Northeastern University professor and course ratings combining TRACE evaluations and RateMyProfessor reviews.',
+          description: 'Northeastern University professor and course ratings combining student reviews and RateMyProfessor ratings.',
         }}
       />
 
@@ -562,7 +562,7 @@ const Homepage = () => {
           Find the <span>right professor</span>, every semester
         </h1>
         <p className="hero-subtitle">
-          TRACE evaluations and RateMyProfessor ratings, all in one place.
+          Student reviews and RateMyProfessor ratings, all in one place.
         </p>
 
         <SearchBar forceAsk={askTrigger} restoreAsk={(location.state as { restoreAsk?: boolean } | null)?.restoreAsk} />
