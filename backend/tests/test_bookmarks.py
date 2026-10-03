@@ -20,7 +20,7 @@ class FakeDb:
         self.professors = {
             "olin-guha": {"slug": "olin-guha", "name": "Olin Guha", "department": "Khoury",
                           "college": "CS", "avg_rating": 4.2, "rmp_rating": 4.1,
-                          "trace_rating": 4.3, "total_reviews": 31, "total_comments": 5,
+                          "total_reviews": 31, "total_comments": 5,
                           "would_take_again_pct": 88.0, "image_url": None,
                           "focus_x": None, "focus_y": None},
         }

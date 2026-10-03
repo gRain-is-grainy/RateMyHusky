@@ -41,22 +41,6 @@ def wants_ratings(text):
     """True when the listing question also asks about quality/ratings."""
     return bool(_RATINGS_RE.search(text or ""))
 
-def _course_overall_rating(code, query_fn):
-    """Weighted overall TRACE rating for one course code (same pattern as fetch_course_facts)."""
-    rows = query_fn("""
-        SELECT
-          SUM(CASE WHEN lower(ts.question) LIKE '%%overall%%' THEN CAST(ts.mean AS FLOAT) * CAST(ts.total_responses AS FLOAT) ELSE 0 END) AS o_w,
-          SUM(CASE WHEN lower(ts.question) LIKE '%%overall%%' THEN CAST(ts.total_responses AS INT) ELSE 0 END) AS o_r
-        FROM trace_scores ts
-        JOIN trace_courses tc ON ts.course_id = tc.course_id
-          AND ts.instructor_id = tc.instructor_id AND ts.term_id = tc.term_id
-        WHERE tc.course_code = %s
-    """, (_norm_course_code(code),))
-    if not rows:
-        return None
-    w = float(rows[0].get("o_w") or 0); r = float(rows[0].get("o_r") or 0)
-    return round(w / r, 2) if r > 0 else None
-
 def fetch_courses_by_topic(topic, query_fn, limit=8, with_ratings=False):
     """Catalog courses whose search_text matches the topic. Reuses the /api/search course
     query. Per-course rating lookups happen ONLY when with_ratings is True."""
@@ -68,15 +52,16 @@ def fetch_courses_by_topic(topic, query_fn, limit=8, with_ratings=False):
         return []
     like = f"%{topic}%"
     rows = query_fn("""
-        SELECT code, name, department FROM course_catalog
+        SELECT code, name, department, avg_rating FROM course_catalog
         WHERE search_text LIKE %s
         ORDER BY CASE WHEN lower(code) LIKE %s THEN 0 ELSE 1 END, code
         LIMIT %s
     """, (like, f"{topic}%", limit))
     courses = [{"code": r["code"], "name": r["name"], "department": r.get("department")} for r in rows]
     if with_ratings:
-        for c in courses:
-            c["rating"] = _course_overall_rating(c["code"], query_fn)
+        for c, r in zip(courses, rows):
+            avg = r.get("avg_rating")
+            c["rating"] = round(float(avg), 2) if avg is not None else None
         courses.sort(key=lambda c: (c.get("rating") is not None, c.get("rating") or 0), reverse=True)
     return courses
 
@@ -107,16 +92,13 @@ def resolve_course_by_name(name, query_fn, limit=6):
 
 # Superlative / ranking questions: "which CS course has the highest rating", "easiest math
 # course", "hardest cs class". metric + direction come from the ranking word; subject is the
-# course-prefix token. The metric maps to the TRACE question LIKE term.
-_METRIC_LIKE = {"rating": "%overall%", "difficulty": "%challeng%", "hours": "%hours%"}
+# course-prefix token. Metrics are the RMP ones: rating and difficulty.
 # (pattern, metric, direction) — direction "desc" = bigger is the answer, "asc" = smaller is.
 _RANK_WORDS = [
     (re.compile(r"\b(highest[- ]?rated|highest rating|best[- ]?rated|best|top[- ]?rated|top)\b", re.I), "rating", "desc"),
     (re.compile(r"\b(lowest[- ]?rated|lowest rating|worst[- ]?rated|worst)\b", re.I), "rating", "asc"),
     (re.compile(r"\b(hardest|most difficult|most challenging|toughest)\b", re.I), "difficulty", "desc"),
     (re.compile(r"\b(easiest|least difficult|least challenging)\b", re.I), "difficulty", "asc"),
-    (re.compile(r"\b(most work|most hours|heaviest|most workload)\b", re.I), "hours", "desc"),
-    (re.compile(r"\b(least work|fewest hours|lightest|least workload)\b", re.I), "hours", "asc"),
 ]
 # subject token sitting right before "course"/"class" (e.g. "CS course", "math class").
 _SUBJECT_RE = re.compile(r"\b([A-Za-z]{2,5})\s+(?:course|class|courses|classes)\b", re.I)
@@ -134,45 +116,32 @@ def parse_course_superlative(query):
             return {"subject": subject, "metric": metric, "direction": direction}
     return None
 
-def rank_courses_by_metric(subject, metric, direction, query_fn, limit=5, min_responses=30):
-    """Rank a subject's courses by a weighted TRACE metric. Filters out courses with fewer than
-    min_responses (tiny-sample noise) and returns the top `limit` in the asked direction."""
-    like = _METRIC_LIKE.get(metric)
-    if not like:
+def _no_mod(alias=""):
+    return ""
+
+def rank_courses_by_metric(subject, metric, direction, query_fn, limit=5, min_responses=5):
+    """Rank a subject's courses by rating or difficulty. Filters out courses with
+    fewer than min_responses reviews (tiny-sample noise) and returns the top `limit` in the
+    asked direction. Both values come from course_catalog, the same blend the course page
+    shows, which already drops out-of-range, unattributed and moderated reviews."""
+    if metric not in ("rating", "difficulty"):
         return []
     rows = query_fn("""
-        SELECT tc.course_code AS code, cc.name AS name, cc.department AS department,
-          SUM(CASE WHEN lower(ts.question) LIKE %s THEN CAST(ts.mean AS FLOAT) * CAST(ts.total_responses AS FLOAT) ELSE 0 END) AS m_w,
-          SUM(CASE WHEN lower(ts.question) LIKE %s THEN CAST(ts.total_responses AS FLOAT) ELSE 0 END) AS m_r
-        FROM trace_scores ts
-        JOIN trace_courses tc ON ts.course_id = tc.course_id
-          AND ts.instructor_id = tc.instructor_id AND ts.term_id = tc.term_id
-        LEFT JOIN course_catalog cc ON cc.code = tc.course_code
-        WHERE tc.course_code LIKE %s AND tc.course_code ~ %s
-        GROUP BY tc.course_code, cc.name, cc.department
-    """, (like, like, f"{subject}%", f"^{subject}[0-9]"))
+        SELECT cc.code AS code, cc.name AS name, cc.department AS department,
+               cc.avg_rating AS r_avg, cc.difficulty AS d_avg, cc.num_ratings AS n
+        FROM course_catalog cc
+        WHERE cc.code LIKE %s AND cc.code ~ %s
+    """, (f"{subject}%", f"^{subject}[0-9]"))
     ranked = []
     for r in rows:
-        resp = float(r.get("m_r") or 0)
-        if resp < min_responses:
+        n = int(r.get("n") or 0)
+        val = r.get("r_avg") if metric == "rating" else r.get("d_avg")
+        if n < min_responses or val is None:
             continue
-        val = round(float(r.get("m_w") or 0) / resp, 2)
         ranked.append({"code": r.get("code"), "name": r.get("name"),
-                       "department": r.get("department"), "value": val, "responses": int(resp)})
+                       "department": r.get("department"), "value": round(float(val), 2), "responses": n})
     ranked.sort(key=lambda c: c["value"], reverse=(direction == "desc"))
     return ranked[:limit]
-
-def _clean_course_label(display_name):
-    """trace_courses.display_name looks like 'ENGW3302:09 (Advanced Writing in Tech Prof)
-    - Laurie Nardone'. For "courses taught" we want just the code + course name, with no
-    section number, term, or instructor — so the same course collapses to one entry."""
-    dn = str(display_name or "").strip()
-    if not dn:
-        return ""
-    code = re.split(r"[:\s]", dn, 1)[0].strip().rstrip(":")
-    m = re.search(r"\(([^)]*)\)", dn)  # course name lives inside the first ( )
-    name = (m.group(1) if m else "").strip()
-    return f"{code} {name}".strip() if name else code
 
 def resolve_entity(query, hint, prof_search_fn, limit=1):
     for term in (hint, query):
@@ -183,136 +152,82 @@ def resolve_entity(query, hint, prof_search_fn, limit=1):
             return rows[0]
     return None
 
-def fetch_facts(slug, query_one_fn, query_fn):
+def fetch_facts(slug, query_one_fn, query_fn, rmp_mod=_no_mod):
     prof = query_one_fn("""
-        SELECT slug, name_key, name, department, rmp_rating, trace_rating, avg_rating,
-               difficulty, would_take_again_pct, total_reviews, avg_hours
+        SELECT slug, name_key, name, department, rmp_rating, avg_rating,
+               difficulty, would_take_again_pct, total_reviews, total_comments
         FROM professors_catalog WHERE slug = %s
     """, (slug,))
     if not prof:
         return {}
     name_key = prof.get("name_key")
-    course_rows = query_fn("""
-        SELECT DISTINCT display_name FROM trace_courses
-        WHERE name_key = %s AND display_name IS NOT NULL
-        ORDER BY display_name LIMIT 25
+    course_rows = query_fn(f"""
+        SELECT rr.course_code AS code, cc.name AS name
+        FROM rmp_reviews rr LEFT JOIN course_catalog cc ON cc.code = rr.course_code
+        WHERE rr.name_key = %s AND rr.course_code IS NOT NULL{rmp_mod("rr")}
+        GROUP BY rr.course_code, cc.name
+        ORDER BY COUNT(*) DESC, rr.course_code LIMIT 25
     """, (name_key,))
-    seen, courses = set(), []
-    for c in course_rows:
-        label = _clean_course_label(c.get("display_name"))
-        if label and label not in seen:
-            seen.add(label); courses.append(label)
-    # total written comments = RMP review comments + TRACE comments (same buckets the
-    # professor page counts), so Ask reports the same number the profile shows.
-    cc = query_one_fn("""
-        SELECT COALESCE(SUM(cnt), 0) AS cnt FROM (
-          SELECT COUNT(*) AS cnt FROM rmp_reviews
-            WHERE name_key = %s AND comment IS NOT NULL AND comment != ''
-          UNION ALL
-          SELECT COUNT(*) AS cnt FROM trace_comments tc
-            JOIN trace_courses tc2 ON tc.tc_course_id = tc2.course_id
-              AND tc.tc_instructor_id = tc2.instructor_id AND tc.tc_term_id = tc2.term_id
-            WHERE tc2.name_key = %s AND tc.comment IS NOT NULL AND tc.comment != ''
-        ) sub
-    """, (name_key, name_key))
+    courses = [f"{c['code']} {c['name']}".strip() if c.get("name") else c["code"]
+               for c in course_rows if c.get("code")]
     return {
         "kind": "professor",
         "name": prof.get("name"), "department": prof.get("department"),
-        "rmp_rating": prof.get("rmp_rating"), "trace_rating": prof.get("trace_rating"),
+        "rmp_rating": prof.get("rmp_rating"),
         "avg_rating": prof.get("avg_rating"), "difficulty": prof.get("difficulty"),
         "would_take_again_pct": prof.get("would_take_again_pct"),
         "total_reviews": prof.get("total_reviews"),
-        "hours_per_week": prof.get("avg_hours"),
-        "total_comments": (cc or {}).get("cnt", 0),
+        # the blend's comment count, as the catalog lists show it (moderated reviews
+        # and blank comments already excluded)
+        "total_comments": prof.get("total_comments") or 0,
         "courses": courses,
     }
 
-def fetch_course_facts(code, query_one_fn, query_fn):
-    """Compact course summary for Ask: overall rating, avg difficulty (challenge), avg
-    hrs/week, last-taught term, and recent professor names. Reuses the trace_scores
-    weighted-aggregation pattern from /api/courses/<code>, aggregated at course grain."""
+def fetch_course_facts(code, query_one_fn, query_fn, rmp_mod=_no_mod):
+    """Compact course summary for Ask: overall rating and difficulty, latest review date,
+    recent professor names, and a per-professor breakdown. The numbers are the blend values
+    the course page shows (course_catalog, and source_summary for each professor card), so
+    Ask never quotes a different figure than the page."""
     norm = _norm_course_code(code)
     cat = query_one_fn(
-        "SELECT code, name, department FROM course_catalog WHERE code = %s", (norm,))
+        "SELECT code, name, department, avg_rating, difficulty FROM course_catalog WHERE code = %s",
+        (norm,))
     if not cat:
         return {}
-    agg = query_one_fn("""
-        SELECT
-          SUM(CASE WHEN lower(question) LIKE '%%overall%%' THEN CAST(mean AS FLOAT) * CAST(total_responses AS FLOAT) ELSE 0 END) AS o_w,
-          SUM(CASE WHEN lower(question) LIKE '%%overall%%' THEN CAST(total_responses AS INT) ELSE 0 END) AS o_r,
-          SUM(CASE WHEN lower(question) LIKE '%%challeng%%' THEN CAST(mean AS FLOAT) * CAST(total_responses AS FLOAT) ELSE 0 END) AS c_w,
-          SUM(CASE WHEN lower(question) LIKE '%%challeng%%' THEN CAST(total_responses AS INT) ELSE 0 END) AS c_r,
-          SUM(CASE WHEN lower(question) LIKE '%%hours%%' THEN CAST(mean AS FLOAT) * CAST(total_responses AS FLOAT) ELSE 0 END) AS h_w,
-          SUM(CASE WHEN lower(question) LIKE '%%hours%%' THEN CAST(total_responses AS INT) ELSE 0 END) AS h_r
-        FROM trace_scores ts
-        JOIN trace_courses tc ON ts.course_id = tc.course_id
-          AND ts.instructor_id = tc.instructor_id AND ts.term_id = tc.term_id
-        WHERE tc.course_code = %s
-    """, (norm,))
-    def _ratio(w, r):
-        w = float((agg or {}).get(w) or 0); r = float((agg or {}).get(r) or 0)
-        return round(w / r, 2) if r > 0 else None
-    # recent professors + last-taught term, newest first by term sort key
-    rows = query_fn("""
-        SELECT DISTINCT instructor_first_name, instructor_last_name, term_title
-        FROM trace_courses WHERE course_code = %s
-    """, (norm,))
-    def _term_key(t):
-        # crude recency: a 4-digit year dominates, season breaks ties (Fall>Summer>Spring)
-        t = (t or "").lower()
-        yr = re.search(r"(\d{4})", t)
-        season = 3 if "fall" in t else 2 if "summer" in t else 1 if "spring" in t else 0
-        return (int(yr.group(1)) if yr else 0, season)
-    last_taught, recent = "", []
-    seen_names = set()
-    for r in sorted(rows, key=lambda r: _term_key(r.get("term_title")), reverse=True):
-        if not last_taught:
-            last_taught = r.get("term_title") or ""
-        nm = f"{(r.get('instructor_first_name') or '').strip()} {(r.get('instructor_last_name') or '').strip()}".strip()
-        if nm and nm not in seen_names:
-            seen_names.add(nm); recent.append(nm)
-        if len(recent) >= 5:
-            break
-    # per-instructor breakdown: rating / difficulty / hrs-week for each professor who has
-    # taught this course, same weighted-aggregation as the course-grain figures above.
-    irows = query_fn("""
-        SELECT
-          tc.instructor_first_name AS fn, tc.instructor_last_name AS ln,
-          SUM(CASE WHEN lower(ts.question) LIKE '%%overall%%' THEN CAST(ts.mean AS FLOAT) * CAST(ts.total_responses AS FLOAT) ELSE 0 END) AS o_w,
-          SUM(CASE WHEN lower(ts.question) LIKE '%%overall%%' THEN CAST(ts.total_responses AS INT) ELSE 0 END) AS o_r,
-          SUM(CASE WHEN lower(ts.question) LIKE '%%challeng%%' THEN CAST(ts.mean AS FLOAT) * CAST(ts.total_responses AS FLOAT) ELSE 0 END) AS c_w,
-          SUM(CASE WHEN lower(ts.question) LIKE '%%challeng%%' THEN CAST(ts.total_responses AS INT) ELSE 0 END) AS c_r,
-          SUM(CASE WHEN lower(ts.question) LIKE '%%hours%%' THEN CAST(ts.mean AS FLOAT) * CAST(ts.total_responses AS FLOAT) ELSE 0 END) AS h_w,
-          SUM(CASE WHEN lower(ts.question) LIKE '%%hours%%' THEN CAST(ts.total_responses AS INT) ELSE 0 END) AS h_r
-        FROM trace_scores ts
-        JOIN trace_courses tc ON ts.course_id = tc.course_id
-          AND ts.instructor_id = tc.instructor_id AND ts.term_id = tc.term_id
-        WHERE tc.course_code = %s
-        GROUP BY tc.instructor_first_name, tc.instructor_last_name
-    """, (norm,))
-    def _row_ratio(row, w, r):
-        w = float(row.get(w) or 0); r = float(row.get(r) or 0)
-        return round(w / r, 2) if r > 0 else None
-    breakdown = []
+    def _r2(v):
+        return round(float(v), 2) if v is not None else None
+    # per-professor blend rows, as course_page.py reads them; review dates still come from
+    # rmp_reviews, so that subquery takes the moderation filter
+    irows = query_fn(f"""
+        SELECT pc.name AS name, s.rating AS rating, s.difficulty AS difficulty,
+               d.latest_date AS latest_date
+        FROM source_summary s
+        JOIN professors_catalog pc ON pc.slug = s.professor_slug
+        LEFT JOIN (
+            SELECT name_key, MAX(date) AS latest_date FROM rmp_reviews
+            WHERE course_code = %s{rmp_mod()}
+            GROUP BY name_key
+        ) d ON d.name_key = pc.name_key
+        WHERE s.course_code = %s AND s.source = 'blend' AND s.professor_slug != ''
+    """, (norm, norm))
+    breakdown, dated = [], []
     for r in irows:
-        nm = f"{(r.get('fn') or '').strip()} {(r.get('ln') or '').strip()}".strip()
-        rating = _row_ratio(r, "o_w", "o_r")
-        if not nm or rating is None:  # skip instructors with no overall-rating responses
+        nm = (r.get("name") or "").strip()
+        rating = _r2(r.get("rating"))
+        if not nm or rating is None:
             continue
-        breakdown.append({
-            "name": nm, "rating": rating,
-            "difficulty": _row_ratio(r, "c_w", "c_r"),
-            "hours_per_week": _row_ratio(r, "h_w", "h_r"),
-        })
+        breakdown.append({"name": nm, "rating": rating, "difficulty": _r2(r.get("difficulty"))})
+        if r.get("latest_date"):
+            dated.append((str(r["latest_date"]), nm))
     breakdown.sort(key=lambda b: b["rating"], reverse=True)
+    dated.sort(reverse=True)
     return {
         "kind": "course",
         "code": cat.get("code"), "name": cat.get("name"), "department": cat.get("department"),
-        "avg_rating": _ratio("o_w", "o_r"),
-        "avg_difficulty": _ratio("c_w", "c_r"),
-        "hours_per_week": _ratio("h_w", "h_r"),
-        "last_taught": last_taught,
-        "recent_professors": recent,
+        "avg_rating": _r2(cat.get("avg_rating")),
+        "avg_difficulty": _r2(cat.get("difficulty")),
+        "last_reviewed": dated[0][0][:10] if dated and dated[0][0] else "",
+        "recent_professors": [nm for _, nm in dated[:5]],
         "instructor_breakdown": breakdown,
     }
 
@@ -411,6 +326,10 @@ def _entity_filter(slug, code):
     return ("(e.course_code = %s OR (e.source = 'reddit' AND (e.body ILIKE %s OR e.body ILIKE %s)))",
             (code, f"%{norm}%", f"%{spaced}%"))
 
+# Evidence sources Ask knows how to label. restore_db.py --all can bring back rows from
+# sources since removed, and those must not reach the answer at all.
+_EVIDENCE_SOURCES = " AND e.source IN ('reddit', 'rmp')"
+
 def _lexical_candidates(where, entity_params, query, query_fn, limit=40):
     """Top lexical candidates for an entity-scoped evidence search, best-first [(id, ts_rank)].
     Shared by fetch_evidence and backend/rag/eval/pool_candidates.py — the eval pool must run the
@@ -420,7 +339,8 @@ def _lexical_candidates(where, entity_params, query, query_fn, limit=40):
     rows = query_fn(
         "SELECT e.id, ts_rank(e.body_tsv, plainto_tsquery('english', %s)) AS r "
         "FROM evidence e WHERE " + where +
-        " AND e.flagged = false AND e.body_tsv @@ plainto_tsquery('english', %s) "
+        " AND e.flagged = false" + _EVIDENCE_SOURCES +
+        " AND e.body_tsv @@ plainto_tsquery('english', %s) "
         "ORDER BY r DESC LIMIT " + str(int(limit)),
         (query,) + entity_params + (query,))
     return [(r["id"], r.get("r", 0)) for r in rows]
@@ -433,7 +353,7 @@ def _vector_candidates(where, entity_params, qv, query_fn, limit=40):
     rows = query_fn(
         "SELECT e.id, 1 - (ee.embedding <=> %s::vector) AS sim "
         "FROM evidence_embeddings ee JOIN evidence e ON e.id = ee.evidence_id "
-        "WHERE " + where + " AND e.flagged = false"
+        "WHERE " + where + " AND e.flagged = false" + _EVIDENCE_SOURCES +
         " ORDER BY ee.embedding <=> %s::vector LIMIT " + str(int(limit)),
         (str(qv),) + entity_params + (str(qv),))
     return [(r["id"], r.get("sim", 0)) for r in rows]
@@ -493,7 +413,8 @@ def fetch_reddit_mentions(slug, query_fn, mod_filter=""):
         })
     return out
 
-def retrieve(query, hint, query_fn, query_one_fn, prof_search_fn, limit=8, embed_query_fn=None):
+def retrieve(query, hint, query_fn, query_one_fn, prof_search_fn, limit=8, embed_query_fn=None,
+             rmp_mod=_no_mod):
     # Superlative / ranking question ("which CS course has the highest rating"). Keys on the
     # query text, so it wins even when the gate hands back a junk hint like "CS course" — but a
     # genuine professor hint must win (don't turn "which CS course did Guha call hardest" into a
@@ -527,7 +448,7 @@ def retrieve(query, hint, query_fn, query_one_fn, prof_search_fn, limit=8, embed
     # course's Reddit discussion, instead of trying to find a professor by that name.
     course_term = next((t for t in (hint, query) if is_course_code(t)), None)
     if course_term:
-        cfacts = fetch_course_facts(course_term, query_one_fn, query_fn)
+        cfacts = fetch_course_facts(course_term, query_one_fn, query_fn, rmp_mod)
         if cfacts:
             code = cfacts["code"]
             comments = fetch_evidence(None, code, query, embed_query_fn, query_fn, limit=limit)
@@ -543,7 +464,7 @@ def retrieve(query, hint, query_fn, query_one_fn, prof_search_fn, limit=8, embed
     if hint and not is_course_code(hint) and not prof_search_fn(hint, limit=1):
         named = resolve_course_by_name(hint, query_fn, limit=6)
         if len(named) == 1:
-            cfacts = fetch_course_facts(named[0]["code"], query_one_fn, query_fn)
+            cfacts = fetch_course_facts(named[0]["code"], query_one_fn, query_fn, rmp_mod)
             if cfacts:
                 code = cfacts["code"]
                 comments = fetch_evidence(None, code, query, embed_query_fn, query_fn, limit=limit)
@@ -564,7 +485,7 @@ def retrieve(query, hint, query_fn, query_one_fn, prof_search_fn, limit=8, embed
     comments = fetch_evidence(slug, None, query, embed_query_fn, query_fn, limit=limit)
     return {"professor_slug": slug, "course_code": None, "entity_key": slug,
             "professor_name": ent.get("name"), "entity_name": ent.get("name"),
-            "facts": fetch_facts(slug, query_one_fn, query_fn),
+            "facts": fetch_facts(slug, query_one_fn, query_fn, rmp_mod),
             "comments": comments, "comment_count": len(comments)}
 
 def selftest():
@@ -580,22 +501,17 @@ def selftest():
     def query_one_fn(sql, params):
         check("facts query parameterized", "%s" in sql)
         if "professors_catalog" in sql:
-            check("facts query selects avg_hours", "avg_hours" in sql)
             return {"slug": "guha-prof", "name_key": "olin guha", "name": "Olin Guha",
-                    "department": "Khoury", "rmp_rating": 4.1, "trace_rating": 4.3,
+                    "department": "Khoury", "rmp_rating": 4.1,
                     "avg_rating": 4.2, "difficulty": 3.5, "would_take_again_pct": 88.0,
-                    "total_reviews": 31, "avg_hours": 7.5}
-        if "rmp_reviews" in sql or "trace_comments" in sql:  # comment-count UNION
-            return {"cnt": 42}
+                    "total_reviews": 31, "total_comments": 42}
         return None
 
     def query_fn(sql, params):
-        if "DISTINCT display_name" in sql:
+        if "rr.course_code AS code" in sql:
             check("course-list query keyed on name_key (not subquery)", "name_key = %s" in sql)
-            # real display_name carries section + instructor; two sections of the SAME
-            # course must collapse to one clean "CODE Name" entry (no section/term/instructor)
-            return [{"display_name": "CS3500:01 (Object-Oriented Design) - Olin Guha"},
-                    {"display_name": "CS3500:02 (Object-Oriented Design) - Olin Guha"}]
+            return [{"code": "CS3500", "name": "Object-Oriented Design"},
+                    {"code": "CS5010", "name": None}]
         if "reddit_mentions" in sql:
             # fetch_reddit_mentions still uses this path (professor profile page)
             check("comments exclude flagged rows", "flagged = false" in sql or "NOT flagged" in sql)
@@ -616,14 +532,11 @@ def selftest():
     check("resolved a professor", r["professor_slug"] == "guha-prof")
     check("entity_key is the slug for a professor", r["entity_key"] == "guha-prof")
     check("facts kind is professor", r["facts"]["kind"] == "professor")
-    check("courses taught strip section/term/instructor + dedupe",
-          r["facts"]["courses"] == ["CS3500 Object-Oriented Design"])
-    # the raw section/instructor must NOT leak into the courses-taught list
-    check("courses taught omit section number", ":01" not in r["facts"]["courses"][0])
-    check("courses taught omit instructor name", "Guha" not in r["facts"]["courses"][0])
+    check("courses taught are code + catalog name (bare code when unnamed)",
+          r["facts"]["courses"] == ["CS3500 Object-Oriented Design", "CS5010"])
     check("facts carry difficulty", r["facts"]["difficulty"] == 3.5)
-    check("facts carry hours_per_week", r["facts"]["hours_per_week"] == 7.5)
-    check("facts carry total_comments", r["facts"]["total_comments"] == 42)
+    check("facts carry no removed fields", "hours_per_week" not in r["facts"])
+    check("facts carry the catalog's total_comments", r["facts"]["total_comments"] == 42)
     check("comments retrieved", r["comment_count"] == 1 and r["comments"][0]["sentiment"] == "positive")
     check("comment score is the reddit upvote score", r["comments"][0]["score"] == 12)
     # fetch_evidence normalizes sentiment_score to None (numeric score lives in the evidence table)
@@ -641,24 +554,19 @@ def selftest():
     # ── course path ──
     def course_query_one(sql, params):
         if "course_catalog" in sql:
-            return {"code": "DS3000", "name": "Foundations of Data Science", "department": "Khoury"}
-        if "trace_scores" in sql:  # weighted aggregation
-            check("course agg joins trace_courses on course_code", "course_code = %s" in sql)
-            return {"o_w": 8.0, "o_r": 2, "c_w": 6.0, "c_r": 2, "h_w": 14.0, "h_r": 2}
+            check("course facts read difficulty from course_catalog", "difficulty" in sql)
+            return {"code": "DS3000", "name": "Foundations of Data Science", "department": "Khoury",
+                    "avg_rating": 3.5, "difficulty": 3.0}
         return None
     def course_query(sql, params):
-        if "trace_scores" in sql and "GROUP BY" in sql:  # per-instructor breakdown
-            check("breakdown groups per instructor", "GROUP BY tc.instructor_first_name" in sql)
+        if "FROM source_summary s" in sql:  # per-professor breakdown
+            check("breakdown reads the blend rows the course page shows",
+                  "s.source = 'blend'" in sql and "s.professor_slug != ''" in sql)
             return [
-                {"fn": "Jan", "ln": "Vitek", "o_w": 8.0, "o_r": 2, "c_w": 6.0, "c_r": 2, "h_w": 14.0, "h_r": 2},
-                {"fn": "Nick", "ln": "Brown", "o_w": 3.0, "o_r": 1, "c_w": 5.0, "c_r": 1, "h_w": 9.0, "h_r": 1},
-                # an instructor with no overall-rating responses must be dropped, not shown as unknown
-                {"fn": "Ghost", "ln": "Prof", "o_w": 0.0, "o_r": 0, "c_w": 4.0, "c_r": 1, "h_w": 4.0, "h_r": 1},
-            ]
-        if "instructor_first_name" in sql and "course_code = %s" in sql:
-            return [
-                {"instructor_first_name": "Jan", "instructor_last_name": "Vitek", "term_title": "Fall 2024"},
-                {"instructor_first_name": "Nick", "instructor_last_name": "Brown", "term_title": "Spring 2023"},
+                {"name": "Nick Brown", "rating": 3.0, "difficulty": 5.0, "latest_date": "2023-02-01 10:00:00"},
+                {"name": "Jan Vitek", "rating": 4.0, "difficulty": 3.0, "latest_date": "2024-11-02 10:00:00"},
+                # a professor with no quality ratings must be dropped, not shown as unknown
+                {"name": "Ghost Prof", "rating": None, "difficulty": 4.0, "latest_date": "2020-01-01 10:00:00"},
             ]
         if "plainto_tsquery" in sql:  # fetch_evidence lexical (replaces reddit_text for retrieve())
             check("evidence avoids unsupported websearch_to_tsquery", "websearch_to_tsquery" not in sql)
@@ -672,19 +580,18 @@ def selftest():
     check("course path sets course_code", rc["course_code"] == "DS3000")
     check("course path entity_key is the code", rc["entity_key"] == "DS3000")
     check("course facts kind is course", rc["facts"]["kind"] == "course")
-    check("course avg_rating computed (8/2)", rc["facts"]["avg_rating"] == 4.0)
-    check("course avg_difficulty computed (6/2)", rc["facts"]["avg_difficulty"] == 3.0)
-    check("course hours_per_week computed (14/2)", rc["facts"]["hours_per_week"] == 7.0)
-    check("course last_taught is newest term", rc["facts"]["last_taught"] == "Fall 2024")
+    check("course avg_rating comes from course_catalog", rc["facts"]["avg_rating"] == 3.5)
+    check("course avg_difficulty from course_catalog", rc["facts"]["avg_difficulty"] == 3.0)
+    check("course has no hours_per_week", "hours_per_week" not in rc["facts"])
+    check("course last_reviewed is newest review date", rc["facts"]["last_reviewed"] == "2024-11-02")
     check("course recent_professors newest-first", rc["facts"]["recent_professors"][0] == "Jan Vitek")
     check("course Reddit comments fetched", rc["comment_count"] == 1)
 
-    # ── per-instructor breakdown (rating / difficulty / hrs-week) ──
+    # ── per-professor breakdown (rating / difficulty) ──
     bd = rc["facts"]["instructor_breakdown"]
-    check("breakdown drops instructors with no rating", len(bd) == 2)
+    check("breakdown drops professors with no rating", len(bd) == 2)
     check("breakdown sorted by rating desc", bd[0]["name"] == "Jan Vitek" and bd[0]["rating"] == 4.0)
-    check("breakdown carries difficulty (6/2)", bd[0]["difficulty"] == 3.0)
-    check("breakdown carries hours/week (14/2)", bd[0]["hours_per_week"] == 7.0)
+    check("breakdown carries difficulty", bd[0]["difficulty"] == 3.0)
     check("breakdown second instructor", bd[1]["name"] == "Nick Brown" and bd[1]["rating"] == 3.0)
 
     # ── fetch_course_comments: exact-phrase matching for BOTH spellings ──
@@ -776,19 +683,16 @@ def selftest():
     check("default topic search issues exactly one query", len(topic_calls) == 1)
     check("default courses carry no rating", "rating" not in courses[0])
 
-    # with_ratings=True: attaches a rating per course and re-sorts desc
+    # with_ratings=True: attaches the catalog rating per course and re-sorts desc
     def topic_query_rated(sql, params):
         if "course_catalog" in sql:
-            return [{"code": "CS3200", "name": "Database Design", "department": "Khoury"},
-                    {"code": "DS3000", "name": "Foundations of Data Science", "department": "Khoury"}]
-        if "trace_scores" in sql:  # per-course overall rating
-            code = params[0]
-            return [{"o_w": 8.0, "o_r": 2}] if code == "CS3200" else [{"o_w": 9.0, "o_r": 2}]
+            return [{"code": "CS3200", "name": "Database Design", "department": "Khoury", "avg_rating": 4.0},
+                    {"code": "DS3000", "name": "Foundations of Data Science", "department": "Khoury", "avg_rating": 4.5}]
         return []
     rated = fetch_courses_by_topic("database", topic_query_rated, limit=8, with_ratings=True)
     check("rated courses carry a rating", all("rating" in c for c in rated))
     check("rated courses sorted by rating desc", [c["code"] for c in rated] == ["DS3000", "CS3200"])
-    check("rated values computed (8/2, 9/2)", rated[0]["rating"] == 4.5 and rated[1]["rating"] == 4.0)
+    check("rated values come from the catalog", rated[0]["rating"] == 4.5 and rated[1]["rating"] == 4.0)
 
     # retrieve() returns a course_list block on a topic query (hint is None — gate found no entity)
     def topic_retrieve_query(sql, params):
@@ -843,10 +747,6 @@ def selftest():
     def name_one_query(sql, params):
         if "course_catalog" in sql:
             return [{"code": "CS1800", "name": "Discrete Structures", "department": "Khoury"}]
-        if "trace_scores" in sql:
-            return [{"o_w": 8.0, "o_r": 2, "c_w": 6.0, "c_r": 2, "h_w": 14.0, "h_r": 2}]
-        if "instructor_first_name" in sql and "course_code = %s" in sql:
-            return [{"instructor_first_name": "A", "instructor_last_name": "B", "term_title": "Fall 2024"}]
         if "plainto_tsquery" in sql:  # fetch_evidence lexical
             return [{"id": "x", "r": 0.7}]
         if "FROM evidence" in sql and "WHERE id IN" in sql:  # fetch_evidence hydrate
@@ -855,9 +755,8 @@ def selftest():
         return []
     def name_one_query_one(sql, params):
         if "course_catalog" in sql:
-            return {"code": "CS1800", "name": "Discrete Structures", "department": "Khoury"}
-        if "trace_scores" in sql:
-            return {"o_w": 8.0, "o_r": 2, "c_w": 6.0, "c_r": 2, "h_w": 14.0, "h_r": 2}
+            return {"code": "CS1800", "name": "Discrete Structures", "department": "Khoury",
+                    "difficulty": 3.0}
         return None
     rn = retrieve("How tough is Discrete Structures?", "Discrete Structures",
                   name_one_query, name_one_query_one, lambda q, limit=1: [], limit=8)
@@ -899,8 +798,10 @@ def selftest():
     check("lexical candidates are (id, score) best-first", lex_c == [("a", 0.9), ("b", 0.5)])
     check("lexical candidates default depth 40", "LIMIT 40" in cand_calls[0][0])
     check("lexical candidates keep the entity filter", w_c in cand_calls[0][0])
+    check("lexical candidates admit only reddit and rmp evidence", _EVIDENCE_SOURCES in cand_calls[0][0])
     vec_c = _vector_candidates(w_c, p_c, [0.1, 0.2], cand_query)
     check("vector candidates are (id, sim) best-first", vec_c == [("b", 0.8)])
+    check("vector candidates admit only reddit and rmp evidence", _EVIDENCE_SOURCES in cand_calls[-1][0])
     check("blank query -> no lexical candidates", _lexical_candidates(w_c, p_c, "  ", cand_query) == [])
     check("None embedding -> no vector candidates", _vector_candidates(w_c, p_c, None, cand_query) == [])
     _lexical_candidates(w_c, p_c, "q", cand_query, limit=20)
@@ -912,11 +813,9 @@ def selftest():
     def prof_fallthrough_one(sql, params):
         if "professors_catalog" in sql:
             return {"slug": "guha-prof", "name_key": "olin guha", "name": "Olin Guha",
-                    "department": "Khoury", "rmp_rating": 4.1, "trace_rating": 4.3,
+                    "department": "Khoury", "rmp_rating": 4.1,
                     "avg_rating": 4.2, "difficulty": 3.5, "would_take_again_pct": 88.0,
-                    "total_reviews": 31, "avg_hours": 7.5}
-        if "rmp_reviews" in sql or "trace_comments" in sql:
-            return {"cnt": 5}
+                    "total_reviews": 31, "total_comments": 5}
         return None
     rp = retrieve("is guha hard", "Guha", prof_fallthrough_query, prof_fallthrough_one,
                   lambda q, limit=1: [{"slug": "guha-prof", "name": "Olin Guha", "name_key": "olin guha"}], limit=8)
@@ -933,10 +832,8 @@ def selftest():
     def lee_query_one(sql, params):
         if "professors_catalog" in sql:
             return {"slug": "lee-prof", "name_key": "j lee", "name": "J. Lee", "department": "Khoury",
-                    "rmp_rating": 4.0, "trace_rating": 4.0, "avg_rating": 4.0, "difficulty": 3.0,
-                    "would_take_again_pct": 90.0, "total_reviews": 10, "avg_hours": 5.0}
-        if "rmp_reviews" in sql or "trace_comments" in sql:
-            return {"cnt": 3}
+                    "rmp_rating": 4.0, "avg_rating": 4.0, "difficulty": 3.0,
+                    "would_take_again_pct": 90.0, "total_reviews": 10, "total_comments": 3}
         return None
     def lee_prof_search(term, limit=1):
         return [{"slug": "lee-prof", "name": "J. Lee", "name_key": "j lee"}]
@@ -971,9 +868,8 @@ def selftest():
     s3 = parse_course_superlative("hardest cs class")
     check("superlative: hardest -> CS/difficulty/desc",
           s3 == {"subject": "CS", "metric": "difficulty", "direction": "desc"})
-    s4 = parse_course_superlative("which DS course has the most work")
-    check("superlative: most work -> DS/hours/desc",
-          s4 == {"subject": "DS", "metric": "hours", "direction": "desc"})
+    check("superlative: workload has no RMP metric -> no ranking",
+          parse_course_superlative("which DS course has the most work") is None)
     # misses: a code-vs-code compare, a professor question, a plain topic listing
     check("superlative: rejects code compare", parse_course_superlative("is CS 3500 harder than CS 3000") is None)
     check("superlative: rejects professor q", parse_course_superlative("is Guha hard") is None)
@@ -984,15 +880,15 @@ def selftest():
     def rank_query(sql, params):
         rank_calls["sql"] = sql; rank_calls["params"] = list(params)
         return [
-            {"code": "CS7870", "name": "Seminar", "department": "CS", "m_w": 10.0, "m_r": 2.0},   # below threshold
-            {"code": "CS3100", "name": "PDI 2", "department": "CS", "m_w": 445.0, "m_r": 100.0},  # 4.45
-            {"code": "CS2000", "name": "Intro", "department": "CS", "m_w": 880.0, "m_r": 200.0},  # 4.40
+            {"code": "CS7870", "name": "Seminar", "department": "CS", "r_avg": 1.0, "d_avg": 2.0, "n": 2},   # below threshold
+            {"code": "CS3100", "name": "PDI 2", "department": "CS", "r_avg": 4.45, "d_avg": 4.1, "n": 100},
+            {"code": "CS2000", "name": "Intro", "department": "CS", "r_avg": 4.40, "d_avg": 2.9, "n": 200},
         ]
     ranked = rank_courses_by_metric("CS", "rating", "desc", rank_query, limit=5, min_responses=30)
-    check("ranking uses sargable LIKE prefix", "tc.course_code LIKE %s" in rank_calls["sql"])
-    check("ranking anchors with a regex to drop false prefixes", "tc.course_code ~ %s" in rank_calls["sql"])
-    check("regexp_replace no longer in the WHERE clause", "regexp_replace" not in rank_calls["sql"])
-    check("ranking passes the metric LIKE term", "%overall%" in rank_calls["params"])
+    check("ranking uses sargable LIKE prefix", "cc.code LIKE %s" in rank_calls["sql"])
+    check("ranking anchors with a regex to drop false prefixes", "cc.code ~ %s" in rank_calls["sql"])
+    check("ranking reads difficulty from course_catalog, not raw reviews",
+          "cc.difficulty" in rank_calls["sql"] and "rmp_reviews" not in rank_calls["sql"])
     check("ranking passes the subject LIKE param", "CS%" in rank_calls["params"])
     check("ranking passes the subject regex param", "^CS[0-9]" in rank_calls["params"])
     check("ranking drops below-threshold courses (CS7870 n=2)", all(c["code"] != "CS7870" for c in ranked))
@@ -1004,8 +900,8 @@ def selftest():
 
     # retrieve() returns a course_ranking block on a superlative query (even with a junk hint)
     def sup_retrieve_query(sql, params):
-        if "trace_scores" in sql and "tc.course_code LIKE" in sql:
-            return [{"code": "CS3100", "name": "PDI 2", "department": "CS", "m_w": 445.0, "m_r": 100.0}]
+        if "cc.code LIKE" in sql:
+            return [{"code": "CS3100", "name": "PDI 2", "department": "CS", "r_avg": 4.45, "d_avg": 4.1, "n": 100}]
         return []
     rr = retrieve("Which CS course has the highest rating?", "CS course",
                   sup_retrieve_query, lambda s, p=None: None, lambda q, limit=1: [], limit=8)
@@ -1020,8 +916,8 @@ def selftest():
 
     # a REAL professor hint must win over the ranking branch (don't drop the named professor)
     def prof_hit_query(sql, params):
-        if "trace_scores" in sql and "tc.course_code LIKE" in sql:
-            return [{"code": "CS3100", "name": "PDI 2", "department": "CS", "m_w": 445.0, "m_r": 100.0}]
+        if "cc.code LIKE" in sql:
+            return [{"code": "CS3100", "name": "PDI 2", "department": "CS", "r_avg": 4.45, "d_avg": 4.1, "n": 100}]
         return query_fn(sql, params)  # reuse the prof-facts fakes defined earlier in selftest
     rrp = retrieve("which CS course did Guha call hardest", "Guha",
                    prof_hit_query, query_one_fn, prof_search_fn, limit=8)
@@ -1034,23 +930,22 @@ def selftest():
     check("rrf: id in both lists ranks first", order[0] == "b")
     check("rrf: includes all unique ids", set(order) == {"a", "b", "c"})
 
-    # ── per-source floor: TRACE-heavy candidate list still yields reddit+rmp slots ──
+    # ── per-source floor: a one-source-heavy candidate list still yields reddit+rmp slots ──
     cand = (
-        [{"id": f"t{i}", "source": "trace"} for i in range(8)]
-        + [{"id": "r1", "source": "reddit"}, {"id": "r2", "source": "reddit"}, {"id": "r3", "source": "reddit"}]
-        + [{"id": "m1", "source": "rmp"}]
+        [{"id": f"t{i}", "source": "reddit"} for i in range(8)]
+        + [{"id": "m1", "source": "rmp"}, {"id": "m2", "source": "rmp"}, {"id": "m3", "source": "rmp"}]
     )  # already in fused-rank order
     picked = _apply_source_floor(cand, limit=8, reddit_floor=2, rmp_floor=2)
     srcs = [p["source"] for p in picked]
     check("floor: <=8 picked", len(picked) == 8)
     check("floor: at least 2 reddit when available", srcs.count("reddit") >= 2)
-    check("floor: rmp present (only 1 exists) ", "rmp" in srcs)
-    check("floor: rest filled by trace", srcs.count("trace") >= 4)
+    check("floor: at least 2 rmp when available", srcs.count("rmp") >= 2)
+    check("floor: rest filled by fused rank", srcs.count("reddit") == 6)
 
     # ── floor with a missing source: its slots roll into fused fill, no filler ──
-    cand2 = [{"id": f"t{i}", "source": "trace"} for i in range(10)]  # only trace exists
+    cand2 = [{"id": f"t{i}", "source": "reddit"} for i in range(10)]  # only reddit exists
     picked2 = _apply_source_floor(cand2, limit=8, reddit_floor=2, rmp_floor=2)
-    check("floor: missing sources don't pad; 8 trace returned", len(picked2) == 8 and all(p["source"] == "trace" for p in picked2))
+    check("floor: missing sources don't pad; 8 reddit returned", len(picked2) == 8 and all(p["source"] == "reddit" for p in picked2))
 
     # ── fetch_evidence: issues lexical (plainto_tsquery) + vector, fuses, tags source ──
     captured = {"sql": []}
@@ -1063,7 +958,7 @@ def selftest():
         if "FROM evidence" in sql and "WHERE id IN" in sql:  # hydrate
             return [{"id": "r1", "source": "reddit", "body": "office hours great", "subreddit": "NEU",
                      "reddit_score": 5, "permalink": "/r/x", "created_utc": None, "sentiment": "positive"},
-                    {"id": "t1", "source": "trace", "body": "clear lectures", "subreddit": None,
+                    {"id": "t1", "source": "rmp", "body": "clear lectures", "subreddit": None,
                      "reddit_score": None, "permalink": None, "created_utc": None, "sentiment": None},
                     {"id": "m1", "source": "rmp", "body": "tough but fair", "subreddit": None,
                      "reddit_score": None, "permalink": None, "created_utc": None, "sentiment": None}]
@@ -1118,6 +1013,23 @@ def selftest():
     fetch_evidence("guha-prof", None, "office hours", None, slug_ev_query, limit=8)
     check("professor path SQL is unchanged (no reddit ILIKE leg)",
           all("ILIKE" not in s for s in captured_slug["sql"]))
+
+    # ── moderation reaches every query that still reads raw rmp_reviews ──
+    mod_sql = []
+    def mod_query(sql, params):
+        mod_sql.append(sql)
+        return query_fn(sql, params)
+    def mod_filter(alias=""):
+        return f" AND {alias + '.' if alias else ''}MODOK"
+    retrieve("is guha hard", "Guha", mod_query, query_one_fn, prof_search_fn, limit=8,
+             rmp_mod=mod_filter)
+    check("professor course list takes the moderation filter",
+          any("rr.course_code AS code" in s and "rr.MODOK" in s for s in mod_sql))
+    mod_sql.clear()
+    retrieve("tell me about DS3000", "DS3000", lambda sql, p: (mod_sql.append(sql), course_query(sql, p))[1],
+             course_query_one, prof_search_fn, limit=8, rmp_mod=mod_filter)
+    check("course breakdown's review-date subquery takes the moderation filter",
+          any("FROM source_summary s" in s and "MODOK" in s for s in mod_sql))
 
     print("ALL PASS" if not fails else f"{len(fails)} FAIL(s): " + ", ".join(fails))
     return 1 if fails else 0

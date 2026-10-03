@@ -1,6 +1,6 @@
 """Build the per-college master professor list for the photo re-scrape.
 
-Merges rmp_professors.csv + trace_courses.csv, dedups by normalized name,
+Merges rmp_professors.csv, dedups by normalized name,
 attaches college (pipeline.names.COLLEGE_MAP), aliases, and any existing photo URL.
 Writes output_data/prof_list.json.
 """
@@ -53,16 +53,6 @@ def build_records(data_dir):
             for row in csv.DictReader(f):
                 add(str(row.get("name", "")).strip(),
                     str(row.get("department", "")).strip())
-
-    trace = os.path.join(data_dir, "trace_courses.csv")
-    if os.path.exists(trace):
-        with open(trace, "r", encoding="utf-8") as f:
-            for row in csv.DictReader(f):
-                first = str(row.get("instructorFirstName", "")).strip()
-                last = str(row.get("instructorLastName", "")).strip()
-                if first and last:
-                    add(f"{first} {last}".title(),
-                        str(row.get("departmentName", "")).strip())
 
     return list(seen.values())
 

@@ -32,19 +32,13 @@ import os
 import sys
 import zipfile
 
-# Logical name -> the filenames that may hold it, in preference order.
-# The big TRACE exports may ship zipped, because GitHub rejects a file over
-# 100MB. trace_comments always has (~415MB raw); trace_scores is at 95.5MB as of
-# the 2026-08-11 export and grew 35% in that one scrape, so it accepts either
-# form now rather than on the day the push is rejected. precompute.py reads
-# both through csv_store.resolve().
+# Logical name -> the filenames that may hold it, in preference order. A big
+# export may ship zipped, because GitHub rejects a file over 100MB; precompute.py
+# and migrate_to_crdb.py read both forms through csv_store.
 FILES = {
     "rmp_professors": ("rmp_professors.csv",),
-    "rmp_reviews": ("rmp_reviews.csv",),
-    "trace_courses": ("trace_courses.csv",),
-    "trace_scores": ("trace_scores.csv", "trace_scores.zip"),
+    "rmp_reviews": ("rmp_reviews.csv", "rmp_reviews.zip"),
     "professor_photos": ("professor_photos.csv",),
-    "trace_comments": ("trace_comments.csv", "trace_comments.zip"),
 }
 
 # The store as measured on 2026-08-12. Recorded rather than inferred because
@@ -53,10 +47,7 @@ FILES = {
 HEALTHY_COUNTS = {
     "rmp_professors": 3892,
     "rmp_reviews": 44536,
-    "trace_courses": 105376,
-    "trace_scores": 1102614,
     "professor_photos": 3925,
-    "trace_comments": 1709263,
 }
 
 # ~80% of HEALTHY_COUNTS. These are a backstop for the case the relative floor
@@ -64,18 +55,15 @@ HEALTHY_COUNTS = {
 # compare against.
 #
 # They were previously derived from the 2026-08-09 store and never re-measured,
-# and the store grew underneath them: trace_scores was at 59% of its floor's
-# basis and professor_photos at 56%, so a run could have lost 40% of either and
+# and the store grew underneath them: professor_photos was at 56% of its floor's
+# basis, so a run could have lost 40% of its rows and
 # still passed as "catastrophic failure not detected". Re-derived here, with
 # FLOOR_BASIS_PCT and test_absolute_floors_track_the_healthy_counts pinning the
 # relationship so the next drift fails a test instead of going quiet.
 ABSOLUTE_FLOORS = {
     "rmp_professors": 3100,
     "rmp_reviews": 35600,
-    "trace_courses": 84000,
-    "trace_scores": 880000,
     "professor_photos": 3100,
-    "trace_comments": 1360000,
 }
 
 # The band each floor must sit in, as a share of its HEALTHY_COUNTS entry. Wide
@@ -90,18 +78,14 @@ STALE_FLOOR_RATIO = 1.45
 
 RELATIVE_FLOOR_PCT = 98
 
-# Not required: precompute.py only reads these while the matching DB tables
-# exist. Floor-checked when present, but left out of the printed listing.
-OPTIONAL = {"trace_scores", "trace_comments"}
-
-# csv's default 128KB field cap is smaller than some TRACE comment blobs.
+# csv's default 128KB field cap is smaller than some review blobs.
 csv.field_size_limit(min(sys.maxsize, 2**31 - 1))
 
 
 def _count_reader(fh):
     """Data rows in an open text handle, header excluded.
 
-    csv.reader, not a line count: TRACE comments and RMP review text contain
+    csv.reader, not a line count: RMP review text contains
     newlines inside quoted fields, so counting lines over-reports and would let
     a truncated file clear its floor.
     """
@@ -166,8 +150,6 @@ def check(counts, baseline=None, accept_lower=False):
     for name in FILES:
         count = counts.get(name)
         if count is None:
-            if name in OPTIONAL:
-                continue
             problems.append(
                 f"Missing required data file: {name}. "
                 "precompute.py reads it; aborting before DB writes."
@@ -208,8 +190,7 @@ def _cmd_baseline(args):
     with open(args.out, "w", encoding="utf-8") as fh:
         json.dump(present, fh, indent=2, sort_keys=True)
     for name in FILES:
-        if name not in OPTIONAL:
-            print(f"  {name}: {counts[name] if counts[name] is not None else 'absent'}")
+        print(f"  {name}: {counts[name] if counts[name] is not None else 'absent'}")
     print(f"Baseline written to {args.out}")
     return 0
 
@@ -221,7 +202,7 @@ def stale_floors(counts):
     failing the run over it would block a legitimately growing corpus. But it is
     the state that quietly disarmed the first set of floors: they were written as
     "~80% of healthy", the store grew 35%, and nobody re-measured, so by the time
-    it mattered trace_scores could have lost 40% of its rows and still passed.
+    it mattered professor_photos could have lost 40% of its rows and still passed.
 
     Nothing else notices, because the relative floor is doing the visible work on
     every run that has a baseline, and the absolute floors only decide the runs
@@ -255,8 +236,6 @@ def _cmd_check(args):
 
     counts = collect_counts(args.data_dir)
     for name in FILES:
-        if name in OPTIONAL:
-            continue
         current = counts[name]
         was = (baseline or {}).get(name)
         print(f"  {name}: {current if current is not None else 'absent'}"

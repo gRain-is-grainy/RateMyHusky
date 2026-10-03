@@ -16,19 +16,19 @@ LEAK_MARKERS = [
 ]
 
 def has_structured_evidence(facts):
-    """True when the RMP/TRACE structured facts carry something substantive to answer from
-    (any rating/difficulty/hours, would-take-again, or a non-zero review count). Mirrors the
+    """True when the RMP structured facts carry something substantive to answer from
+    (any rating/difficulty, would-take-again, or a non-zero review count). Mirrors the
     fields the professor & course pages display, so Ask treats them as real evidence."""
     if not facts:
         return False
     if facts.get("kind") == "course":
         return any(facts.get(k) is not None
-                   for k in ("avg_rating", "avg_difficulty", "hours_per_week"))
+                   for k in ("avg_rating", "avg_difficulty"))
     # professor (default)
     if (facts.get("total_reviews") or 0) > 0:
         return True
     return any(facts.get(k) is not None
-               for k in ("avg_rating", "rmp_rating", "trace_rating",
+               for k in ("avg_rating", "rmp_rating",
                          "difficulty", "would_take_again_pct"))
 
 def has_reddit_evidence(retrieval):
@@ -40,7 +40,7 @@ def has_reddit_evidence(retrieval):
     return total_words >= MIN_TOTAL_WORDS
 
 def thin_data_check(retrieval):
-    """Answerable when EITHER the structured RMP/TRACE facts are substantive OR the Reddit
+    """Answerable when EITHER the structured RMP facts are substantive OR the Reddit
     discussion clears its bar. Only 'thin' when neither source has enough to answer."""
     if has_structured_evidence(retrieval.get("facts")) or has_reddit_evidence(retrieval):
         return True, None
@@ -73,25 +73,25 @@ def selftest():
     bad, reason = thin_data_check(thin)
     check("thin Reddit + no facts blocked", bad is False and reason)
 
-    # COMBINED EVIDENCE: thin Reddit but substantive RMP/TRACE facts -> answerable.
+    # COMBINED EVIDENCE: thin Reddit but substantive RMP facts -> answerable.
     prof_facts_thin_reddit = dict(thin, facts={"kind": "professor", "total_reviews": 31})
     ok2, _ = thin_data_check(prof_facts_thin_reddit)
-    check("prof RMP/TRACE facts answer despite thin Reddit", ok2 is True)
+    check("prof RMP facts answer despite thin Reddit", ok2 is True)
 
     rating_only = dict(thin, facts={"kind": "professor", "total_reviews": 0, "avg_rating": 4.2})
     check("a single real rating counts as evidence", thin_data_check(rating_only)[0] is True)
 
     course_facts_thin = dict(thin, facts={"kind": "course", "avg_rating": 4.0, "avg_difficulty": None})
-    check("course TRACE facts answer despite thin Reddit", thin_data_check(course_facts_thin)[0] is True)
+    check("course RMP facts answer despite thin Reddit", thin_data_check(course_facts_thin)[0] is True)
 
     # EMPTY facts (entity exists but has no ratings/reviews) + thin Reddit -> still thin.
     empty_prof = dict(thin, facts={"kind": "professor", "total_reviews": 0,
-                                   "avg_rating": None, "rmp_rating": None, "trace_rating": None,
+                                   "avg_rating": None, "rmp_rating": None,
                                    "difficulty": None, "would_take_again_pct": None})
     check("no facts + thin Reddit -> thin", thin_data_check(empty_prof)[0] is False)
 
     empty_course = dict(thin, facts={"kind": "course", "avg_rating": None,
-                                     "avg_difficulty": None, "hours_per_week": None})
+                                     "avg_difficulty": None})
     check("empty course facts + thin Reddit -> thin", thin_data_check(empty_course)[0] is False)
 
     # helper-level assertions

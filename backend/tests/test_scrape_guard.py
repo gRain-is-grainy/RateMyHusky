@@ -58,16 +58,16 @@ def test_count_rows_on_header_only_file_is_zero(tmp_path):
 
 
 def test_count_rows_reads_the_csv_inside_a_zip(tmp_path):
-    inner = write_csv(tmp_path / "trace_comments.csv", 5)
-    zpath = tmp_path / "trace_comments.zip"
+    inner = write_csv(tmp_path / "rmp_reviews.csv", 5)
+    zpath = tmp_path / "rmp_reviews.zip"
     with zipfile.ZipFile(zpath, "w") as z:
-        z.write(inner, arcname="trace_comments.csv")
+        z.write(inner, arcname="rmp_reviews.csv")
     inner.unlink()
     assert count_rows(zpath) == 5
 
 
 def test_count_rows_handles_embedded_newlines_in_quoted_comments(tmp_path):
-    # TRACE comments and RMP review text contain newlines inside quotes; a
+    # RMP review text contains newlines inside quotes; a
     # line count would over-report and let a truncated file clear the floor.
     path = tmp_path / "f.csv"
     path.write_text('comment,x\n"line one\nline two",1\n"another",2\n')
@@ -76,29 +76,16 @@ def test_count_rows_handles_embedded_newlines_in_quoted_comments(tmp_path):
 
 # ── locating files ──────────────────────────────────────────────────────────
 
-def test_trace_comments_is_accepted_as_csv(tmp_path):
-    write_csv(tmp_path / "trace_comments.csv", 1)
-    assert resolve_path(tmp_path, "trace_comments").name == "trace_comments.csv"
+def test_rmp_reviews_is_accepted_as_csv(tmp_path):
+    write_csv(tmp_path / "rmp_reviews.csv", 1)
+    assert resolve_path(tmp_path, "rmp_reviews").name == "rmp_reviews.csv"
 
 
-def test_trace_comments_is_accepted_as_zip(tmp_path):
-    # The uncompressed file is ~415MB and exceeds GitHub's 100MB limit, so the
-    # data store tracks only the zip; precompute.py reads it directly.
-    (tmp_path / "trace_comments.zip").write_bytes(b"")
-    assert resolve_path(tmp_path, "trace_comments").name == "trace_comments.zip"
-
-
-def test_trace_scores_is_accepted_as_csv(tmp_path):
-    write_csv(tmp_path / "trace_scores.csv", 1)
-    assert resolve_path(tmp_path, "trace_scores").name == "trace_scores.csv"
-
-
-def test_trace_scores_is_accepted_as_zip(tmp_path):
-    # 95.5MB at the 2026-08-11 export against GitHub's 100MB cap, after a 35%
-    # jump in one scrape — the store will have to zip it, so the guard has to
-    # count it either way or the refresh fails on a file that is simply there.
-    (tmp_path / "trace_scores.zip").write_bytes(b"")
-    assert resolve_path(tmp_path, "trace_scores").name == "trace_scores.zip"
+def test_rmp_reviews_is_accepted_as_zip(tmp_path):
+    # rmp_reviews is the largest file in the store; if it nears GitHub's 100MB
+    # cap the store zips it, and the guard has to count it either way.
+    (tmp_path / "rmp_reviews.zip").write_bytes(b"")
+    assert resolve_path(tmp_path, "rmp_reviews").name == "rmp_reviews.zip"
 
 
 def test_missing_file_resolves_to_none(tmp_path):
@@ -133,30 +120,18 @@ def test_file_exactly_at_its_absolute_floor_passes():
 def test_missing_file_is_a_problem_even_when_every_other_file_is_healthy():
     # precompute.py reads every required file; a missing one crashes it mid-run,
     # after the RMP load has already written to the DB.
-    problems = check(dict(HEALTHY, trace_courses=None), baseline=HEALTHY)
+    problems = check(dict(HEALTHY, professor_photos=None), baseline=HEALTHY)
     assert len(problems) == 1
-    assert "trace_courses" in problems[0]
+    assert "professor_photos" in problems[0]
     assert "issing" in problems[0]
-
-
-def test_trace_scores_and_comments_may_be_absent():
-    # precompute skips them once the DB tables are gone, so they are optional.
-    counts = dict(HEALTHY, trace_scores=None, trace_comments=None)
-    assert check(counts, baseline=HEALTHY) == []
-
-
-def test_optional_file_still_has_its_floor_when_present():
-    problems = check(dict(HEALTHY, trace_comments=10), baseline=HEALTHY)
-    assert len(problems) == 1
-    assert "trace_comments" in problems[0]
 
 
 def test_absolute_floors_track_the_healthy_counts():
     """A floor left behind by a growing store stops being the ~80% it claims.
 
     The first set was derived from the 2026-08-09 store and never re-measured.
-    By 2026-08-12 the store had grown 35%, putting trace_scores at 59% of its
-    floor's basis and professor_photos at 56% — so either could have lost 40% of
+    By 2026-08-12 the store had grown 35%, putting professor_photos at 56% of its
+    floor's basis — so either could have lost 40% of
     its rows on a baseline-less run and been waved through as healthy. Nothing
     failed, because the relative floor covers every run that has a baseline and
     the absolute floors only decide the runs that do not.
@@ -178,18 +153,18 @@ def test_healthy_store_trips_no_staleness_warning():
 
 
 def test_a_store_that_has_outgrown_its_floor_is_reported():
-    grown = dict(HEALTHY, trace_scores=int(
-        ABSOLUTE_FLOORS["trace_scores"] * STALE_FLOOR_RATIO) + 1)
+    grown = dict(HEALTHY, professor_photos=int(
+        ABSOLUTE_FLOORS["professor_photos"] * STALE_FLOOR_RATIO) + 1)
     notes = stale_floors(grown)
     assert len(notes) == 1
-    assert "trace_scores" in notes[0]
+    assert "professor_photos" in notes[0]
     assert "re-measure" in notes[0].lower()
 
 
 def test_staleness_is_advisory_not_a_violation():
     # Growth is the healthy direction; it must never fail the run, or a growing
     # corpus would block its own refresh.
-    grown = dict(HEALTHY, trace_scores=ABSOLUTE_FLOORS["trace_scores"] * 10)
+    grown = dict(HEALTHY, professor_photos=ABSOLUTE_FLOORS["professor_photos"] * 10)
     assert stale_floors(grown) != []
     assert check(grown, baseline=None) == []
 
@@ -197,12 +172,12 @@ def test_staleness_is_advisory_not_a_violation():
 def test_a_missing_file_is_not_reported_as_stale():
     # None means absent, which `check` already reports as a hard problem; a
     # second advisory line about it would be noise.
-    assert stale_floors(dict(HEALTHY, trace_scores=None)) == []
+    assert stale_floors(dict(HEALTHY, professor_photos=None)) == []
 
 
 def test_every_file_gets_an_absolute_floor():
     # The shipped bash checked counts for rmp_professors and rmp_reviews only;
-    # the other four got an existence check and nothing more.
+    # the rest got an existence check and nothing more.
     assert set(ABSOLUTE_FLOORS) == set(HEALTHY)
 
 
@@ -233,9 +208,9 @@ def test_growth_over_baseline_passes():
 
 
 def test_relative_floor_applies_to_every_file_not_just_the_rmp_pair():
-    problems = check(dict(HEALTHY, trace_scores=900000), baseline=HEALTHY)
+    problems = check(dict(HEALTHY, professor_photos=3000), baseline=HEALTHY)
     assert len(problems) == 1
-    assert "trace_scores" in problems[0]
+    assert "professor_photos" in problems[0]
 
 
 def test_missing_baseline_degrades_to_absolute_floors(tmp_path):
@@ -262,5 +237,5 @@ def test_accept_lower_still_enforces_absolute_floors():
 
 
 def test_all_problems_are_reported_not_just_the_first():
-    counts = dict(HEALTHY, rmp_professors=10, rmp_reviews=10, trace_courses=None)
+    counts = dict(HEALTHY, rmp_professors=10, rmp_reviews=10, professor_photos=None)
     assert len(check(counts, baseline=HEALTHY)) == 3

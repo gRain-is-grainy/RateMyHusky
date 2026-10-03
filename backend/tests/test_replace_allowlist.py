@@ -26,12 +26,26 @@ def test_rmp_professors_can_be_replaced():
 
 
 def test_cumulative_artifacts_cannot_be_replaced():
-    # TRACE and photo CSVs accumulate across scrapes rather than being a
-    # complete snapshot of the source, so replacing from them destroys data.
-    for table in ("trace_courses", "trace_scores", "trace_comments",
-                  "professor_photos"):
-        assert table not in REPLACE_ALLOWED
+    # The photo CSV accumulates across scrapes rather than being a complete
+    # snapshot of the source, so replacing from it destroys data.
+    assert "professor_photos" not in REPLACE_ALLOWED
 
 
 def test_allowlist_only_names_real_tables():
     assert REPLACE_ALLOWED <= set(TABLES)
+
+
+def test_a_bare_run_writes_nothing(monkeypatch):
+    """No default target: a bare run would upsert every table from local CSVs,
+    re-inserting reviews prune_rmp_reviews.py removed if the CSV is stale."""
+    import pytest
+    import migrate_to_crdb
+
+    def no_connect(*a, **k):
+        raise AssertionError("a bare run must not connect")
+
+    monkeypatch.setattr(migrate_to_crdb, "get_connection", no_connect)
+    monkeypatch.setattr(migrate_to_crdb.sys, "argv", ["migrate_to_crdb.py"])
+    with pytest.raises(SystemExit) as exc:
+        migrate_to_crdb.main()
+    assert "usage" in str(exc.value)

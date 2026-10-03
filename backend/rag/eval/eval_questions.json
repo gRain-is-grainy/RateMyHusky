@@ -55,7 +55,7 @@
   "entities": [{"kind": "professor", "slug": "silvio-amir-alves-moreira"}], "notes": "course_specific"},
  {"id": "p28", "mode": "professor", "question": "how is grading for Gregory aloupis for 5800 online?",
   "entities": [{"kind": "professor", "slug": "gregory-aloupis"}], "notes": "grading_online"},
- {"id": "p29", "mode": "professor", "question": "what do trace comment say about MUSC 1001 for james Gutierrez online?",
+ {"id": "p29", "mode": "professor", "question": "what do reviews say about MUSC 1001 for james Gutierrez online?",
   "entities": [{"kind": "professor", "slug": "james-gutierrez"}], "notes": "online_course_specific"},
 
  {"id": "c01", "mode": "course", "question": "best prof for algo?",

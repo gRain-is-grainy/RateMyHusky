@@ -2,7 +2,7 @@
 Emergency restore from a backend/backup_db.py gzipped SQL dump into CockroachDB.
 
 Usage:
-    python backend/restore_db.py <dump.sql.gz> --tables trace_courses,trace_scores,trace_comments [--yes]
+    python backend/restore_db.py <dump.sql.gz> --tables rmp_professors,rmp_reviews [--yes]
     python backend/restore_db.py <dump.sql.gz> --all [--yes]
     python backend/restore_db.py <dump.sql.gz> --list
     python backend/restore_db.py --selftest
@@ -18,16 +18,16 @@ import os, sys, re, argparse, glob
 from urllib.parse import urlparse
 
 _FIXTURE_SQL = """-- ratemyhusky NEW cluster backup
--- Table: trace_comments  (3 rows)
+-- Table: rmp_reviews  (3 rows)
 SET sql_safe_updates = false;
 
-DROP TABLE IF EXISTS trace_comments CASCADE;
-CREATE TABLE public.trace_comments (
+DROP TABLE IF EXISTS rmp_reviews CASCADE;
+CREATE TABLE public.rmp_reviews (
     id INT8 NOT NULL,
     comment STRING NULL
 );
 
-INSERT INTO trace_comments (id, comment) VALUES
+INSERT INTO rmp_reviews (id, comment) VALUES
 (1,'simple'),
 (2,'tricky; has ''quoted'' text;
 and a newline -- not a comment'),
@@ -42,8 +42,8 @@ INSERT INTO stats_cache (key, value) VALUES ('professors',9385);
 def iter_statements(lines):
     """Split a backup_db.py dump into statements, streaming. State machine handles:
     '...' literals with '' doubling (psycopg2 mogrify), E'...' with backslash escapes
-    (defensive), "..." identifiers, and -- line comments outside strings. Comment text in
-    TRACE data contains ; and newlines INSIDE literals — naive split(';') corrupts it."""
+    (defensive), "..." identifiers, and -- line comments outside strings. RMP
+    review text contains ; and newlines INSIDE literals — naive split(';') corrupts it."""
     buf = []
     in_sq = in_dq = False
     estring = False
@@ -186,10 +186,10 @@ def selftest():
     check("E-string backslash escape did not split", any("escaped" in s and s.count("VALUES") == 1 for s in stmts))
     check("SET statement captured", stmts[0].startswith("SET sql_safe_updates"))
 
-    check("table of DROP", statement_table("DROP TABLE IF EXISTS trace_comments CASCADE") == "trace_comments")
-    check("table of CREATE", statement_table('CREATE TABLE trace_comments (\n id INT8)') == "trace_comments")
+    check("table of DROP", statement_table("DROP TABLE IF EXISTS rmp_reviews CASCADE") == "rmp_reviews")
+    check("table of CREATE", statement_table('CREATE TABLE rmp_reviews (\n id INT8)') == "rmp_reviews")
     check("table of schema-qualified CREATE",
-          statement_table('CREATE TABLE public.trace_comments (\n id INT8)') == "trace_comments")
+          statement_table('CREATE TABLE public.rmp_reviews (\n id INT8)') == "rmp_reviews")
     check("table of INSERT", statement_table("INSERT INTO stats_cache (key) VALUES ('x')") == "stats_cache")
     check("SET has no table", statement_table("SET sql_safe_updates = false") is None)
 
@@ -197,10 +197,10 @@ def selftest():
     check("--tables filter keeps SET + target table only", len(kept) == 3)
 
     check("confirm accepts typed host label",
-          confirm("free-tier-cluster.gcp.cockroachlabs.cloud", ["trace_comments"], "d.sql.gz",
+          confirm("free-tier-cluster.gcp.cockroachlabs.cloud", ["rmp_reviews"], "d.sql.gz",
                   input_fn=lambda _: "free-tier-cluster") is True)
     check("confirm rejects wrong input",
-          confirm("free-tier-cluster.gcp.cockroachlabs.cloud", ["trace_comments"], "d.sql.gz",
+          confirm("free-tier-cluster.gcp.cockroachlabs.cloud", ["rmp_reviews"], "d.sql.gz",
                   input_fn=lambda _: "yes") is False)
     check("confirm honors --yes",
           confirm("h.x.y", ["t"], "d", input_fn=lambda _: (_ for _ in ()).throw(AssertionError("prompted")),

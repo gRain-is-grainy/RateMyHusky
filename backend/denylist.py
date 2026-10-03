@@ -2,7 +2,7 @@
 
 A data-deletion request has to survive the pipeline, and nothing else here does:
 precompute DROPs and rebuilds professors_catalog from the CSVs on every run, and
-migrate_to_crdb re-inserts trace_courses/trace_comments from the store. Deleting
+migrate_to_crdb re-inserts rmp_reviews from the store. Deleting
 someone's rows by hand removes them until the next refresh puts them back. So the
 list lives in the repo, is read by every loader, and is applied before a row is
 ever written.
@@ -19,7 +19,7 @@ a filter only governs the next write.
 ## Scope: the database, not the data store
 
 Deliberate, and worth stating because it is the surprising half. The filters run
-at *load* time, so the scraped CSVs in RateMyHusky-data still contain a denied
+at *load* time, so the scraped CSVs in the data store still contain a denied
 professor's rows — the scrapers write everyone, and the loaders drop them on the
 way in. Nothing the site or the chat can reach holds their data; the private
 store does.
@@ -27,9 +27,8 @@ store does.
 Chosen on 2026-08-12 over scrubbing at write time. The store is private, and its
 push step force-pushes an orphan commit each run, so there is no accumulating
 history — a professor's rows leave the store as soon as they leave the source
-CSVs rather than living in git forever. For RMP that is automatic once RMP
-removes them. For TRACE it is not: those exports carry historical terms, so the
-rows persist in the store until someone edits the file.
+CSVs rather than living in git forever. That is automatic once RMP removes them,
+and until then the rows persist in the store.
 
 If a request has to mean "retained nowhere", this is the piece to extend: filter
 in fetch_lite's CSV dumps and add a scrub pass before the store push. Until then,
@@ -85,10 +84,10 @@ def normalize_name(name):
 def name_key(name):
     """Normalized, alias-resolved key — the form every table joins on.
 
-    ALIAS_MAP matters here: a professor RMP spells "sakib miazi" and TRACE spells
-    "md nazmus sakib miazi" is one person, and a denylist that caught only the
-    spelling they happened to write in their request would leave the other half
-    of their data published.
+    ALIAS_MAP matters here: a professor RMP spells "sakib miazi" and other
+    sources spell "md nazmus sakib miazi" is one person, and a denylist that
+    caught only the spelling they happened to write in their request would leave
+    the other half of their data published.
     """
     key = normalize_name(name)
     return ALIAS_MAP.get(key, key)
@@ -123,8 +122,8 @@ _cache = {}
 def denied_hashes(path=None, refresh=False):
     """The hash set, read once per process.
 
-    Cached because migrate_to_crdb consults it per CSV row — 1.7M times for
-    trace_comments — and re-reading the file there would dominate the load.
+    Cached because migrate_to_crdb consults it per CSV row — tens of thousands of
+    times for rmp_reviews — and re-reading the file there would dominate the load.
     """
     path = path or DENYLIST_PATH
     if refresh or path not in _cache:
@@ -152,11 +151,6 @@ def is_denied_key(key, path=None):
     if not key:
         return False
     return hashlib.sha256(str(key).encode("utf-8")).hexdigest() in denied_hashes(path)
-
-
-def denied_full_name(first, last, path=None):
-    """TRACE stores names split; this joins them the way precompute does."""
-    return is_denied(f"{normalize_name(first)} {normalize_name(last)}", path)
 
 
 # ── CLI ─────────────────────────────────────────────────────────────────────

@@ -16,8 +16,9 @@ backend/groq_keys.local.json
 *.local.json
 
 archive/
-scraper/trace_pipeline/cookies.txt
-scraper/applyweb_pipeline/data/
-scraper/applyweb_pipeline/cookies.txt
+scraper/*/cookies.txt
+# Left behind in existing checkouts by the deleted scrapers: a browser profile
+# (saved logins/cookies) and downloaded files.
+scraper/*/data/
 backend/rag/eval/pool.json*
 backend/rag/eval/runs/*/answers.json*

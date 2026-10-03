@@ -1,5 +1,5 @@
 """
-Build the unified `evidence` corpus (RMP + TRACE + Reddit) in CockroachDB for Ask retrieval.
+Build the unified `evidence` corpus (RMP + Reddit) in CockroachDB for Ask retrieval.
 Idempotent. Reads existing source tables; writes only `evidence` + `evidence_embeddings` schema.
 
 Usage:
@@ -122,7 +122,7 @@ def body_sha(text: str) -> str:
     return hashlib.sha256((text or "").encode()).hexdigest()[:32]
 
 def is_meaningful(text: str) -> bool:
-    """Return True if text passes TRACE filter: non-empty, not n/a, >=15 chars."""
+    """Return True if text passes the quality filter: non-empty, not n/a, >=15 chars."""
     t = sanitize_body(text)
     if not t or t.lower() in _NA:
         return False
@@ -187,26 +187,10 @@ def build_reddit_rows(query_fn) -> list:
     return out
 
 def build_rmp_rows(query_fn) -> list:
-    """Yield evidence rows from rmp_reviews, resolving course_code via TRACE validation."""
-    catalog = query_fn(
-        "SELECT name_key, slug, trace_name_key FROM professors_catalog", ())
+    """Yield evidence rows from rmp_reviews, carrying the precomputed rmp_reviews.course_code."""
+    catalog = query_fn("SELECT name_key, slug FROM professors_catalog", ())
     slug_by_key = {r["name_key"]: r["slug"] for r in catalog}
-    # RMP name_key -> the name TRACE files this professor's courses under. For a
-    # fuzzy-matched professor the two spellings differ, and `taught` below is
-    # keyed on TRACE's — so looking it up with the RMP key found nothing and the
-    # validation stopped being a validation: it stripped the course from every
-    # one of their reviews instead of only the ones TRACE cannot vouch for.
-    # NULL means no fuzzy match, so fall back to the RMP key. Same rule as
-    # professor_full.trace_key and the trace join below.
-    trace_key_by_key = {r["name_key"]: (r.get("trace_name_key") or r["name_key"])
-                        for r in catalog}
-    taught = {}  # TRACE name_key -> set(course_code) from TRACE
-    for r in query_fn("SELECT DISTINCT name_key, course_code FROM trace_courses", ()):
-        nk = r.get("name_key")
-        code = norm_code(r.get("course_code", ""))
-        if nk:
-            taught.setdefault(nk, set()).add(code)
-    rows = query_fn("""SELECT id, name_key, course, comment, quality, difficulty, tags, grade
+    rows = query_fn("""SELECT id, name_key, course, course_code, comment, quality, difficulty, tags, grade
                        FROM rmp_reviews WHERE comment IS NOT NULL AND comment <> ''""", ())
     out = []
     for r in rows:
@@ -220,14 +204,9 @@ def build_rmp_rows(query_fn) -> list:
         # the lookup above already fails — but an evidence build against a
         # catalog written before the request would otherwise re-embed them, and
         # this corpus is what the chat quotes.
-        # Both spellings: a fuzzy-matched professor's request may have been
-        # hashed from the TRACE one.
-        nk = r.get("name_key")
-        if is_denied_key(nk) or is_denied_key(trace_key_by_key.get(nk)):
+        if is_denied_key(r.get("name_key")):
             continue
-        code = norm_code(r.get("course"))
-        prof_codes = taught.get(trace_key_by_key.get(nk, nk), set())
-        course_code = code if code in prof_codes else None
+        course_code = norm_code(r.get("course_code")) or None
         meta = {
             "course": r.get("course"),
             "quality": r.get("quality"),
@@ -236,43 +215,6 @@ def build_rmp_rows(query_fn) -> list:
             "grade": r.get("grade"),
         }
         out.append(_row("rmp", r["id"], slug, course_code, r.get("comment"), rmp_meta=meta))
-    return out
-
-def build_trace_rows(query_fn) -> list:
-    """Yield evidence rows from trace_comments joined to trace_courses + professors_catalog."""
-    rows = query_fn("""
-        SELECT tc.id, tc.comment, c.name_key, c.course_code,
-               p.slug AS professor_slug, p.name_key AS catalog_name_key
-        FROM trace_comments tc
-        JOIN trace_courses c
-          ON tc.tc_course_id = c.course_id AND tc.tc_instructor_id = c.instructor_id
-         AND tc.tc_term_id = c.term_id
-        -- COALESCE, not p.name_key: for a fuzzy-matched professor the catalog
-        -- holds the RMP spelling while trace_courses holds TRACE's, so a plain
-        -- equality drops every one of their comments from the corpus and the
-        -- chat cannot see what the profile page shows. trace_name_key is NULL
-        -- unless a fuzzy match happened, which is why this falls back rather
-        -- than joining on it outright. Same rule as professor_full.trace_key.
-        JOIN professors_catalog p
-          ON COALESCE(p.trace_name_key, p.name_key) = c.name_key
-        WHERE tc.comment IS NOT NULL AND tc.comment <> ''
-        ORDER BY tc.id
-    """, ())
-    seen, out = set(), []
-    for r in rows:
-        if not is_meaningful(r.get("comment")):
-            continue
-        slug = r.get("professor_slug")
-        # Both spellings, as in build_rmp_rows: c.name_key is TRACE's, and the
-        # catalog row's name_key is RMP's for a fuzzy-matched professor.
-        if is_denied_key(r.get("name_key")) or is_denied_key(r.get("catalog_name_key")):
-            continue
-        code = norm_code(r.get("course_code"))
-        k = (slug, code, dedup_key(r.get("comment")))
-        if k in seen:
-            continue
-        seen.add(k)
-        out.append(_row("trace", r["id"], slug, code or None, r.get("comment")))
     return out
 
 # ── Upsert ──
@@ -411,7 +353,7 @@ def selftest():
     check("norm_code uppercases + strips space", norm_code("cs 3500") == "CS3500")
     check("norm_code on clean code", norm_code("EECE2140") == "EECE2140")
 
-    # ── is_meaningful (TRACE filter) ──
+    # ── is_meaningful ──
     check("meaningful keeps a real comment", is_meaningful("Great professor, very clear lectures") is True)
     check("meaningful drops n/a", is_meaningful("N/A") is False)
     check("meaningful drops blank", is_meaningful("   ") is False)
@@ -427,6 +369,8 @@ def selftest():
             return [{"source_id": "c1", "professor_slug": "guha-prof", "body": "hard but fair, great office hours",
                      "subreddit": "NEU", "score": 12, "permalink": "/r/x",
                      "sentiment": "positive", "flagged": False}]
+        if "professors_catalog" in sql:
+            return [{"slug": "guha-prof"}]
         return []
     rr = build_reddit_rows(reddit_q)
     check("reddit row source tag", rr[0]["source"] == "reddit")
@@ -437,72 +381,24 @@ def selftest():
     check("reddit row has body_sha", len(rr[0]["body_sha"]) == 32)
     check("reddit row carries subreddit", rr[0]["subreddit"] == "NEU")
 
-    # ── RMP rows: course_code only on exact match to the prof's TRACE set ──
+    # ── RMP rows: course_code comes from the precomputed rmp_reviews.course_code ──
     def rmp_q(sql, params=None):
         if "rmp_reviews" in sql:
             return [
-                {"id": "r1", "name_key": "olin guha", "course": "CS3500", "comment": "Tough grader but I learned a ton in this class",
+                {"id": "r1", "name_key": "olin guha", "course": "3500", "course_code": "CS3500", "comment": "Tough grader but I learned a ton in this class",
                  "quality": 5, "difficulty": 4, "tags": "GIVES GOOD FEEDBACK", "grade": "A"},
-                {"id": "r2", "name_key": "olin guha", "course": "Algorithms", "comment": "Loved the material and the pacing of the course",
+                {"id": "r2", "name_key": "olin guha", "course": "Algorithms", "course_code": None, "comment": "Loved the material and the pacing of the course",
                  "quality": 4, "difficulty": 3, "tags": "", "grade": "B"},
             ]
         if "professors_catalog" in sql:
             return [{"name_key": "olin guha", "slug": "guha-prof"}]
-        if "trace_courses" in sql:  # courses this prof actually taught
-            return [{"name_key": "olin guha", "course_code": "CS3500"}]
         return []
     mr = build_rmp_rows(rmp_q)
     check("rmp row tagged rmp", all(r["source"] == "rmp" for r in mr))
     check("rmp keyed to prof slug", all(r["professor_slug"] == "guha-prof" for r in mr))
-    check("rmp validated code keeps course_code", mr[0]["course_code"] == "CS3500")
-    check("rmp stale/name course -> course_code '' (kept, prof-only)", mr[1]["course_code"] == "")
+    check("rmp resolved code keeps course_code", mr[0]["course_code"] == "CS3500")
+    check("rmp unresolved course -> course_code '' (kept, prof-only)", mr[1]["course_code"] == "")
     check("rmp carries meta", mr[0]["rmp_meta"]["quality"] == 5 and mr[0]["rmp_meta"]["grade"] == "A")
-
-    # ── TRACE rows: keyed to BOTH prof + course via join; filtered + deduped ──
-    def trace_q(sql, params=None):
-        if "trace_comments" in sql:
-            return [
-                {"id": "t1", "comment": "The instructor explained recursion exceptionally well",
-                 "name_key": "olin guha", "course_code": "CS3500", "professor_slug": "guha-prof"},
-                {"id": "t2", "comment": "N/A", "name_key": "olin guha", "course_code": "CS3500", "professor_slug": "guha-prof"},
-                {"id": "t3", "comment": "The instructor explained recursion exceptionally well",
-                 "name_key": "olin guha", "course_code": "CS3500", "professor_slug": "guha-prof"},  # dup of t1
-            ]
-        return []
-    tr = build_trace_rows(trace_q)
-    check("trace row tagged trace", all(r["source"] == "trace" for r in tr))
-    check("trace keyed to prof AND course", tr[0]["professor_slug"] == "guha-prof" and tr[0]["course_code"] == "CS3500")
-    check("trace drops n/a + dedupes (3 in -> 1 out)", len(tr) == 1)
-    check("trace sentiment is None", tr[0]["sentiment"] is None)
-
-    # ── Issue 23: dedupe representative is deterministic regardless of SELECT order ──
-    def trace_q_order_a(sql, params=None):
-        if "trace_comments" in sql:
-            return [
-                {"id": "t1", "comment": "The instructor explained recursion exceptionally well",
-                 "name_key": "olin guha", "course_code": "CS3500", "professor_slug": "guha-prof"},
-                {"id": "t3", "comment": "The instructor explained recursion exceptionally well",
-                 "name_key": "olin guha", "course_code": "CS3500", "professor_slug": "guha-prof"},
-            ]
-        return []
-    def trace_q_order_b(sql, params=None):
-        if "trace_comments" in sql:
-            return sorted(trace_q_order_a(sql, params), key=lambda r: r["id"])
-        return []
-    trace_sql_holder = []
-    def trace_q_capture_sql(sql, params=None):
-        trace_sql_holder.append(sql)
-        return []
-    build_trace_rows(trace_q_capture_sql)
-    check("trace SELECT orders by tc.id (deterministic dedupe representative)",
-          "ORDER BY tc.id" in trace_sql_holder[0])
-    # Because the SQL orders by tc.id, the rows dedupe sees are always in id order regardless of
-    # any unordered re-run of the same query — simulate that guarantee by feeding both an
-    # already-sorted list (as the real ORDER BY would produce) from two independently-run mocks.
-    tr_a = build_trace_rows(trace_q_order_a)
-    tr_b = build_trace_rows(trace_q_order_b)
-    check("dedupe keeps first-seen (lowest id) row consistently once query is ordered by tc.id",
-          tr_a[0]["source_ref"] == tr_b[0]["source_ref"] == "t1")
 
     # ── Issue 24: upsert refreshes mutable metadata columns, not just body/flagged ──
     upsert_sql_holder = []
@@ -575,7 +471,7 @@ def selftest():
         def commit(self): pass
         def rollback(self): pass
     fresh_refs_multi = ["a", "b", "c", "d"]
-    deleted_multi = prune_evidence(_FakeMultiBatchConn(), "trace", fresh_refs_multi, batch=2)
+    deleted_multi = prune_evidence(_FakeMultiBatchConn(), "reddit", fresh_refs_multi, batch=2)
     all_delete_params = [p for _, p in prune_multi_sql_holder]
     all_chunk_refs = [ref for _source, chunk in all_delete_params for ref in chunk]
     check("prune (multi-batch) never puts a fresh ref in any DELETE param",
@@ -618,13 +514,12 @@ def main():
 
         reddit_rows = build_reddit_rows(query_fn)
         rmp_rows = build_rmp_rows(query_fn)
-        trace_rows = build_trace_rows(query_fn)
-        all_rows = reddit_rows + rmp_rows + trace_rows
+        all_rows = reddit_rows + rmp_rows
         n = upsert_evidence(conn, all_rows)
         print(f"Upserted {n} evidence rows")
 
         if args.prune:
-            for source, rows in (("reddit", reddit_rows), ("rmp", rmp_rows), ("trace", trace_rows)):
+            for source, rows in (("reddit", reddit_rows), ("rmp", rmp_rows)):
                 fresh_refs = [r["source_ref"] for r in rows]
                 deleted = prune_evidence(conn, source, fresh_refs)
                 print(f"Pruned {deleted} stale {source} evidence rows")

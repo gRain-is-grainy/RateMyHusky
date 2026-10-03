@@ -53,7 +53,7 @@ export const PromoVideo: React.FC = () => {
     Math.round(manifest.scenes.compare.durationSec * FPS) - SCENES.compare;
   // courses.mp4: the CS3500 page top is fully painted at ~6.6s (everything
   // earlier is the dept hop + loading fade-in) and the clip ends settled on
-  // the Rating History chart. Play from that first painted frame through the
+  // the Professors panel. Play from that first painted frame through the
   // clip end, and freeze-hold the painted top for whatever the slot has left
   // over, so the page top holds on screen instead of flashing by mid-scroll.
   const coursesPlayFrom = Math.round(6.6 * FPS);

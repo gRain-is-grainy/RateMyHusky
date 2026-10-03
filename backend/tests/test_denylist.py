@@ -1,7 +1,7 @@
 """A data-deletion request has to survive a pipeline that rebuilds from CSVs.
 
 precompute DROPs and rebuilds professors_catalog every run, and migrate_to_crdb
-re-inserts trace_courses/trace_comments from the store, so deleting a professor's
+re-inserts rmp_reviews from the store, so deleting a professor's
 rows by hand removes them only until the next refresh. The denylist is the part
 that persists: it lives in the repo and every loader consults it before writing.
 
@@ -22,7 +22,6 @@ from denylist import (
     entry_hash,
     is_denied,
     is_denied_key,
-    denied_full_name,
     denied_hashes,
     name_key,
     normalize_name,
@@ -104,11 +103,11 @@ def test_an_empty_list_denies_nobody(listfile):
 def test_aliases_resolve_so_both_spellings_are_caught(listfile):
     """One person, two spellings, one request — both halves must go.
 
-    RMP and TRACE spell the same professor differently; ALIAS_MAP is what makes
-    them one row. A denylist that matched only the spelling someone happened to
-    type in their request would leave the other source published.
+    Sources spell the same professor differently; ALIAS_MAP is what makes them
+    one row. A denylist that matched only the spelling someone happened to type
+    in their request would leave the other spelling published.
     """
-    listfile("Md Nazmus Sakib Miazi")     # the TRACE spelling
+    listfile("Md Nazmus Sakib Miazi")     # the long spelling
     assert is_denied("sakib miazi")        # the RMP spelling
     assert is_denied("Md Nazmus Sakib Miazi")
     # ...and adding it under the RMP spelling resolves to the same entry.
@@ -121,14 +120,6 @@ def test_key_form_skips_renormalizing(listfile):
     assert not is_denied_key("Julia Garrett"), "is_denied_key takes a normalized key"
     assert not is_denied_key(None)
     assert not is_denied_key("")
-
-
-def test_split_trace_names_are_joined(listfile):
-    """TRACE stores first and last separately; trace_courses is filtered on that."""
-    listfile("Julia Garrett")
-    assert denied_full_name("Julia", "Garrett")
-    assert denied_full_name(" julia ", " GARRETT ")
-    assert not denied_full_name("Julia", "Morrow")
 
 
 def test_entries_are_hashed_not_plaintext(listfile):
@@ -189,18 +180,10 @@ def test_migrate_tags_every_table_that_carries_a_name():
     expected = {
         "rmp_professors": ("name",),
         "rmp_reviews": ("professor_name",),
-        "trace_courses": ("instructor_first_name", "instructor_last_name"),
         "professor_photos": ("name",),
     }
     for table, cols in expected.items():
         assert TABLES[table].get("deny_name") == cols, f"{table} is not filtered"
-    # The two that legitimately carry no name reach a professor only by joining
-    # trace_courses, so they are detached by the course filter and cleared by
-    # purge_denied. Asserted so that adding a name column to either is noticed.
-    for table in ("trace_comments", "trace_scores"):
-        cols = TABLES[table]["columns"]
-        assert not any("name" in c for c in cols), (
-            f"{table} gained a name column — it now needs a deny_name entry")
 
 
 def test_migrate_withholds_a_denied_row(listfile, tmp_path, capsys):
@@ -241,15 +224,13 @@ def test_migrate_withholds_a_denied_row(listfile, tmp_path, capsys):
     assert "1 withheld (denylist)" in capsys.readouterr().out
 
 
-def test_precompute_filters_both_sides(listfile):
-    """The catalog build drops them from the RMP frame and the TRACE frame."""
+def test_precompute_filters_the_rmp_frame(listfile):
+    """The catalog build drops them from the RMP frame."""
     import pandas as pd
     listfile("Julia Garrett")
 
     rmp = pd.DataFrame({"_name_key": ["julia garrett", "garrett morrow"]})
-    tc = pd.DataFrame({"name_key": ["julia garrett", "julia garrett", "garrett morrow"]})
     assert list(rmp[~rmp["_name_key"].map(is_denied_key)]["_name_key"]) == ["garrett morrow"]
-    assert list(tc[~tc["name_key"].map(is_denied_key)]["name_key"]) == ["garrett morrow"]
 
 
 def test_evidence_builders_import_the_filter():
@@ -258,10 +239,8 @@ def test_evidence_builders_import_the_filter():
     src = pathlib.Path(__file__).resolve().parents[2] / "scraper" / "load_evidence_to_crdb.py"
     text = src.read_text()
     assert "from denylist import is_denied_key" in text
-    assert "is_denied_key(trace_key_by_key.get(nk))" in text, (
-        "the RMP evidence builder must check the TRACE spelling too")
-    assert "is_denied_key(r.get(\"catalog_name_key\"))" in text, (
-        "the TRACE evidence builder must check the RMP spelling too")
+    assert 'is_denied_key(r.get("name_key"))' in text, (
+        "the RMP evidence builder must check the denylist")
     assert "known_slugs" in text, "reddit rows must be restricted to catalog slugs"
 
 
@@ -270,19 +249,17 @@ def test_evidence_builders_import_the_filter():
 class FakeCursor:
     """Answers find_targets' probe queries from canned rows.
 
-    Dispatch is on (table, shape) rather than a single substring: several probes
-    now carry `name_key IS NULL`, so matching that alone would answer the
-    rmp_reviews probe with trace_courses rows.
+    Dispatch is on (table, shape) rather than a single substring: the
+    rmp_reviews probes both mention name_key, so matching that alone would
+    answer one with the other's rows.
     """
 
-    def __init__(self, catalog, trace_names, rmp_reviews, trace_keys,
-                 null_key_rows=(), slug_rows=(), null_key_reviews=()):
+    def __init__(self, catalog, rmp_reviews, slug_rows=(), null_key_reviews=(),
+                 professors=()):
         self._data = {
             "catalog": catalog,
-            "trace_names": trace_names,
+            "professors": professors,
             "rmp_reviews": rmp_reviews,
-            "trace_keys": trace_keys,
-            "trace_null": null_key_rows,
             "slugs": slug_rows,
             "rmp_null": null_key_reviews,
         }
@@ -292,14 +269,12 @@ class FakeCursor:
         flat = " ".join(sql.split())
         if "FROM professors_catalog" in flat:
             key = "catalog"
+        elif "FROM professors" in flat:
+            key = "professors"
         elif "professor_slug FROM" in flat:
             key = "slugs"
         elif "FROM rmp_reviews" in flat:
             key = "rmp_null" if "name_key IS NULL" in flat else "rmp_reviews"
-        elif "instructor_first_name, instructor_last_name" in flat:
-            key = "trace_null" if "name_key IS NULL" in flat else "trace_names"
-        elif "course_id, instructor_id, term_id" in flat:
-            key = "trace_null" if "name_key IS NULL" in flat else "trace_keys"
         else:
             key = None
         self._rows = self._data.get(key, []) if key else []
@@ -312,38 +287,33 @@ def test_purge_finds_the_professor_through_the_catalog(listfile):
     from purge_denied import find_targets
     listfile("Julia Garrett")
     cur = FakeCursor(
-        catalog=[("julia-garrett", "Julia Garrett", "julia garrett", None),
-                 ("garrett-morrow", "Garrett Morrow", "garrett morrow", None)],
-        trace_names=[("Julia", "Garrett"), ("Garrett", "Morrow")],
+        catalog=[("julia-garrett", "Julia Garrett", "julia garrett"),
+                 ("garrett-morrow", "Garrett Morrow", "garrett morrow")],
         rmp_reviews=[("Julia Garrett", "julia garrett")],
-        trace_keys=[(1, 10, 202430), (2, 10, 202510)],
     )
-    slugs, name_keys, trace_keys, _ = find_targets(cur)
+    slugs, name_keys, _ = find_targets(cur)
     assert slugs == ["julia-garrett"]
     assert "julia garrett" in name_keys
     assert "garrett morrow" not in name_keys
-    assert set(trace_keys) == {(1, 10, 202430), (2, 10, 202510)}
 
 
 def test_purge_still_finds_them_after_precompute_removed_the_catalog_row(listfile):
     """The case a naive purge misses entirely.
 
-    Run precompute first and the professor has no catalog row, while their TRACE
-    courses and comments are still loaded. A purge that only searched the catalog
-    would find nothing and report clean while the data sat there.
+    Run precompute first and the professor has no catalog row, while their
+    review rows are still loaded. A purge that only searched the catalog would
+    find nothing and report clean while the data sat there.
     """
     from purge_denied import find_targets
     listfile("Julia Garrett")
     cur = FakeCursor(
-        catalog=[("garrett-morrow", "Garrett Morrow", "garrett morrow", None)],
-        trace_names=[("Julia", "Garrett"), ("Garrett", "Morrow")],
-        rmp_reviews=[],
-        trace_keys=[(1, 10, 202430)],
+        catalog=[("garrett-morrow", "Garrett Morrow", "garrett morrow")],
+        rmp_reviews=[("Julia Garrett", "julia garrett"),
+                     ("Garrett Morrow", "garrett morrow")],
     )
-    slugs, name_keys, trace_keys, _ = find_targets(cur)
+    slugs, name_keys, _ = find_targets(cur)
     assert slugs == []
     assert name_keys == ["julia garrett"]
-    assert trace_keys == [(1, 10, 202430)]
 
 
 def test_purge_recovers_evidence_slugs_the_catalog_can_no_longer_resolve(listfile):
@@ -357,13 +327,11 @@ def test_purge_recovers_evidence_slugs_the_catalog_can_no_longer_resolve(listfil
     from purge_denied import find_targets
     listfile("Julia Garrett")
     cur = FakeCursor(
-        catalog=[("garrett-morrow", "Garrett Morrow", "garrett morrow", None)],
-        trace_names=[("Julia", "Garrett")],
-        rmp_reviews=[],
-        trace_keys=[],
+        catalog=[("garrett-morrow", "Garrett Morrow", "garrett morrow")],
+        rmp_reviews=[("Julia Garrett", "julia garrett")],
         slug_rows=[("julia-garrett",), ("garrett-morrow",)],
     )
-    slugs, _, _, _ = find_targets(cur)
+    slugs, _, _ = find_targets(cur)
     assert slugs == ["julia-garrett"]
 
 
@@ -380,12 +348,10 @@ def test_slug_recovery_does_not_widen_to_deduped_variants(listfile):
     listfile("Julia Garrett")
     cur = FakeCursor(
         catalog=[],
-        trace_names=[("Julia", "Garrett")],
-        rmp_reviews=[],
-        trace_keys=[],
+        rmp_reviews=[("Julia Garrett", "julia garrett")],
         slug_rows=[("julia-garrett",), ("julia-garrett-2",)],
     )
-    slugs, _, _, _ = find_targets(cur)
+    slugs, _, _ = find_targets(cur)
     assert slugs == ["julia-garrett"]
 
 
@@ -420,46 +386,39 @@ def test_a_missing_slug_table_does_not_poison_the_transaction(listfile):
     listfile("Julia Garrett")
     cur = Poisonable(
         catalog=[],
-        trace_names=[("Julia", "Garrett")],
-        rmp_reviews=[],
-        trace_keys=[],
+        rmp_reviews=[("Julia Garrett", "julia garrett")],
         slug_rows=[("julia-garrett",)],
     )
-    slugs, name_keys, _, _ = find_targets(cur)
+    slugs, name_keys, _ = find_targets(cur)
     assert slugs == ["julia-garrett"], "a later probe was lost to the failed one"
     assert name_keys == ["julia garrett"]
     assert cur.rolled_back == 1, "the failed probe left the transaction aborted"
 
 
-def test_purge_matches_a_trace_name_that_needs_normalizing(listfile):
-    """The fallback key skipped the NFKD fold and the whitespace collapse.
+def test_purge_normalizes_a_review_name_with_no_name_key(listfile):
+    """A row whose name_key is not backfilled still resolves through name_key().
 
-    trace_courses.name_key is written by precompute through the full
-    normalization, so a hand-built "  josé  garcía " key matched zero rows and
-    the professor's TRACE data survived a purge that reported success.
+    A hand-built "  josé  garcía " key skips the NFKD fold and the whitespace
+    collapse, and would match nothing.
     """
     from purge_denied import find_targets
     listfile("José García")
     cur = FakeCursor(
         catalog=[],
-        trace_names=[("José", "  García ")],
-        rmp_reviews=[],
-        trace_keys=[(3, 11, 202510)],
+        rmp_reviews=[("José  García ", None)],
     )
-    _, name_keys, _, _ = find_targets(cur)
+    _, name_keys, _ = find_targets(cur)
     assert name_keys == ["jose garcia"]
 
 
-def test_purge_resolves_an_alias_on_the_trace_fallback_path(listfile):
-    """The fallback also skipped ALIAS_MAP, which name_key applies."""
+def test_purge_resolves_an_alias_from_a_review_name(listfile):
+    """name_key applies ALIAS_MAP, so the alias spelling resolves to the target."""
     from prof_aliases import ALIAS_MAP
     from purge_denied import find_targets
     alias = next(iter(ALIAS_MAP))
     listfile(ALIAS_MAP[alias])
-    first, _, last = alias.partition(" ")
-    cur = FakeCursor(catalog=[], trace_names=[(first, last)],
-                     rmp_reviews=[], trace_keys=[])
-    _, name_keys, _, _ = find_targets(cur)
+    cur = FakeCursor(catalog=[], rmp_reviews=[(alias, None)])
+    _, name_keys, _ = find_targets(cur)
     assert name_keys == [ALIAS_MAP[alias]]
 
 
@@ -471,92 +430,102 @@ def test_purge_collects_review_ids_whose_name_key_is_not_backfilled_yet(listfile
     listfile("Julia Garrett")
     cur = FakeCursor(
         catalog=[],
-        trace_names=[],
         rmp_reviews=[("Julia Garrett", "julia garrett")],
-        trace_keys=[],
         null_key_reviews=[(101, "Julia Garrett"), (102, "Garrett Morrow")],
     )
-    _, _, _, review_ids = find_targets(cur)
+    _, _, review_ids = find_targets(cur)
     assert review_ids == [101]
-
-
-def test_purge_matches_a_fuzzy_matched_trace_spelling(listfile):
-    """trace_name_key differs from name_key for fuzzy-matched professors."""
-    from purge_denied import find_targets
-    listfile("Md Nazmus Sakib Miazi")
-    cur = FakeCursor(
-        catalog=[("sakib-miazi", "Sakib Miazi", "md nazmus sakib miazi", "md nazmus sakib miazi")],
-        trace_names=[],
-        rmp_reviews=[],
-        trace_keys=[(5, 7, 202510)],
-    )
-    slugs, name_keys, _, _ = find_targets(cur)
-    assert slugs == ["sakib-miazi"]
-    assert "md nazmus sakib miazi" in name_keys
-
-
-def test_purge_picks_up_courses_whose_name_key_is_not_backfilled_yet(listfile):
-    """precompute backfills trace_courses.name_key; rows loaded since are NULL."""
-    from purge_denied import find_targets
-    listfile("Julia Garrett")
-    cur = FakeCursor(
-        catalog=[],
-        trace_names=[("Julia", "Garrett")],
-        rmp_reviews=[],
-        trace_keys=[],
-        null_key_rows=[(9, 3, 202530, "Julia", "Garrett"),
-                       (8, 4, 202530, "Garrett", "Morrow")],
-    )
-    _, _, trace_keys, _ = find_targets(cur)
-    assert trace_keys == [(9, 3, 202530)]
 
 
 def test_nothing_matches_an_empty_list(listfile):
     from purge_denied import find_targets
     cur = FakeCursor(
-        catalog=[("julia-garrett", "Julia Garrett", "julia garrett", None)],
-        trace_names=[("Julia", "Garrett")],
+        catalog=[("julia-garrett", "Julia Garrett", "julia garrett")],
         rmp_reviews=[("Julia Garrett", "julia garrett")],
-        trace_keys=[(1, 10, 202430)],
     )
-    assert find_targets(cur) == ([], [], [], [])
+    assert find_targets(cur) == ([], [], [])
 
 
 def test_migrate_filter_survives_a_transform_that_yields_nothing(listfile):
     """The filter must not depend on the transform understanding the CSV.
 
-    trace_courses' transform reads camelCase while the export in output_data is
-    snake_case, so it produces empty strings for every field. A name check
-    against only that output would wave every row through and report nothing
-    wrong — the one failure mode a privacy filter must not have.
+    A transform that reads camelCase keys against a snake_case export produces
+    empty strings for every field. A name check against only that output would
+    wave every row through and report nothing wrong — the one failure mode a
+    privacy filter must not have.
     """
     from migrate_to_crdb import _row_is_denied
     listfile("Julia Garrett")
-    deny = ("instructor_first_name", "instructor_last_name")
+    deny = ("first_name", "last_name")
 
     # Transform understood the CSV.
-    assert _row_is_denied({"instructor_first_name": "Julia",
-                           "instructor_last_name": "Garrett"}, {}, deny)
+    assert _row_is_denied({"first_name": "Julia", "last_name": "Garrett"}, {}, deny)
     # Transform produced nothing; the raw snake_case row still catches it.
-    raw_snake = {"instructor_first_name": "Julia", "instructor_last_name": "Garrett"}
-    assert _row_is_denied({"instructor_first_name": "", "instructor_last_name": ""},
-                          raw_snake, deny)
+    raw_snake = {"first_name": "Julia", "last_name": "Garrett"}
+    assert _row_is_denied({"first_name": "", "last_name": ""}, raw_snake, deny)
     # ...and the raw camelCase row too.
-    raw_camel = {"instructorFirstName": "Julia", "instructorLastName": "Garrett"}
-    assert _row_is_denied({"instructor_first_name": "", "instructor_last_name": ""},
-                          raw_camel, deny)
+    raw_camel = {"firstName": "Julia", "lastName": "Garrett"}
+    assert _row_is_denied({"first_name": "", "last_name": ""}, raw_camel, deny)
     # A different professor passes through under every spelling.
-    assert not _row_is_denied({"instructor_first_name": "Garrett",
-                               "instructor_last_name": "Morrow"}, {}, deny)
-    assert not _row_is_denied({}, {"instructorFirstName": "Garrett",
-                                   "instructorLastName": "Morrow"}, deny)
+    assert not _row_is_denied({"first_name": "Garrett", "last_name": "Morrow"}, {}, deny)
+    assert not _row_is_denied({}, {"firstName": "Garrett", "lastName": "Morrow"}, deny)
     # An all-empty row is not a match for a one-word denylist entry.
-    assert not _row_is_denied({"instructor_first_name": "", "instructor_last_name": ""},
-                              {}, deny)
+    assert not _row_is_denied({"first_name": "", "last_name": ""}, {}, deny)
 
 
 def test_camel_conversion_matches_the_transform_keys():
     from migrate_to_crdb import _camel
-    assert _camel("instructor_first_name") == "instructorFirstName"
     assert _camel("professor_name") == "professorName"
     assert _camel("name") == "name"
+
+
+def test_purge_finds_a_professor_with_no_reviews_through_the_pipeline_table(listfile):
+    """No catalog row and no RMP reviews leaves only the pipeline's professors row.
+
+    Without it the slug never resolves, the reddit and evidence rows survive, and
+    the tool prints "Nothing to purge".
+    """
+    from purge_denied import find_targets
+    listfile("Julia Garrett")
+    cur = FakeCursor(
+        catalog=[], rmp_reviews=[],
+        professors=[("julia-garrett", "Julia Garrett", "julia garrett"),
+                    ("garrett-morrow", "Garrett Morrow", "garrett morrow")],
+        slug_rows=[("julia-garrett",)],
+    )
+    slugs, name_keys, _ = find_targets(cur)
+    assert slugs == ["julia-garrett"]
+    assert name_keys == ["julia garrett"]
+
+
+def test_purge_deletes_the_pipeline_identity_rows(listfile):
+    """A deletion request must not leave the name, RMP name or RMP URL behind."""
+    from purge_denied import purge
+    listfile("Julia Garrett")
+
+    class Recording(FakeCursor):
+        executed = []
+
+        def execute(self, sql, params=None):
+            Recording.executed.append(" ".join(sql.split()))
+            super().execute(sql, params)
+
+        def fetchone(self):
+            return (1,)
+
+    cur = Recording(catalog=[("julia-garrett", "Julia Garrett", "julia garrett")],
+                    rmp_reviews=[])
+
+    class Conn:
+        def cursor(self):
+            return cur
+
+        def commit(self):
+            pass
+
+        def rollback(self):
+            pass
+
+    purge(Conn())
+    assert "DELETE FROM rmp_links WHERE slug = ANY(%s)" in Recording.executed
+    assert "DELETE FROM professors WHERE slug = ANY(%s)" in Recording.executed

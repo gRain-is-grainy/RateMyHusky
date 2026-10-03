@@ -89,7 +89,7 @@ for _from, _to in ALIAS_MAP.items():
 
 
 def resolve_alias(q):
-    """Return the canonical (trace) query if q matches an alias, else q."""
+    """Return the canonical query if q matches an alias, else q."""
     return ALIAS_MAP.get(q, q)
 
 
@@ -611,7 +611,7 @@ SHRINKAGE_M = 50
 #
 # The prior of a ranking should be the mean of the quantity being ranked, so it
 # is measured over professors whose rating is actually pinned down. At 30
-# responses the standard error of a TRACE mean is ~0.13; at 5 it is ~0.33, which
+# responses the standard error of a mean rating is ~0.13; at 5 it is ~0.33, which
 # is wider than the entire top of the board.
 #
 # Deliberately global rather than per-college: a per-college prior ranks each
@@ -845,7 +845,8 @@ def chat():
         cache_set_fn=cache_set,
         keyword_search_fn=lambda qq: keyword_search(qq, query, _professor_search),
         gate_fn=lambda qq: gate(qq, _chat_adapter),
-        retrieve_fn=lambda qq, hint: retrieve(qq, hint, query, query_one, _professor_search, embed_query_fn=embed_query),
+        retrieve_fn=lambda qq, hint: retrieve(qq, hint, query, query_one, _professor_search,
+                                             embed_query_fn=embed_query, rmp_mod=moderation.sql_filter),
         generate_fn=lambda qq, blocks: generate(qq, blocks, _chat_adapter),
         generate_course_list_fn=lambda topic, courses: generate_course_list(topic, courses, _chat_adapter),
         generate_course_ranking_fn=lambda subject, metric, direction, courses: generate_course_ranking(subject, metric, direction, courses, _chat_adapter),

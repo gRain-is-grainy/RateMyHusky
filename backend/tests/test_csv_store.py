@@ -1,9 +1,8 @@
 """Data-store CSVs that may ship zipped.
 
-trace_comments has always exceeded GitHub's 100MB file limit uncompressed
-(~415MB), so the store tracks only its .zip. trace_scores is now on the same
-path: 95.5MB at the 2026-08-11 export against a 100MB cap, and it grew 35% in
-the last one. The fallback goes in before the push that fails, not after.
+A big export can exceed GitHub's 100MB file limit uncompressed, so the store
+may track only its .zip. The fallback goes in before the push that fails, not
+after.
 
 resolve() covers pandas callers, which open a .zip directly; open_text() covers
 csv.DictReader callers, which do not.
@@ -33,23 +32,23 @@ def write_zip(path, member, rows):
 # ── resolve ─────────────────────────────────────────────────────────────────
 
 def test_resolve_prefers_the_plain_csv_when_both_exist(tmp_path):
-    # A local TRACE re-scrape writes the .csv beside the store's .zip; the
+    # A local re-scrape writes the .csv beside the store's .zip; the
     # fresh file is the one that should win.
-    write_csv(tmp_path / "trace_scores.csv", 3)
-    write_zip(tmp_path / "trace_scores.zip", "trace_scores.csv", 99)
-    assert resolve(tmp_path, "trace_scores.csv").endswith("trace_scores.csv")
-    assert not resolve(tmp_path, "trace_scores.csv").endswith(".zip")
+    write_csv(tmp_path / "rmp_reviews.csv", 3)
+    write_zip(tmp_path / "rmp_reviews.zip", "rmp_reviews.csv", 99)
+    assert resolve(tmp_path, "rmp_reviews.csv").endswith("rmp_reviews.csv")
+    assert not resolve(tmp_path, "rmp_reviews.csv").endswith(".zip")
 
 
 def test_resolve_falls_back_to_the_zip(tmp_path):
-    write_zip(tmp_path / "trace_scores.zip", "trace_scores.csv", 3)
-    assert resolve(tmp_path, "trace_scores.csv").endswith("trace_scores.zip")
+    write_zip(tmp_path / "rmp_reviews.zip", "rmp_reviews.csv", 3)
+    assert resolve(tmp_path, "rmp_reviews.csv").endswith("rmp_reviews.zip")
 
 
 def test_resolve_returns_the_csv_path_when_neither_exists(tmp_path):
     # Callers report "File not found: <path>" off this return; naming the .zip
     # there would send someone looking for the wrong file.
-    assert resolve(tmp_path, "trace_scores.csv").endswith("trace_scores.csv")
+    assert resolve(tmp_path, "rmp_reviews.csv").endswith("rmp_reviews.csv")
 
 
 def test_resolve_leaves_a_non_csv_name_alone(tmp_path):
@@ -89,7 +88,7 @@ def test_open_text_rejects_a_zip_with_no_csv(tmp_path):
 
 
 def test_open_text_survives_undecodable_bytes(tmp_path):
-    # TRACE comment text is not reliably UTF-8; the CSV readers all pass
+    # Review text is not reliably UTF-8; the CSV readers all pass
     # errors="replace" and a zipped file must not become the exception.
     path = tmp_path / "f.zip"
     with zipfile.ZipFile(path, "w") as z:

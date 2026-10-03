@@ -172,7 +172,7 @@ def selftest():
         check("no tmp file left behind", not os.path.exists(p + ".tmp"))
 
     labels = [
-        {"evidence_id": "id-1", "source": "trace", "source_ref": "t1",
+        {"evidence_id": "id-1", "source": "rmp", "source_ref": "t1",
          "professor_slug": "guha", "course_code": "", "body_sha": "s1", "rel": 2},
         {"evidence_id": "id-old", "source": "rmp", "source_ref": "r1",
          "professor_slug": "guha", "course_code": "", "body_sha": "s2", "rel": 1},

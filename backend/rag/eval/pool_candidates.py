@@ -183,7 +183,7 @@ def selftest():
         if "WHERE id IN" in sql and "body" in sql:
             ids = set(params[0])
             rows = {"L1": "lex only", "B1": "both", "V1": "vec only", "S1": "top8 straggler"}
-            return [{"id": i, "source": "trace", "source_ref": f"ref-{i}",
+            return [{"id": i, "source": "rmp", "source_ref": f"ref-{i}",
                      "professor_slug": "guha", "course_code": "", "body_sha": f"sha-{i}",
                      "body": rows[i]} for i in rows if i in ids]
         return []

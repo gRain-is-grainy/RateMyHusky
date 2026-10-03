@@ -51,7 +51,7 @@ def bm_client(monkeypatch):
         if "FROM professors_catalog" in sql and "ANY" in sql:
             return [{"slug": "alice-smith", "name": "Alice Smith",
                      "department": "Computer Science", "college": "Khoury",
-                     "avg_rating": 4.5, "rmp_rating": 4.4, "trace_rating": 4.6,
+                     "avg_rating": 4.5, "rmp_rating": 4.4,
                      "total_reviews": 120, "total_comments": 12,
                      "would_take_again_pct": 90.0, "image_url": None,
                      "focus_x": None, "focus_y": None}]

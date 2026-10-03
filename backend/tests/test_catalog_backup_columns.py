@@ -1,8 +1,8 @@
 """load_catalog must read professors_catalog columns by name, not by position.
 
 _CATALOG_COLS was a hand-maintained copy of the table's column order, and it
-drifted: focus_x and focus_y were added to professors_catalog between image_url
-and avg_hours and never added here, so every row's `total_comments` was read out
+drifted: focus_x and focus_y were added to professors_catalog after image_url
+and never added here, so every row's `total_comments` was read out
 of the focus_y slot — a focus coordinate, around 30 for every professor, with
 nothing to distinguish it from a plausible comment count.
 
@@ -35,10 +35,9 @@ from match_professors import (  # noqa: E402
 # reordering of that CREATE TABLE has to be reflected deliberately.
 REAL_COLUMNS = [
     "slug", "name", "name_key", "department", "college", "avg_rating",
-    "rmp_rating", "trace_rating", "num_ratings", "trace_reviews",
-    "total_reviews", "would_take_again_pct", "difficulty", "professor_url",
-    "image_url", "focus_x", "focus_y", "avg_hours", "total_comments",
-    "trace_name_key",
+    "rmp_rating", "num_ratings", "total_reviews", "would_take_again_pct",
+    "difficulty", "professor_url", "image_url", "focus_x", "focus_y",
+    "total_comments",
 ]
 
 
@@ -47,9 +46,9 @@ def _row(slug, name, num_ratings, total_reviews, total_comments,
     """One VALUES tuple in the real column order."""
     return (
         f"('{slug}', '{name}', '{name.lower()}', 'Computer Science', 'Khoury', "
-        f"4.5, 4.2, 4.6, {num_ratings}, 300, {total_reviews}, 88.0, 3.1, "
-        f"'https://rmp/x', 'https://img/x', {focus_x}, {focus_y}, 9.5, "
-        f"{total_comments}, NULL)"
+        f"4.5, 4.2, {num_ratings}, {total_reviews}, 88.0, 3.1, "
+        f"'https://rmp/x', 'https://img/x', {focus_x}, {focus_y}, "
+        f"{total_comments})"
     )
 
 

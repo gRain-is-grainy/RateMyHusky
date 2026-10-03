@@ -24,15 +24,11 @@ class TestHasStructuredEvidence:
     def test_course_kind_with_avg_difficulty(self):
         assert has_structured_evidence({"kind": "course", "avg_difficulty": 3.0}) is True
 
-    def test_course_kind_with_hours_per_week(self):
-        assert has_structured_evidence({"kind": "course", "hours_per_week": 10}) is True
-
     def test_course_kind_all_none_returns_false(self):
         assert has_structured_evidence({
             "kind": "course",
             "avg_rating": None,
             "avg_difficulty": None,
-            "hours_per_week": None,
         }) is False
 
     def test_professor_kind_with_total_reviews_gt_zero(self):
@@ -44,7 +40,6 @@ class TestHasStructuredEvidence:
             "total_reviews": 0,
             "avg_rating": None,
             "rmp_rating": None,
-            "trace_rating": None,
             "difficulty": None,
             "would_take_again_pct": None,
         }) is False
@@ -61,13 +56,6 @@ class TestHasStructuredEvidence:
             "kind": "professor",
             "total_reviews": 0,
             "rmp_rating": 4.0,
-        }) is True
-
-    def test_professor_kind_with_trace_rating(self):
-        assert has_structured_evidence({
-            "kind": "professor",
-            "total_reviews": 0,
-            "trace_rating": 3.8,
         }) is True
 
     def test_professor_kind_with_difficulty(self):
@@ -92,7 +80,6 @@ class TestHasStructuredEvidence:
             "total_reviews": 0,
             "avg_rating": None,
             "rmp_rating": None,
-            "trace_rating": None,
             "difficulty": None,
             "would_take_again_pct": None,
         }) is False

@@ -25,7 +25,7 @@ def score_unit(run_ids, run_rels, run_sources, labels):
     # per-source recall@8 (rel>=1): of the relevant labels from source s, how many made top-8
     rel_ids_in_run = {i for i, r in zip(run_ids[:K], run_rels[:K]) if r >= 1}
     src = {}
-    for s in ("reddit", "rmp", "trace"):
+    for s in ("reddit", "rmp"):
         rel_labels = [l for l in labels if l["source"] == s and l["rel"] >= 1]
         if rel_labels:
             src[s] = sum(1 for l in rel_labels if l["evidence_id"] in rel_ids_in_run) / len(rel_labels)
@@ -92,7 +92,7 @@ def score_all(questions, qrels, query_fn, fetch_fn, embed_fn):
         if uids:
             by_mode[mode] = {m: aggregate([units[u][m] for u in uids]) for m in METRICS}
     src_recall = {}
-    for s in ("reddit", "rmp", "trace"):
+    for s in ("reddit", "rmp"):
         vals = [u["source_recall_rel1"].get(s) for u in units.values() if s in u["source_recall_rel1"]]
         if vals:
             src_recall[s] = aggregate(vals)
@@ -150,22 +150,21 @@ def selftest():
         return a is not None and abs(a - b) <= tol
 
     labels_u1 = [
-        {"evidence_id": "a", "source": "trace", "source_ref": "ra", "professor_slug": "g", "course_code": "", "body_sha": "s", "rel": 2},
-        {"evidence_id": "b", "source": "rmp", "source_ref": "rb", "professor_slug": "g", "course_code": "", "body_sha": "s", "rel": 1},
-        {"evidence_id": "c", "source": "reddit", "source_ref": "rc", "professor_slug": "g", "course_code": "", "body_sha": "s", "rel": 0},
-        {"evidence_id": "d", "source": "trace", "source_ref": "rd", "professor_slug": "g", "course_code": "", "body_sha": "s", "rel": 2},
+        {"evidence_id": "a", "source": "rmp", "source_ref": "ra", "professor_slug": "g", "course_code": "", "body_sha": "s", "rel": 2},
+        {"evidence_id": "b", "source": "reddit", "source_ref": "rb", "professor_slug": "g", "course_code": "", "body_sha": "s", "rel": 1},
+        {"evidence_id": "c", "source": "rmp", "source_ref": "rc", "professor_slug": "g", "course_code": "", "body_sha": "s", "rel": 0},
+        {"evidence_id": "d", "source": "rmp", "source_ref": "rd", "professor_slug": "g", "course_code": "", "body_sha": "s", "rel": 2},
     ]
     # run returns a,b,c,d in that order -> run_rels [2,1,0,2] vs pool [2,1,0,2]
     u = score_unit(["a", "b", "c", "d"], [2, 1, 0, 2],
-                   {"a": "trace", "b": "rmp", "c": "reddit", "d": "trace"}, labels_u1)
+                   {"a": "rmp", "b": "reddit", "c": "rmp", "d": "rmp"}, labels_u1)
     # ideal pool [2,2,1,0] -> same worked example as rag_metrics selftest
     check("unit ndcg matches worked example", approx(u["ndcg@8"], 0.91287807, 1e-4))
     check("unit recall rel2 = 1.0", u["recall@8_rel2"] == 1.0)
     check("unit mrr rel2 = 1.0 (first item is rel2)", u["mrr_rel2"] == 1.0)
     check("unit precision = 0.75", u["precision@8"] == 0.75)
-    check("per-source recall: trace 2/2", u["source_recall_rel1"]["trace"] == 1.0)
-    check("per-source recall: rmp 1/1", u["source_recall_rel1"]["rmp"] == 1.0)
-    check("per-source recall omits sources with no relevant labels", "reddit" not in u["source_recall_rel1"])
+    check("per-source recall: rmp 2/2", u["source_recall_rel1"]["rmp"] == 1.0)
+    check("per-source recall: reddit 1/1", u["source_recall_rel1"]["reddit"] == 1.0)
 
     # ── score_all: a natural-key-resolved label (stale evidence_id, corpus reloaded since
     # labeling) must still count toward source_recall_rel1, agreeing with the ndcg/recall/mrr
@@ -173,19 +172,19 @@ def selftest():
     questions_nk = [{"id": "p01", "mode": "professor", "question": "is g hard?",
                      "entities": [{"kind": "professor", "slug": "g"}]}]
     qrels_nk = {"p01::g": {"entity": {"kind": "professor", "slug": "g"}, "labels": [
-        {"evidence_id": "old-id", "source": "trace", "source_ref": "ref1",
+        {"evidence_id": "old-id", "source": "rmp", "source_ref": "ref1",
          "professor_slug": "g", "course_code": "", "body_sha": "s", "rel": 2}]}}
     def fake_query_nk(sql, params):
         if "FROM evidence WHERE id IN" in sql:
-            return [{"id": "new-id", "source": "trace", "source_ref": "ref1",
+            return [{"id": "new-id", "source": "rmp", "source_ref": "ref1",
                      "professor_slug": "g", "course_code": "", "body_sha": "s"}]
         return []
     def fake_fetch_nk(slug, code, q, embed_fn, query_fn, limit=8):
-        return [{"source_id": "new-id", "source": "trace"}]
+        return [{"source_id": "new-id", "source": "rmp"}]
     res_nk = score_all(questions_nk, qrels_nk, fake_query_nk, fake_fetch_nk, lambda q: None)
     unit_nk = res_nk["units"]["p01::g"]
     check("natural-key-resolved label counts in source_recall_rel1",
-          unit_nk["source_recall_rel1"].get("trace") == 1.0)
+          unit_nk["source_recall_rel1"].get("rmp") == 1.0)
 
     print("ALL PASS" if not fails else f"{len(fails)} FAIL(s): " + ", ".join(fails))
     return 1 if fails else 0

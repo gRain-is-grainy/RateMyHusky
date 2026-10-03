@@ -101,7 +101,7 @@ SKIP_PATTERNS = [
 
 # Local, photo-pipeline-only department->college mapping. Supplements
 # precompute.COLLEGE_MAP (which we intentionally do NOT modify) so the photo
-# run can organize the ~2,800 professors whose TRACE department strings are
+# run can organize the ~2,800 professors whose department strings are
 # not in the app's COLLEGE_MAP. Keys are verbatim from the data, including the
 # double-space artifacts left when "&" was stripped upstream.
 SUPPLEMENTAL_COLLEGE_MAP = {

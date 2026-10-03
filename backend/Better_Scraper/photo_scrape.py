@@ -9,7 +9,7 @@ Three-phase approach:
   Phase 2: For remaining professors whose department maps to a known college,
            try ONE slug-based URL on their department's subdomain only.
 
-Reads professor names from rmp_professors.csv and trace_courses.csv.
+Reads professor names from rmp_professors.csv.
 Outputs: professor_photos.csv (name, image_url, source_page)
 
 Usage:
@@ -523,19 +523,6 @@ def load_professors(data_dir):
                     if key not in profs:
                         profs[key] = {'name': name, 'department': dept}
 
-    trace_path = os.path.join(data_dir, "trace_courses.csv")
-    if os.path.exists(trace_path):
-        with open(trace_path, 'r', encoding='utf-8') as f:
-            for row in csv.DictReader(f):
-                first = str(row.get('instructorFirstName', '')).strip()
-                last = str(row.get('instructorLastName', '')).strip()
-                dept = str(row.get('departmentName', '')).strip()
-                if first and last:
-                    name = f"{first} {last}".title()
-                    key = normalize_name(name)
-                    if key not in profs:
-                        profs[key] = {'name': name, 'department': dept}
-
     return list(profs.values())
 
 
@@ -799,7 +786,7 @@ def main():
     )
     parser.add_argument(
         "--data-dir", type=str, default=None,
-        help="Directory containing rmp_professors.csv and trace_courses.csv",
+        help="Directory containing rmp_professors.csv",
     )
     parser.add_argument(
         "--workers", type=int, default=15,

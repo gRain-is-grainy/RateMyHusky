@@ -93,7 +93,7 @@ def selftest():
         if not cond: fails.append(label)
         print(("PASS" if cond else "FAIL") + ": " + label)
 
-    cand = lambda i: {"evidence_id": i, "source": "trace", "source_ref": f"ref-{i}",
+    cand = lambda i: {"evidence_id": i, "source": "rmp", "source_ref": f"ref-{i}",
                       "professor_slug": "guha", "course_code": "", "body_sha": f"sha-{i}",
                       "body": f"body {i}"}
     pool_unit = {"question": "q?", "candidates": [cand("a"), cand("b")]}

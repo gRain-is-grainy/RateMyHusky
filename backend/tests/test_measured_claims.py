@@ -1,8 +1,8 @@
 """Guards the measured numbers that are written into comments.
 
 Several comments around the leaderboard quote numbers measured off the live
-corpus -- how many professors sit at exactly 5.00, how much of total_reviews is
-TRACE, how far the comment count exceeds the rating count. They are load-bearing:
+corpus -- how many professors sit at exactly 5.00, how long each college's board
+is at the review floor, how many ties the name tiebreak settles. They are load-bearing:
 each one is the evidence for a design decision sitting right next to it, and a
 reader who re-measures and gets something different has to work out whether the
 code broke or the comment rotted.

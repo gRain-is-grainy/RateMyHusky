@@ -150,14 +150,14 @@ def _handle_course_ranking(q, block, deps, _log, session_token, ip_hash):
             return _safe_fallback(deps, q, banner="AI generation failed. Showing keyword results."), 200
 
         # Reuse the course_list frontend mode. Carry the metric value as `rating` ONLY when the
-        # metric is rating, so the frontend's ★ badge stays meaningful; for difficulty/hours the
+        # metric is rating, so the frontend's ★ badge stays meaningful; for difficulty the
         # value lives in the summary prose.
         payload = {
             "mode": "course_list", "answer": gen.get("text", ""),
             "topic": f"{subject} courses by {metric}",
             "courses": [{"code": c.get("code"), "name": c.get("name"), "department": c.get("department"),
                          "rating": c.get("value") if metric == "rating" else None} for c in courses],
-            "disclaimer": "AI-generated ranking of Northeastern courses by TRACE data; may be incomplete.",
+            "disclaimer": "AI-generated ranking of Northeastern courses by RateMyProfessors review data; may be incomplete.",
         }
         set_cached(q, [cache_key], payload, deps.cache_set_fn)
         _log("ok", retrieved_count=len(courses), answer_text=payload["answer"], tokens_used=gen.get("tokens_used", 0))
@@ -323,7 +323,7 @@ def handle_question(q, session_token, ip_hash, deps):
         primary_slug = blocks[0].get("professor_slug") or blocks[0].get("entity_key")
         total_comments = sum(b.get("comment_count", 0) for b in blocks)
 
-        # 9. Thin-data check over the COMBINED evidence (RMP/TRACE facts + Reddit across all
+        # 9. Thin-data check over the COMBINED evidence (RMP facts + Reddit across all
         # resolved entities): only fall back when neither structured ratings nor Reddit can answer.
         combined_evidence = {
             "comment_count": total_comments,
@@ -648,7 +648,7 @@ def selftest():
                 "source_entities": [{"professor_slug": "guha-prof", "course_code": None}] * 5
                                    + [{"professor_slug": "rachlin-prof", "course_code": None}] * 3,
                 "sources_comments": [{"body": f"g{i}", "permalink": f"/g/{i}", "subreddit": "NEU", "source": "reddit"} for i in range(5)]
-                                   + [{"body": f"r{i}", "permalink": f"/r/{i}", "subreddit": "NEU", "source": "trace"} for i in range(3)]}
+                                   + [{"body": f"r{i}", "permalink": f"/r/{i}", "subreddit": "NEU", "source": "rmp"} for i in range(3)]}
     d_multi.generate_fn = types.MethodType(_gen_multi, d_multi)
     payload, code = handle_question("compare Guha and Rachlin", "s", "iphash", d_multi)
     check("multi: retrieve called per entity", retrieved == ["Guha", "Rachlin"])
@@ -667,10 +667,10 @@ def selftest():
           payload["sources"][5]["snippet"].startswith("r")
           and payload["sources"][5]["professor_slug"] == "rachlin-prof")
     # the per-source provenance tag must survive the pipeline->API hop so the frontend badge
-    # shows the real source (Reddit/RMP/TRACE), not always the "Reddit" fallback
+    # shows the real source (Reddit/RMP), not always the "Reddit" fallback
     check("multi: source field flows through to API sources",
           payload["sources"][0]["source"] == "reddit"
-          and payload["sources"][5]["source"] == "trace")
+          and payload["sources"][5]["source"] == "rmp")
     check("multi: primary slug is first resolved entity", payload["professor_slug"] == "guha-prof")
     check("multi: logged ok once", logged[-1][_status_idx()] == "ok")
 

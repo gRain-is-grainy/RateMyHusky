@@ -6,7 +6,7 @@
 
 **Find the right professor, every semester.**
 
-RateMyProfessors ratings and Reddit chatter for 9,300+ Northeastern professors — searchable, comparable, and answerable in one place.
+RateMyProfessors ratings and Reddit chatter for 3,800+ Northeastern professors — searchable, comparable, and answerable in one place.
 
 [![Live Site](https://img.shields.io/badge/Live-ratemyhusky.com-e63946?style=for-the-badge)](https://ratemyhusky.com)
 [![React](https://img.shields.io/badge/React_19-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)](frontend)
@@ -24,33 +24,33 @@ RateMyProfessors ratings and Reddit chatter for 9,300+ Northeastern professors �
 
 ## Why RateMyHusky?
 
-Choosing classes at Northeastern means juggling RateMyProfessors tabs and Reddit threads —> each with a fragment of the picture. RateMyHusky unifies both sources into a single profile per professor, then layers search, comparison, and an AI question-answering mode on top.
+Choosing classes at Northeastern means juggling RateMyProfessors tabs and Reddit threads — each with a fragment of the picture. RateMyHusky unifies both sources into a single profile per professor, then layers search, comparison, and an AI question-answering mode on top. On-site student reviews are planned.
 
 | Source | Scale |
 |---|---|
 | RateMyProfessors | 43K+ ratings & reviews |
 | Reddit (r/NEU and beyond) | ~9K verified professor mentions, sentiment-scored |
-| Professor profiles | 9,300+ professors, 3,700+ photos, full course history |
+| Professor profiles | 3,800+ professors, ~2,000 photos, courses they're reviewed for |
 
 ## Features
 
 ### Explore
-- **Professor catalog** —> filter by college, department, rating, and review volume
-- **Rich profile pages** —> RMP ratings, rating history, grade distributions, review feeds from RMP and Reddit, and related courses
-- **Course catalog** —> course detail pages with sections, ratings, and linked professors
-- **Side-by-side compare** —> stack any professors against each other
-- **GOATED leaderboard** —> top-rated professors by college
-- **Search that keeps up** —> instant autocomplete across professors and courses, plus a shuffle wheel for serendipity
+- **Professor catalog** — filter by college, department, rating, and review volume
+- **Rich profile pages** — RMP ratings and department comparison, grade distributions, review feeds from RMP and Reddit, and the courses each professor is reviewed for
+- **Course catalog** — course detail pages with ratings and the professors reviewed for each course
+- **Side-by-side compare** — stack any professors against each other
+- **GOATED leaderboard** — top-rated professors by college
+- **Search that keeps up** — instant autocomplete across professors and courses, plus a shuffle wheel for serendipity
 
 ### Ask (AI)
-- **Ask a real question** —> *"Is Rachlin a fair grader?"* — and get a cited, single-shot answer grounded in actual student reviews
-- **Hybrid retrieval** —> full-text search + 384-dim [BGE-small](https://huggingface.co/BAAI/bge-small-en-v1.5) embeddings fused with Reciprocal Rank Fusion over RMP and Reddit review excerpts
-- **Citations that jump** —> every cited snippet pins, scrolls to, and highlights its source on the professor page
-- **Guardrailed** —> prompt-injection gate, topic classifier, output validation, per-user abuse strikes, adaptive rate limiting, and answer caching
+- **Ask a real question** — *"Is Rachlin a fair grader?"* — and get a cited, single-shot answer grounded in actual student reviews
+- **Hybrid retrieval** — full-text search + 384-dim [BGE-small](https://huggingface.co/BAAI/bge-small-en-v1.5) embeddings fused with Reciprocal Rank Fusion over review excerpts from RMP and Reddit
+- **Citations that jump** — every cited snippet pins, scrolls to, and highlights its source on the professor page
+- **Guardrailed** — prompt-injection gate, topic classifier, output validation, per-user abuse strikes, adaptive rate limiting, and answer caching
 
 ### Account
-- **Bookmarks** —> one-click bookmark toggle on professor and course cards/profiles, backed by a global bookmarks context for instant, optimistic updates
-- **Bookmarks tab** —> a dedicated view under Account listing all bookmarked professors and courses, reusing the catalog's card layout
+- **Bookmarks** — one-click bookmark toggle on professor and course cards/profiles, backed by a global bookmarks context for instant, optimistic updates
+- **Bookmarks tab** — a dedicated view under Account listing all bookmarked professors and courses, reusing the catalog's card layout
 - Signed-out bookmark clicks prompt Google sign-in instead of failing silently
 - Profile/Bookmarks tabs share an animated sliding underline indicator
 

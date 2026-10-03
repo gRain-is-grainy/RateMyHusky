@@ -1,5 +1,5 @@
 # Baseline: known historical findings, amnestied 2026-07-29.
-# 15 x expired TRACE Blue session cookies in old scraper/main.py commits.
+# 15 x expired university course-portal session cookies in old scraper/main.py commits.
 # 1 x dummy TEST_SECRET in backend/tests/test_bookmarks_api.py (false positive).
 # Anything NOT listed here still fails CI.
 0b186f8ea5613de81d392aa4a5fef6f92d9d78b2:backend/tests/test_bookmarks_api.py:generic-api-key:15

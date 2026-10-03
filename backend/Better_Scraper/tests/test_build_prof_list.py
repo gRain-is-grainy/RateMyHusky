@@ -15,11 +15,9 @@ def test_build_records_dedup_college_and_existing(tmp_path):
     _write_csv(d / "rmp_professors.csv",
                ["name", "department", "rating", "num_ratings",
                 "would_take_again_pct", "level_of_difficulty", "professor_url"],
-               [["Jane Doe", "Computer Science", "4", "10", "80%", "2", "u"]])
-    _write_csv(d / "trace_courses.csv",
-               ["instructorFirstName", "instructorLastName", "departmentName"],
-               [["Jane", "Doe", "Computer Science"],      # dup of RMP
-                ["John", "Smith", "Economics"]])
+               [["Jane Doe", "Computer Science", "4", "10", "80%", "2", "u"],
+                ["Jane  Doe", "Computer Science", "4", "10", "80%", "2", "u"],   # dup
+                ["John Smith", "Economics", "3", "5", "50%", "3", "u"]])
     _write_csv(d / "professor_photos.csv",
                ["name", "image_url", "source_page"],
                [["Jane Doe", "https://x.edu/jane-400x400.jpg", "p"]])

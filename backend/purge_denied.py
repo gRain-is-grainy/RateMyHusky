@@ -6,12 +6,9 @@ restores the professor, this so the data goes now.
 
 Deletion order is forced by how the tables reference each other:
 
-  1. resolve identity   trace_courses holds the only mapping from a name to the
-                        (course_id, instructor_id, term_id) keys that
-                        trace_scores and trace_comments are filed under, so the
-                        keys must be collected BEFORE the course rows go. Delete
-                        trace_courses first and the scores and comments become
-                        unreachable orphans that no later run can find.
+  1. resolve identity   every slug and name key is collected BEFORE anything is
+                        deleted, because the catalog row is the handle the
+                        slug-keyed tables are found by.
   2. evidence_embeddings then evidence   the embedding references the evidence
                         row; the other order leaves vectors joined to nothing.
   3. everything else
@@ -46,7 +43,7 @@ def name_to_slug(name):
 def find_targets(cur):
     """Everything the denylist matches, resolved to ids before anything is deleted.
 
-    Returns (slugs, name_keys, trace_keys, review_ids). Matching happens in
+    Returns (slugs, name_keys, review_ids). Matching happens in
     Python rather than SQL because the list holds hashes, not names — there is no
     WHERE clause that can express "sha256 of this column is in this set", and the
     alternative is shipping the plaintext names into the query the file
@@ -54,33 +51,45 @@ def find_targets(cur):
     """
     slugs, name_keys = set(), set()
 
-    cur.execute("SELECT slug, name, name_key, trace_name_key FROM professors_catalog")
-    for slug, name, nk, trace_nk in cur.fetchall():
-        if is_denied(name) or is_denied_key(nk) or is_denied_key(trace_nk):
+    cur.execute("SELECT slug, name, name_key FROM professors_catalog")
+    for slug, name, nk in cur.fetchall():
+        if is_denied(name) or is_denied_key(nk):
             slugs.add(slug)
-            name_keys.update(k for k in (nk, trace_nk) if k)
+            if nk:
+                name_keys.add(nk)
+
+    # The pipeline's own professors table keeps (slug, name_key) for a denied
+    # professor even after the read-model rebuild drops their catalog row, since
+    # drop_denied only filters in memory. It is the one slug source that survives
+    # when the professor also has no RMP reviews left to rebuild a name from.
+    try:
+        cur.execute("SELECT slug, name, name_key FROM professors")
+        for slug, name, nk in cur.fetchall():
+            if is_denied(name) or is_denied_key(nk):
+                slugs.add(slug)
+                if nk:
+                    name_keys.add(nk)
+    except Exception:
+        # Absent on a database the pipeline never ran on. Same rollback reason
+        # as the slug probe below.
+        conn = getattr(cur, "connection", None)
+        if conn is not None:
+            conn.rollback()
 
     # The catalog is not enough on its own. Once precompute has run with the
-    # denylist the professor has no catalog row at all, while their TRACE course
-    # and comment rows are still loaded — so the raw tables have to be searched
-    # by name too, or a purge after a refresh would find nothing and report clean.
+    # denylist the professor has no catalog row at all, while their review rows
+    # are still loaded — so the raw tables have to be searched by name too, or a
+    # purge after a refresh would find nothing and report clean.
     #
     # name_key(), not a hand-built "first last": the column this is compared
     # against is written by precompute through the full normalization, so a key
     # assembled without the NFKD fold, the whitespace collapse and ALIAS_MAP
     # matches zero rows for any accented or double-spaced name — and the purge
     # then reports success having deleted nothing.
-    cur.execute("SELECT DISTINCT instructor_first_name, instructor_last_name FROM trace_courses")
-    for first, last in cur.fetchall():
-        full = f"{first or ''} {last or ''}"
-        if is_denied(full):
-            name_keys.add(name_key(full))
-
     cur.execute("SELECT DISTINCT professor_name, name_key FROM rmp_reviews")
     for professor_name, nk in cur.fetchall():
         if is_denied(professor_name) or is_denied_key(nk):
-            if nk:
-                name_keys.add(nk)
+            name_keys.add(nk or name_key(professor_name))
 
     # rmp_reviews.name_key is backfilled by precompute, so every row the weekly
     # RMP load just wrote still has it NULL. The delete below keys on name_key,
@@ -93,21 +102,6 @@ def find_targets(cur):
     for review_id, professor_name in cur.fetchall():
         if is_denied(professor_name):
             review_ids.add(review_id)
-
-    trace_keys = []
-    if name_keys:
-        cur.execute(
-            "SELECT DISTINCT course_id, instructor_id, term_id FROM trace_courses "
-            "WHERE name_key = ANY(%s)", (list(name_keys),))
-        trace_keys = [tuple(r) for r in cur.fetchall()]
-        # name_key is backfilled by precompute and may be NULL on rows loaded
-        # since the last run, so match on the split names as well.
-        cur.execute("SELECT DISTINCT course_id, instructor_id, term_id, "
-                    "instructor_first_name, instructor_last_name FROM trace_courses "
-                    "WHERE name_key IS NULL")
-        for cid, iid, tid, first, last in cur.fetchall():
-            if is_denied(f"{first or ''} {last or ''}"):
-                trace_keys.append((cid, iid, tid))
 
     # evidence, reddit_mentions and reddit_sentiment key on professor_slug and
     # nothing else, so once precompute has dropped the catalog row there is no
@@ -140,7 +134,7 @@ def find_targets(cur):
                 continue
             slugs.update(row[0] for row in found if row[0] in bases)
 
-    return sorted(slugs), sorted(name_keys), sorted(set(trace_keys)), sorted(review_ids)
+    return sorted(slugs), sorted(name_keys), sorted(review_ids)
 
 
 def purge(conn, dry_run=False):
@@ -150,11 +144,10 @@ def purge(conn, dry_run=False):
         return {}
 
     cur = conn.cursor()
-    slugs, name_keys, trace_keys, review_ids = find_targets(cur)
+    slugs, name_keys, review_ids = find_targets(cur)
     print(f"Matched {len(slugs)} catalog slugs, {len(name_keys)} name keys, "
-          f"{len(trace_keys)} TRACE (course, instructor, term) keys, "
           f"{len(review_ids)} un-keyed review rows")
-    if not (slugs or name_keys or trace_keys or review_ids):
+    if not (slugs or name_keys or review_ids):
         print("Nothing to purge.")
         return {}
 
@@ -189,32 +182,18 @@ def purge(conn, dry_run=False):
             "DELETE FROM professors_catalog WHERE slug = ANY(%s)",
             "SELECT count(*) FROM professors_catalog WHERE slug = ANY(%s)",
             (slugs,)))
-    if trace_keys:
-        cids = [k[0] for k in trace_keys]
-        iids = [k[1] for k in trace_keys]
-        tids = [k[2] for k in trace_keys]
-        # Tuple-wise IN over three parallel arrays: CRDB takes (a,b,c) IN
-        # (SELECT unnest, unnest, unnest), which keeps this one statement rather
-        # than one per course-term.
-        tup = ("(course_id, instructor_id, term_id) IN "
-               "(SELECT unnest(%s::INT[]), unnest(%s::INT[]), unnest(%s::INT[]))")
+        # The pipeline's identity tables: without these a deletion request
+        # leaves the name and the RMP name + URL behind.
         steps.append((
-            "trace_comments",
-            "DELETE FROM trace_comments WHERE (tc_course_id, tc_instructor_id, tc_term_id) IN "
-            "(SELECT unnest(%s::INT[]), unnest(%s::INT[]), unnest(%s::INT[]))",
-            "SELECT count(*) FROM trace_comments WHERE (tc_course_id, tc_instructor_id, tc_term_id) IN "
-            "(SELECT unnest(%s::INT[]), unnest(%s::INT[]), unnest(%s::INT[]))",
-            (cids, iids, tids)))
+            "rmp_links",
+            "DELETE FROM rmp_links WHERE slug = ANY(%s)",
+            "SELECT count(*) FROM rmp_links WHERE slug = ANY(%s)",
+            (slugs,)))
         steps.append((
-            "trace_scores",
-            f"DELETE FROM trace_scores WHERE {tup}",
-            f"SELECT count(*) FROM trace_scores WHERE {tup}",
-            (cids, iids, tids)))
-        steps.append((
-            "trace_courses",
-            f"DELETE FROM trace_courses WHERE {tup}",
-            f"SELECT count(*) FROM trace_courses WHERE {tup}",
-            (cids, iids, tids)))
+            "professors",
+            "DELETE FROM professors WHERE slug = ANY(%s)",
+            "SELECT count(*) FROM professors WHERE slug = ANY(%s)",
+            (slugs,)))
     if name_keys:
         steps.append((
             "rmp_reviews",

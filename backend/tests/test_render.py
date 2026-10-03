@@ -32,7 +32,7 @@ def test_professor_html_has_title_canonical_and_h1():
         "name": "Francis Georges", "department": "Economics",
         "avgRating": 4.25, "totalRatings": 2686, "wouldTakeAgainPct": 83,
         "difficulty": 2.9, "rmpRating": 4.25, "rmpNumRatings": 2686,
-        "rmpDifficulty": 2.9, "traceRating": 4.2,
+        "rmpDifficulty": 2.9,
         "imageUrl": "https://img/x.jpg", "professorUrl": None,
         "courses": ["ECON1115"],
     }
@@ -73,8 +73,8 @@ def test_professor_html_jsonld_person_never_has_aggregate_rating():
     profile = {
         "name": "Francis Georges", "department": "Economics",
         "avgRating": 4.25, "totalRatings": 2686, "wouldTakeAgainPct": 83,
-        "difficulty": 2.9, "rmpRating": None, "traceRating": None,
-        "imageUrl": None, "professorUrl": None, "traceCourses": [],
+        "difficulty": 2.9, "rmpRating": None,
+        "imageUrl": None, "professorUrl": None,
     }
     html = professor_html(profile, [], "https://ratemyhusky.com/professors/francis-georges")
     blocks = _extract_jsonld(html)
@@ -95,7 +95,7 @@ def test_professor_html_says_no_ratings_rather_than_rating_them_zero():
     """
     profile = _base_profile(avgRating=None, totalRatings=0, wouldTakeAgainPct=None,
                             difficulty=None, rmpRating=None, rmpNumRatings=0,
-                            rmpDifficulty=None, traceRating=None)
+                            rmpDifficulty=None)
     html = professor_html(profile, [], "https://ratemyhusky.com/professors/x")
     assert "0/5" not in html
     assert "<dt>Rate My Professors rating</dt>" not in html
@@ -107,8 +107,8 @@ def test_professor_html_omits_aggregate_rating_when_no_ratings():
     profile = {
         "name": "New Prof", "department": "Music",
         "avgRating": 0.0, "totalRatings": 0, "wouldTakeAgainPct": None,
-        "difficulty": None, "rmpRating": None, "traceRating": None,
-        "imageUrl": None, "professorUrl": None, "traceCourses": [],
+        "difficulty": None, "rmpRating": None,
+        "imageUrl": None, "professorUrl": None,
     }
     html = professor_html(profile, [], "https://ratemyhusky.com/professors/new-prof")
     person = _extract_jsonld(html)[0]["mainEntity"]
@@ -218,7 +218,7 @@ def test_professor_html_escapes_review_comment():
     profile = {
         "name": "X Y", "department": "CS", "avgRating": 3.0, "totalRatings": 1,
         "wouldTakeAgainPct": None, "difficulty": None, "rmpRating": None,
-        "traceRating": None, "imageUrl": None, "professorUrl": None, "traceCourses": [],
+        "imageUrl": None, "professorUrl": None,
     }
     reviews = [{"course": "CS1", "quality": 3, "difficulty": 3, "date": "2024",
                 "comment": "<script>alert(1)</script> great"}]
@@ -231,7 +231,7 @@ def test_professor_html_caps_reviews():
     profile = {
         "name": "X Y", "department": "CS", "avgRating": 3.0, "totalRatings": 50,
         "wouldTakeAgainPct": None, "difficulty": None, "rmpRating": None,
-        "traceRating": None, "imageUrl": None, "professorUrl": None, "traceCourses": [],
+        "imageUrl": None, "professorUrl": None,
     }
     reviews = [{"course": "CS1", "quality": 3, "difficulty": 3, "date": "2024",
                 "comment": f"comment number {i}"} for i in range(50)]

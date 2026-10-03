@@ -1,10 +1,8 @@
 """Reading data-store CSVs that may ship zipped.
 
-GitHub rejects any file over 100MB, so the store tracks the big TRACE exports
-compressed. trace_comments has always been past the limit (~415MB raw). Now
-trace_scores is close behind: 95.5MB at the 2026-08-11 export, 4.5MB of
-headroom, after growing 813,731 -> 1,102,614 rows in a single scrape. The
-fallback belongs here before a push is rejected, not after.
+GitHub rejects any file over 100MB, so a big data-store export (rmp_reviews is
+the largest) may be tracked compressed. The fallback belongs here before a push
+is rejected, not after.
 
 Two readers, because they consume the file differently:
 
@@ -26,7 +24,7 @@ import zipfile
 def resolve(data_dir, filename):
     """Path to `filename` in `data_dir`, or its .zip sibling when only that is there.
 
-    Prefers the plain .csv when both exist: a local TRACE re-scrape writes the
+    Prefers the plain .csv when both exist: a local re-scrape writes the
     uncompressed file beside the store's zip, and the fresh one should win.
 
     Returns the .csv path when neither exists, so a caller's "file not found"
@@ -43,7 +41,7 @@ def resolve(data_dir, filename):
 def open_text(path):
     """A text handle for a .csv, or for the single .csv inside a .zip.
 
-    errors="replace" because TRACE comment text is not reliably UTF-8, and
+    errors="replace" because review text is not reliably UTF-8, and
     newline="" because the csv module requires it to keep newlines embedded in
     quoted fields intact.
     """

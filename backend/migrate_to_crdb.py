@@ -3,7 +3,12 @@ Migrate CSV data into CockroachDB.
 Idempotent — safe to re-run. Pre-filters rows client-side to avoid sending
 data the DB already has, minimizing Request Units.
 
-Run:  python backend/migrate_to_crdb.py all
+Run:  python backend/migrate_to_crdb.py <table> [<table> ...] [--replace]
+      python backend/migrate_to_crdb.py all
+      python backend/migrate_to_crdb.py add-constraints
+
+Tables must be named: a bare run upserts nothing. Uploading every table from a
+stale local CSV would re-insert reviews prune_rmp_reviews.py already removed.
 """
 
 import os, csv, sys, time
@@ -77,10 +82,9 @@ def _row_is_denied(row, raw, deny_name) -> bool:
     Checks the transformed row and, independently, the raw CSV row under both
     naming conventions — because the transforms are not format-agnostic and a
     filter that silently stops matching is the worst failure mode this code has.
-    trace_courses' transform reads camelCase (`instructorFirstName`) while the
-    export in output_data is snake_case, so it yields empty strings for every
-    field; a name check against that output would pass every row through while
-    reporting nothing wrong.
+    a transform that reads camelCase keys against a snake_case export yields
+    empty strings for every field; a name check against that output would pass
+    every row through while reporting nothing wrong.
 
     Fail-safe on purpose: any spelling that matches drops the row. The cost of a
     false positive is one professor's rows missing from a load that can be re-run;
@@ -104,8 +108,8 @@ def upload_csv(conn, table: str, columns: list[str], csv_path: str,
         print(f"  File not found: {csv_path}")
         return
 
-    # csv_store, not open(): the big TRACE exports may ship zipped, and
-    # DictReader cannot open a .zip the way pandas can.
+    # csv_store, not open(): a big export may ship zipped, and DictReader
+    # cannot open a .zip the way pandas can.
     with csv_store.open_text(csv_path) as f:
         reader = csv.DictReader(f)
         batch = []
@@ -125,9 +129,7 @@ def upload_csv(conn, table: str, columns: list[str], csv_path: str,
         # Data-deletion requests: drop the row before it is ever inserted.
         # `deny_name` names the post-transform columns holding the professor's
         # name; joined with a space, that is the same string precompute builds a
-        # name_key from. Tables without a name (trace_scores, trace_comments)
-        # reach a professor only through trace_courses, so dropping the course
-        # rows detaches them — purge_denied.py deletes the orphans.
+        # name_key from.
         denied_active = bool(deny_name) and bool(denied_hashes())
         denied_rows = 0
 
@@ -176,28 +178,6 @@ def upload_csv(conn, table: str, columns: list[str], csv_path: str,
 # ──────────────────────────────────────────────
 
 TABLES = {
-    "trace_comments": {
-        "create_sql": """
-            CREATE TABLE IF NOT EXISTS trace_comments (
-                id INT8 DEFAULT unique_rowid() PRIMARY KEY,
-                course_url TEXT NOT NULL,
-                question TEXT,
-                comment TEXT,
-                UNIQUE (course_url, question, comment)
-            );
-        """,
-        "columns": ["course_url", "question", "comment"],
-        # Use just course_url as lightweight filter — skips entire sections cheaply
-        "key_columns": ["course_url"],
-        "key_query": "SELECT DISTINCT course_url FROM trace_comments",
-        "csv": "trace_comments.csv",
-        "on_conflict": "ON CONFLICT (course_url, question, comment) DO NOTHING",
-        "transform": lambda row: {
-            "course_url": row.get("course_url", ""),
-            "question": row.get("question", ""),
-            "comment": row.get("comment", ""),
-        },
-    },
     "rmp_professors": {
         "create_sql": """
             CREATE TABLE IF NOT EXISTS rmp_professors (
@@ -270,91 +250,6 @@ TABLES = {
             "comment": row.get("comment", ""),
         },
     },
-    "trace_courses": {
-        "create_sql": """
-            CREATE TABLE IF NOT EXISTS trace_courses (
-                id INT8 DEFAULT unique_rowid() PRIMARY KEY,
-                course_id INT,
-                school_code TEXT,
-                term_id INT,
-                term_title TEXT,
-                instructor_id INT,
-                term_end_date TEXT,
-                instructor_first_name TEXT,
-                instructor_last_name TEXT,
-                department_name TEXT,
-                enrollment INT,
-                display_name TEXT,
-                section TEXT,
-                UNIQUE (course_id, instructor_id, term_id)
-            );
-        """,
-        "columns": ["course_id", "school_code", "term_id", "term_title", "instructor_id", "term_end_date", "instructor_first_name", "instructor_last_name", "department_name", "enrollment", "display_name", "section"],
-        "key_columns": ["course_id", "instructor_id", "term_id"],
-        "csv": "trace_courses.csv",
-        "deny_name": ("instructor_first_name", "instructor_last_name"),
-        "on_conflict": "ON CONFLICT (course_id, instructor_id, term_id) DO NOTHING",
-        "transform": lambda row: {
-            "course_id": int(row["courseId"]) if row.get("courseId") else None,
-            "school_code": row.get("schoolCode", ""),
-            "term_id": int(row["termId"]) if row.get("termId") else None,
-            "term_title": row.get("termTitle", ""),
-            "instructor_id": int(row["instructorId"]) if row.get("instructorId") else None,
-            "term_end_date": row.get("termEndDate", ""),
-            "instructor_first_name": row.get("instructorFirstName", ""),
-            "instructor_last_name": row.get("instructorLastName", ""),
-            "department_name": row.get("departmentName", ""),
-            "enrollment": int(row["enrollment"]) if row.get("enrollment") else None,
-            "display_name": row.get("displayName", ""),
-            "section": row.get("section", ""),
-        },
-    },
-    "trace_scores": {
-        "create_sql": """
-            CREATE TABLE IF NOT EXISTS trace_scores (
-                id INT8 DEFAULT unique_rowid() PRIMARY KEY,
-                course_id INT,
-                instructor_id INT,
-                term_id INT,
-                enrollment INT,
-                completed INT,
-                question TEXT,
-                count_5 INT,
-                count_4 INT,
-                count_3 INT,
-                count_2 INT,
-                count_1 INT,
-                mean REAL,
-                median REAL,
-                std_dev REAL,
-                dept_mean REAL,
-                UNIQUE (course_id, instructor_id, term_id, question)
-            );
-        """,
-        "columns": ["course_id", "instructor_id", "term_id", "enrollment", "completed", "question", "count_5", "count_4", "count_3", "count_2", "count_1", "mean", "median", "std_dev", "dept_mean"],
-        # Lightweight proxy: skip by section-level key, avoids fetching question text
-        "key_columns": ["course_id", "instructor_id", "term_id"],
-        "key_query": "SELECT DISTINCT course_id, instructor_id, term_id FROM trace_scores",
-        "csv": "trace_scores.csv",
-        "on_conflict": "ON CONFLICT (course_id, instructor_id, term_id, question) DO NOTHING",
-        "transform": lambda row: {
-            "course_id": int(row["courseId"]) if row.get("courseId") else None,
-            "instructor_id": int(row["instructorId"]) if row.get("instructorId") else None,
-            "term_id": int(row["termId"]) if row.get("termId") else None,
-            "enrollment": int(row["enrollment"]) if row.get("enrollment") else None,
-            "completed": int(row["completed"]) if row.get("completed") else None,
-            "question": row.get("question", ""),
-            "count_5": int(row["count_5"]) if row.get("count_5") else None,
-            "count_4": int(row["count_4"]) if row.get("count_4") else None,
-            "count_3": int(row["count_3"]) if row.get("count_3") else None,
-            "count_2": int(row["count_2"]) if row.get("count_2") else None,
-            "count_1": int(row["count_1"]) if row.get("count_1") else None,
-            "mean": float(row["mean"]) if row.get("mean") else None,
-            "median": float(row["median"]) if row.get("median") else None,
-            "std_dev": float(row["std_dev"]) if row.get("std_dev") else None,
-            "dept_mean": float(row["dept_mean"]) if row.get("dept_mean") else None,
-        },
-    },
     "professor_photos": {
         "create_sql": """
             CREATE TABLE IF NOT EXISTS professor_photos (
@@ -386,8 +281,8 @@ TABLES = {
 
 
 # Full-replace is only safe for a table whose CSV is a complete snapshot of the
-# source each run AND whose ids nothing else references. TRACE/photo CSVs are
-# cumulative artifacts — replacing from them would destroy data.
+# source each run AND whose ids nothing else references. The photo CSV is a
+# cumulative artifact — replacing from it would destroy data.
 #
 # rmp_reviews meets the snapshot half but fails the second: evidence.source_ref
 # for RMP is the review's rowid (scraper/load_evidence_to_crdb.py:208), so
@@ -399,9 +294,6 @@ REPLACE_ALLOWED = {"rmp_professors"}
 
 
 UNIQUE_CONSTRAINTS = {
-    "trace_courses": ("uq_trace_courses", "(course_id, instructor_id, term_id)"),
-    "trace_scores": ("uq_trace_scores", "(course_id, instructor_id, term_id, question)"),
-    "trace_comments": ("uq_trace_comments", "(course_url, question, comment)"),
     "rmp_professors": ("uq_rmp_professors", "(name, department)"),
     "rmp_reviews": ("uq_rmp_reviews", "(professor_name, course, date, comment)"),
     "professor_photos": ("uq_professor_photos", "(name, source_page)"),
@@ -426,30 +318,14 @@ def add_constraints(conn):
     cur.close()
 
 
-def purge_new_scraper_rows(conn):
-    """Delete rows added by transform_to_trace.py (courseId >= 500001) so they can be re-imported."""
-    cur = conn.cursor()
-    print("Purging new-scraper rows (course_id >= 500001) from trace_courses and trace_scores...")
-    cur.execute("DELETE FROM trace_scores WHERE course_id >= 500001")
-    print(f"  trace_scores: deleted {cur.rowcount:,} rows")
-    cur.execute("DELETE FROM trace_courses WHERE course_id >= 500001")
-    print(f"  trace_courses: deleted {cur.rowcount:,} rows")
-    conn.commit()
-    cur.close()
-
-
 def main():
     args = sys.argv[1:]
     replace = "--replace" in args
-    targets = [a for a in args if not a.startswith("--")] or ["trace_comments"]
-
-    if targets == ["purge-new"]:
-        conn = get_connection()
-        print("Connected to CockroachDB!")
-        purge_new_scraper_rows(conn)
-        conn.close()
-        print("Done! Now run: python backend/migrate_to_crdb.py trace_courses trace_scores")
-        return
+    targets = [a for a in args if not a.startswith("--")]
+    if not targets:
+        # No default: "all" writes every table to prod, so it has to be asked for.
+        sys.exit("usage: migrate_to_crdb.py <table> [<table> ...] [--replace] | all | add-constraints\n"
+                 f"tables: {', '.join(TABLES)}")
 
     if targets == ["add-constraints"]:
         conn = get_connection()

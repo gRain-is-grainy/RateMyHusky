@@ -152,7 +152,7 @@ async function sceneSearch(browser) {
 }
 
 // Scene 3: professor page — scroll to the review tabs, flip
-// RMP (default) -> TRACE -> Reddit to show all three sources.
+// RMP (default) -> Reddit to show both sources.
 async function sceneProfessor(browser) {
   const s = await newScene(browser);
   const { page } = s;
@@ -171,16 +171,13 @@ async function sceneProfessor(browser) {
     [tabsY]
   );
   await page.waitForTimeout(400);
-  await glideClick(page, '.prof-review-tabs button:has-text("TRACE")', 500);
-  await page.waitForTimeout(1000);
   await glideClick(page, '.prof-review-tabs button:has-text("Reddit")', 500);
   await page.waitForTimeout(1400);
   return saveScene(s, 'professor');
 }
 
-// Ask and the course rating-history chart are sign-in gated: inject the
-// user's session token (gitignored file) before navigation so gated
-// features render. Never log or echo the token.
+// Ask is sign-in gated: inject the user's session token (gitignored file)
+// before navigation so it renders. Never log or echo the token.
 async function injectAuth(scene) {
   const token = readFileSync(
     fileURLToPath(new URL('./auth-token.txt', import.meta.url)),
@@ -268,12 +265,10 @@ async function sceneCompare(browser) {
   return saveScene(s, 'compare');
 }
 
-// Scene 6: department hub -> course page with the section history chart
-// (the chart is sign-in gated, so this scene runs authenticated).
+// Scene 6: department hub -> course page, scrolled to the Professors panel.
 async function sceneCourses(browser) {
   const s = await newScene(browser);
   const { page } = s;
-  await injectAuth(s);
   await page.goto(`${BASE}/departments/computer-science`, {
     waitUntil: 'networkidle',
   });
@@ -284,9 +279,9 @@ async function sceneCourses(browser) {
   await page.goto(`${BASE}/courses/CS3500`, { waitUntil: 'networkidle' });
   await page.evaluate(() => window.__cursor.show());
   await page.waitForTimeout(800);
-  const chartPanel = page.locator('.course-panel:has-text("Rating History")');
-  await chartPanel.waitFor();
-  const chartY = await chartPanel.evaluate(
+  const professorsPanel = page.locator('.course-panel:has(h2:text-is("Professors"))');
+  await professorsPanel.waitFor();
+  const chartY = await professorsPanel.evaluate(
     (el) => el.getBoundingClientRect().top + window.scrollY
   );
   await page.evaluate(
