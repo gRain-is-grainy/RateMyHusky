@@ -189,3 +189,41 @@ jobs:
           git push -f \
             "https://x-access-token:${RMH_DATA_TOKEN}@github.com/RayanR000/RateMyHusky-data.git" \
             main
+
+  # A failed refresh can leave prod stale or half-written with nothing on the
+  # site to say so, and GitHub's own failure email only reaches whoever started
+  # the run. Open an issue instead, so the failure reaches everyone watching the
+  # repo and stays open until someone deals with it. Repeat failures comment on
+  # the open issue rather than stacking new ones. A separate job, so only this
+  # step gets write access: the job that writes prod keeps its read-only token.
+  notify-failure:
+    needs: refresh
+    # Not failure(): a job that hits timeout-minutes ends as cancelled, and a
+    # timeout is the likeliest way a run dies mid-write. A run cancelled by hand
+    # partway through a prod write deserves an alert too. Dry runs never touch
+    # prod, and whoever dispatched one is watching it.
+    if: ${{ always() && needs.refresh.result != 'success' && !inputs.dry_run }}
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Open or update the failure issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          RESULT: ${{ needs.refresh.result }}
+        run: |
+          title="Data refresh failed"
+          # No --search (its index lags a just-created issue) and no pipe (a
+          # failed gh call must fail the step, not read as "no open issue").
+          existing=$(gh issue list --state open --limit 200 --json number,title \
+            -q "[.[] | select(.title == \"$title\")][0].number // empty")
+          body="A data refresh run ended as $RESULT: $RUN_URL
+
+          Check which step failed. If it was at or after \"Load fresh RMP rows into CockroachDB\", prod may hold partially refreshed data: RMP reviews may already be upserted, and if \"Verify DB state after write\" failed, the site is already serving the data that failed the check. If it failed earlier, prod is untouched and the site keeps serving the last good RMP data."
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body "$body"
+          else
+            gh issue create --title "$title" --body "$body"
+          fi
