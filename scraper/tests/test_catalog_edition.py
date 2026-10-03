@@ -12,6 +12,7 @@ import os
 import sys
 
 import pytest
+import requests
 
 sys.path.insert(0, os.path.abspath(os.path.dirname(os.path.dirname(__file__))))
 import catalog_edition  # noqa: E402
@@ -97,10 +98,18 @@ def test_unchanged_edition_exits_zero(state, serve, capsys):
     assert "Unchanged: 2025-2026" in capsys.readouterr().out
 
 
-def test_rollover_exits_nonzero_so_ci_goes_red(state, serve, capsys):
+def test_rollover_exits_with_its_own_code_so_ci_goes_red(state, serve, capsys):
     serve.html = fixture("home_sidebar.html").replace("2025-2026", "2026-2027")
-    assert catalog_edition.main(["--state", state]) == 1
+    assert catalog_edition.main(["--state", state]) == catalog_edition.EXIT_NEW_EDITION
     assert "2025-2026 -> 2026-2027" in capsys.readouterr().err
+
+
+def test_no_outcome_shares_exit_1_with_an_uncaught_exception():
+    """CI files a different issue per code; a crash must never read as a rollover."""
+    codes = {catalog_edition.EXIT_UNCHANGED, catalog_edition.EXIT_NEW_EDITION,
+             catalog_edition.EXIT_UNREADABLE, catalog_edition.EXIT_FETCH_FAILED}
+    assert len(codes) == 4
+    assert 1 not in codes
 
 
 def test_one_check_costs_one_request(state, serve):
@@ -110,10 +119,73 @@ def test_one_check_costs_one_request(state, serve):
     assert len(serve.calls) == 1
 
 
-def test_unreadable_page_surfaces_rather_than_passing_silently(state, serve):
+def test_unreadable_page_surfaces_rather_than_passing_silently(state, serve, capsys):
     serve.html = fixture("home_sidebar.html").replace('id="edition"', 'id="masthead"')
-    with pytest.raises(EditionUnreadable):
-        catalog_edition.main(["--state", state])
+    assert catalog_edition.main(["--state", state]) == catalog_edition.EXIT_UNREADABLE
+    assert "EDITION UNREADABLE" in capsys.readouterr().err
+
+
+def test_fetch_failure_is_not_reported_as_a_rollover(state, monkeypatch, capsys):
+    def down(url=catalog_edition.HOME_URL, session=None):
+        raise requests.ConnectionError("connection reset")
+
+    monkeypatch.setattr(catalog_edition, "fetch_home", down)
+    assert catalog_edition.main(["--state", state]) == catalog_edition.EXIT_FETCH_FAILED
+    assert "FETCH FAILED" in capsys.readouterr().err
+
+
+def test_missing_baseline_crashes_instead_of_fetching(tmp_path, serve):
+    serve.html = fixture("home_sidebar.html")
+    with pytest.raises(FileNotFoundError):
+        catalog_edition.main(["--state", str(tmp_path / "missing.json")])
+    assert serve.calls == []
+
+
+# --- fetch_home: retried like catalog_scrape.py, since this host drops connections ---
+
+
+class FakeResponse:
+    def __init__(self, status, text=""):
+        self.status_code = status
+        self.text = text
+
+    def raise_for_status(self):
+        if self.status_code >= 400:
+            raise requests.HTTPError(f"{self.status_code}")
+
+
+class FakeSession:
+    def __init__(self, *outcomes):
+        self.outcomes = list(outcomes)
+        self.calls = 0
+
+    def get(self, url, **kwargs):
+        self.calls += 1
+        outcome = self.outcomes.pop(0)
+        if isinstance(outcome, Exception):
+            raise outcome
+        return outcome
+
+
+def test_fetch_retries_a_dropped_connection_and_a_503():
+    session = FakeSession(requests.ConnectionError("reset"), FakeResponse(503),
+                          FakeResponse(200, "ok"))
+    assert catalog_edition.fetch_home(session=session, sleep=lambda s: None) == "ok"
+    assert session.calls == 3
+
+
+def test_fetch_gives_up_after_max_attempts():
+    session = FakeSession(*[requests.Timeout("slow")] * catalog_edition.MAX_ATTEMPTS)
+    with pytest.raises(requests.Timeout):
+        catalog_edition.fetch_home(session=session, sleep=lambda s: None)
+    assert session.calls == catalog_edition.MAX_ATTEMPTS
+
+
+def test_fetch_does_not_retry_a_403():
+    session = FakeSession(FakeResponse(403))
+    with pytest.raises(requests.HTTPError):
+        catalog_edition.fetch_home(session=session, sleep=lambda s: None)
+    assert session.calls == 1
 
 
 def test_record_writes_the_live_edition_as_the_new_baseline(state, serve):

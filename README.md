@@ -157,6 +157,10 @@ npm run dev                  # → http://localhost:5173
 
 The dev frontend talks to the backend on port 5001 automatically.
 
+### Scheduled jobs
+
+`catalog-edition-watch` checks every Monday for the NEU catalog's new academic-year edition, which goes live between July and September. GitHub disables scheduled workflows in a public repo after 60 days without activity, so **before July each year, confirm it is still enabled in the Actions tab**.
+
 ---
 
 <div align="center">

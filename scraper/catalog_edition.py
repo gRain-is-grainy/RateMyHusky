@@ -15,6 +15,15 @@ Usage
 -----
     python catalog_edition.py            # compare live against the recorded edition
     python catalog_edition.py --record   # accept the live edition as the new baseline
+
+Exit codes are the interface CI branches on, so each outcome gets its own. None
+of them is 1, which Python also returns for any uncaught exception: a crash must
+never read as a rollover.
+
+    0   unchanged
+    10  new edition is live
+    11  EditionUnreadable — the layout moved and the watcher is blind
+    12  the homepage could not be fetched, even after retries
 """
 
 import argparse
@@ -22,6 +31,7 @@ import json
 import os
 import re
 import sys
+import time
 from datetime import date
 from typing import NamedTuple
 
@@ -31,6 +41,18 @@ HOME_URL = "https://catalog.northeastern.edu/"
 STATE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "catalog_edition.json")
 TIMEOUT = 30
 USER_AGENT = "RateMyHusky edition watcher (+https://ratemyhusky.com)"
+
+# Same policy as catalog_scrape.py: this host drops connections and 5xxs often
+# enough that a single attempt would file false alarms.
+RETRY_STATUSES = (429, 500, 502, 503, 504)
+TRANSPORT_ERRORS = (requests.ConnectionError, requests.Timeout,
+                    requests.exceptions.ChunkedEncodingError)
+MAX_ATTEMPTS = 3
+
+EXIT_UNCHANGED = 0
+EXIT_NEW_EDITION = 10
+EXIT_UNREADABLE = 11
+EXIT_FETCH_FAILED = 12
 
 # The id is the contract, not the position: the mobile toggle button repeats the
 # same label with no id, so matching the first year on the page would let stale
@@ -78,11 +100,23 @@ def check_edition(html, expected):
     return EditionCheck(expected=expected, live=parse_edition(html))
 
 
-def fetch_home(url=HOME_URL, session=None):
+def fetch_home(url=HOME_URL, session=None, sleep=time.sleep):
     session = session or requests
-    response = session.get(url, timeout=TIMEOUT, headers={"User-Agent": USER_AGENT})
-    response.raise_for_status()
-    return response.text
+    for attempt in range(1, MAX_ATTEMPTS + 1):
+        try:
+            response = session.get(url, timeout=TIMEOUT, headers={"User-Agent": USER_AGENT})
+        except TRANSPORT_ERRORS:
+            if attempt == MAX_ATTEMPTS:
+                raise
+            sleep(attempt * 2)
+            continue
+
+        if response.status_code in RETRY_STATUSES and attempt < MAX_ATTEMPTS:
+            sleep(attempt * 2)
+            continue
+        response.raise_for_status()
+        return response.text
+    raise RuntimeError(f"{url}: exhausted {MAX_ATTEMPTS} attempts")
 
 
 def read_state(path=STATE_PATH):
@@ -105,20 +139,33 @@ def main(argv=None):
     parser.add_argument("--state", default=STATE_PATH)
     args = parser.parse_args(argv)
 
-    html = fetch_home(args.url)
+    # Read the baseline first: a missing or corrupt state file is a repo bug and
+    # should crash (exit 1), not be confused with anything the site did.
+    expected = None if args.record else read_state(args.state)
+
+    try:
+        html = fetch_home(args.url)
+    except requests.RequestException as exc:
+        print(f"FETCH FAILED: {exc}", file=sys.stderr)
+        return EXIT_FETCH_FAILED
+
+    try:
+        live = parse_edition(html)
+    except EditionUnreadable as exc:
+        print(f"EDITION UNREADABLE: {exc}", file=sys.stderr)
+        return EXIT_UNREADABLE
 
     if args.record:
-        live = parse_edition(html)
         write_state(live, args.state)
         print(f"Recorded {live} as the baseline in {args.state}")
-        return 0
+        return EXIT_UNCHANGED
 
-    result = check_edition(html, read_state(args.state))
+    result = EditionCheck(expected=expected, live=live)
     if result.changed:
         print(f"NEW EDITION: {result.expected} -> {result.live}", file=sys.stderr)
-        return 1
+        return EXIT_NEW_EDITION
     print(f"Unchanged: {result.live}")
-    return 0
+    return EXIT_UNCHANGED
 
 
 if __name__ == "__main__":

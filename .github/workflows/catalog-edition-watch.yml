@@ -1,0 +1,143 @@
+name: Catalog edition watch
+
+# One GET a week against catalog.northeastern.edu, asking a single question:
+# is the site still serving the edition we last scraped?
+#
+# Cron rather than a date because the rollover date moves. Measured 2026-08-13
+# from Wayback snapshots of the homepage's own edition label:
+#
+#   2025-26 edition   live between 2025-07-12 and 2025-08-02
+#   2024-25 edition   live between 2024-07-03 and 2024-08-01
+#   2023-24 edition   live between 2023-08-03 and 2023-09-27
+#
+# A six-week window that drifts year to year, so any fixed date is wrong in at
+# least one of those three years. Weekly polling bounds the detection lag to
+# seven days for the cost of 52 requests a year.
+#
+# GitHub disables scheduled workflows in a public repo after 60 days with no
+# repository activity, and the only notice is an email. A quiet spring can
+# switch this off right before the window it exists for, so check it is still
+# enabled in the Actions tab before July (the README says so too).
+on:
+  schedule:
+    - cron: "0 9 * * 1"   # Mondays 09:00 UTC
+  workflow_dispatch:
+
+# Needs issues:write because the whole point is to be loud. A run that only
+# went red in the Actions tab would sit unread until someone looked, and this
+# job's signal arrives roughly once a year.
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: catalog-edition-watch
+  cancel-in-progress: false
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"  # match ci.yml, which runs this script's tests
+      # The script needs nothing else; the full scraper requirements would only
+      # add ways for the install, and so the whole watch, to fail.
+      - name: Install dependencies
+        run: pip install requests
+
+      # Exit codes are documented in catalog_edition.py. Keep the code as an
+      # output so the steps below can tell a rollover from a broken watcher.
+      - name: Check the live edition against the recorded baseline
+        id: check
+        working-directory: scraper
+        run: |
+          set +e
+          python catalog_edition.py
+          code=$?
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          exit "$code"
+
+      # A fetch that failed after retries is most likely the host having a bad
+      # day. The run still goes red, but an issue for every blip would teach
+      # people to ignore the issue that matters.
+      - name: Note a failed fetch without filing an issue
+        if: failure() && steps.check.outputs.code == '12'
+        run: echo "::warning::Could not fetch the catalog homepage after retries; see the check step. No issue filed."
+
+      # Everything else deserves a human: a real rollover, an unreadable
+      # edition label (the watcher is blind), or the watcher itself crashing or
+      # failing to install (also blind).
+      - name: Open or update the edition issue
+        if: failure() && steps.check.outputs.code != '12'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          CODE: ${{ steps.check.outputs.code }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          case "$CODE" in
+            10)
+              title="NEU catalog edition changed — rescrape, record and reload"
+              body=$(cat <<'EOF'
+          `catalog-edition-watch` found a new academic-year edition live on the catalog. Every course description on the site has been replaced, and prod is still serving the old one.
+
+          To roll over, from `scraper/`:
+
+          1. `python catalog_scrape.py --json-out ../../RateMyHusky-data/catalog_courses.json --previous-count <course_count from the last scrape>` (that path is where the loader reads by default).
+          2. `python catalog_edition.py --record`. This has to come before the load: the loader stamps every row with the edition in `catalog_edition.json`.
+          3. `python load_catalog_to_crdb.py` with `NEW_CRDB_DATABASE_URL` set (`--dry-run` first to see the gates).
+          4. Commit `scraper/catalog_edition.json`. The next green run of this job closes this issue, or close it by hand.
+          EOF
+              ) ;;
+            11)
+              title="NEU catalog edition label unreadable — fix the watcher"
+              body=$(cat <<'EOF'
+          `catalog-edition-watch` could not find the `id="edition"` label on the catalog homepage. The layout changed, and the watcher is blind to a rollover until the selector in `scraper/catalog_edition.py` is updated. The next green run closes this issue.
+          EOF
+              ) ;;
+            *)
+              title="Catalog edition watcher is broken"
+              body=$(cat <<'EOF'
+          `catalog-edition-watch` failed without reaching a verdict: the script crashed (for example a missing or corrupt `scraper/catalog_edition.json`) or an earlier step failed. Until it is fixed, a rollover would go unnoticed. The next green run closes this issue.
+          EOF
+              ) ;;
+          esac
+          # Actions logs expire, so link the run while its output still exists.
+          body="$body
+
+          Run: $RUN_URL"
+
+          # No --search (its index lags) and no pipe (a failed gh call must fail
+          # the step, not read as "no open issue").
+          gh label create catalog-edition --description "NEU catalog edition rollover" --color B60205 --force
+          open=$(gh issue list --state open --label catalog-edition --limit 1 --json number,title \
+            -q '.[0] // empty | "\(.number)\t\(.title)"')
+          if [ -z "$open" ]; then
+            gh issue create --title "$title" --label catalog-edition --body "$body"
+          elif [ "${open#*$'\t'}" = "$title" ]; then
+            echo "Issue #${open%%$'\t'*} already covers this; not filing a duplicate."
+          else
+            # The situation changed (say, a fixed selector now sees a rollover).
+            # Retitle the open issue so it never hides the newer problem.
+            number=${open%%$'\t'*}
+            gh issue edit "$number" --title "$title"
+            gh issue comment "$number" --body "$body"
+          fi
+
+      # Without this, an issue left open after the rollover lands would make
+      # next year's real rollover hit the duplicate check above and stay silent.
+      - name: Close the issue once the baseline matches
+        if: success()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          numbers=$(gh issue list --state open --label catalog-edition --json number -q '.[].number')
+          for n in $numbers; do
+            gh issue close "$n" --comment "The live edition matches the recorded baseline again."
+          done
